@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Oasis Taxi</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>oasis_taxi</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	
+	<!-- Facebook Configuration -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- Replace with your Facebook App ID -->
+				<string>fb1234567890123456</string>
+			</array>
+		</dict>
+		<!-- Google Sign In -->
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- Replace with your REVERSED_CLIENT_ID from GoogleService-Info.plist -->
+				<string>com.googleusercontent.apps.123456789012-abcdefghijklmnopqrstuvwxyz</string>
+			</array>
+		</dict>
+		<!-- App Deep Links -->
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oasistaxiapp</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- Facebook App ID and Display Name -->
+	<key>FacebookAppID</key>
+	<string>1234567890123456</string>
+	<key>FacebookClientToken</key>
+	<string>abcdef1234567890abcdef1234567890</string>
+	<key>FacebookDisplayName</key>
+	<string>Oasis Taxi</string>
+	
+	<!-- Facebook LSApplicationQueriesSchemes -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
+	
+	<!-- Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Oasis Taxi necesita acceder a tu ubicación para mostrarte conductores cercanos y calcular rutas</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Oasis Taxi necesita acceder a tu ubicación para seguimiento del viaje incluso en segundo plano</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Oasis Taxi necesita acceder a tu ubicación para el seguimiento continuo del viaje</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Oasis Taxi detecta el movimiento para mejorar la precisión del seguimiento</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Oasis Taxi necesita acceso a tu galería para que puedas subir tu foto de perfil</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Oasis Taxi necesita acceso a la cámara para tomar fotos de perfil y documentos</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Oasis Taxi necesita acceso al micrófono para llamadas con el conductor</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Oasis Taxi necesita acceso a tus contactos para compartir viajes</string>
+	
+	<!-- App Transport Security for Facebook -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>facebook.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSThirdPartyExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+			<key>fbcdn.net</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSThirdPartyExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+			<key>akamaihd.net</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSThirdPartyExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+	
+	<!-- Google Maps API Key -->
+	<key>GMSApiKey</key>
+	<string>AIzaSyD_xxxxxxxxxxxxxxxxxxxxxxxxxx</string>
+	
+	<!-- Firebase Configuration -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+</dict>
+</plist>

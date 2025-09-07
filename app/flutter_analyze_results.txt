@@ -1,0 +1,948 @@
+﻿Analyzing app...                                                
+
+   info - Unnecessary braces in a string interpolation - lib\core\utils\location_helper.dart:57:15 - unnecessary_brace_in_string_interps
+warning - The value of the field '_firebaseService' isn't used - lib\providers\admin_provider.dart:7:25 - unused_field
+   info - The 'if' statement could be replaced by a null-aware assignment - lib\providers\document_provider.dart:187:7 - prefer_conditional_assignment
+   info - 'desiredAccuracy' is deprecated and shouldn't be used. use settings parameter with AndroidSettings, AppleSettings, WebSettings, or LocationSettings - lib\providers\emergency_provider.dart:496:9 - deprecated_member_use
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' - lib\providers\location_provider.dart:6:8 - unnecessary_import
+warning - Unused import: 'package:firebase_auth/firebase_auth.dart' - lib\providers\location_provider.dart:10:8 - unused_import
+warning - The value of the field '_passengerIcon' isn't used - lib\providers\location_provider.dart:49:21 - unused_field
+warning - Unnecessary cast - lib\providers\location_provider.dart:685:21 - unnecessary_cast
+warning - Unnecessary cast - lib\providers\location_provider.dart:689:24 - unnecessary_cast
+   info - The parameter name 'sum' matches a visible type name - lib\providers\location_provider.dart:875:11 - avoid_types_as_parameter_names
+warning - The value of the field '_currentPage' isn't used - lib\providers\ride_provider.dart:38:7 - unused_field
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:406:50 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:409:50 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:420:47 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:421:57 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:456:43 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\providers\ride_provider.dart:459:50 - dead_null_aware_expression
+warning - The operand can't be 'null', so the condition is always 'true' - lib\providers\ride_provider.dart:474:35 - unnecessary_null_comparison
+warning - The '!' will have no effect because the receiver can't be null - lib\providers\ride_provider.dart:475:47 - unnecessary_non_null_assertion
+warning - The '!' will have no effect because the receiver can't be null - lib\providers\ride_provider.dart:476:52 - unnecessary_non_null_assertion
+   info - The parameter name 'count' matches a visible type name - lib\providers\ride_provider.dart:483:38 - avoid_types_as_parameter_names
+   info - The parameter name 'count' matches a visible type name - lib\providers\ride_provider.dart:493:36 - avoid_types_as_parameter_names
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1248:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1248:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1252:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1252:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1260:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1260:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1282:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1282:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1288:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1288:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1299:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1299:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1353:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1353:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1366:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1366:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1375:5 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1375:5 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1400:5 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1400:5 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1407:5 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1407:5 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1430:5 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1430:5 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1463:11 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1463:11 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1493:11 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1493:11 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1512:5 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1512:5 - invalid_use_of_protected_member
+   info - The parameter name 'sum' matches a visible type name - lib\providers\ride_provider.dart:1535:23 - avoid_types_as_parameter_names
+   info - The parameter name 'sum' matches a visible type name - lib\providers\ride_provider.dart:1542:25 - avoid_types_as_parameter_names
+   info - The parameter name 'sum' matches a visible type name - lib\providers\ride_provider.dart:1545:25 - avoid_types_as_parameter_names
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1552:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1552:7 - invalid_use_of_protected_member
+warning - The member 'notifyListeners' can only be used within 'package:flutter/src/foundation/change_notifier.dart' or a test - lib\providers\ride_provider.dart:1556:7 - invalid_use_of_visible_for_testing_member
+warning - The member 'notifyListeners' can only be used within instance members of subclasses of 'ChangeNotifier' - lib\providers\ride_provider.dart:1556:7 - invalid_use_of_protected_member
+   info - The prefix 'AppLogger' isn't a lower_case_with_underscores identifier - lib\providers\vehicle_provider.dart:5:34 - library_prefixes
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:48:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:58:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:61:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:118:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:120:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:147:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:149:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:176:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:178:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:217:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:223:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:265:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:272:17 - undefined_prefixed_name
+   info - Unnecessary braces in a string interpolation - lib\providers\vehicle_provider.dart:299:35 - unnecessary_brace_in_string_interps
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:344:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:350:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:416:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:422:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:473:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:479:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:505:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:509:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:530:17 - undefined_prefixed_name
+  error - The name 'Logger' is being referenced through the prefix 'AppLogger', but it isn't defined in any of the libraries imported using that prefix - lib\providers\vehicle_provider.dart:534:17 - undefined_prefixed_name
+   info - The parameter name 'sum' matches a visible type name - lib\providers\vehicle_provider.dart:564:23 - avoid_types_as_parameter_names
+   info - The private field _totalWithdrawn could be 'final' - lib\providers\wallet_provider.dart:189:10 - prefer_final_fields
+   info - Unnecessary override - lib\providers\wallet_provider.dart:722:8 - unnecessary_overrides
+   info - The private field _selectedIndex could be 'final' - lib\screens\admin\admin_dashboard_screen.dart:17:7 - prefer_final_fields
+warning - Unused import: 'package:firebase_auth/firebase_auth.dart' - lib\screens\admin\admin_login_screen.dart:3:8 - unused_import
+warning - Unused import: 'package:http/http.dart' - lib\screens\admin\admin_login_screen.dart:4:8 - unused_import
+warning - Unused import: 'dart:convert' - lib\screens\admin\admin_login_screen.dart:5:8 - unused_import
+  error - Too many positional arguments: 1 expected, but 2 found - lib\screens\admin\admin_login_screen.dart:111:9 - extra_positional_arguments
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\admin\analytics_screen.dart:92:58 - dead_null_aware_expression
+  error - The property 'isNotEmpty' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:401:58 - unchecked_use_of_nullable_value
+  error - The argument type 'String?' can't be assigned to the parameter type 'String'.  - lib\screens\admin\drivers_management_screen.dart:402:42 - argument_type_not_assignable
+  error - The property 'isEmpty' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:404:48 - unchecked_use_of_nullable_value
+  error - The argument type 'DateTime?' can't be assigned to the parameter type 'DateTime'.  - lib\screens\admin\drivers_management_screen.dart:515:46 - argument_type_not_assignable
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:729:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:736:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:819:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:826:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:865:38 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\drivers_management_screen.dart:872:38 - use_build_context_synchronously
+  error - The property 'isNotEmpty' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:944:52 - unchecked_use_of_nullable_value
+  error - The argument type 'String?' can't be assigned to the parameter type 'String'.  - lib\screens\admin\drivers_management_screen.dart:945:36 - argument_type_not_assignable
+  error - The property 'isEmpty' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:947:42 - unchecked_use_of_nullable_value
+  error - The argument type 'DateTime?' can't be assigned to the parameter type 'DateTime'.  - lib\screens\admin\drivers_management_screen.dart:1009:59 - argument_type_not_assignable
+  error - The property 'day' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:1024:47 - unchecked_use_of_nullable_value
+  error - The property 'month' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:1024:73 - unchecked_use_of_nullable_value
+  error - The property 'year' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\admin\drivers_management_screen.dart:1024:101 - unchecked_use_of_nullable_value
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\admin\financial_screen.dart:143:60 - dead_null_aware_expression
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\financial_screen.dart:1645:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\settings_admin_screen.dart:1111:26 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\admin\users_management_screen.dart:34:58 - dead_null_aware_expression
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\admin\users_management_screen.dart:260:58 - invalid_null_aware_operator
+warning - The '!' will have no effect because the receiver can't be null - lib\screens\admin\users_management_screen.dart:261:58 - unnecessary_non_null_assertion
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\admin\users_management_screen.dart:263:48 - invalid_null_aware_operator
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\users_management_screen.dart:387:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\users_management_screen.dart:394:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\users_management_screen.dart:521:38 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\admin\users_management_screen.dart:528:38 - use_build_context_synchronously
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\admin\users_management_screen.dart:582:56 - invalid_null_aware_operator
+warning - The '!' will have no effect because the receiver can't be null - lib\screens\admin\users_management_screen.dart:583:56 - unnecessary_non_null_assertion
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\admin\users_management_screen.dart:585:46 - invalid_null_aware_operator
+   info - The private field _verificationCode could be 'final' - lib\screens\auth\forgot_password_screen.dart:32:10 - prefer_final_fields
+  error - Too many positional arguments: 1 expected, but 2 found - lib\screens\auth\forgot_password_screen.dart:167:9 - extra_positional_arguments
+  error - The method '_buildStepIndicator' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:293:21 - undefined_method
+  error - The method '_buildStepConnector' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:294:21 - undefined_method
+  error - The method '_buildStepIndicator' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:295:21 - undefined_method
+  error - The method '_buildStepConnector' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:296:21 - undefined_method
+  error - The method '_buildStepIndicator' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:297:21 - undefined_method
+  error - The method '_buildCurrentStepContent' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:323:32 - undefined_method
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:336:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:336:10 - named_function_expression
+  error - Too many positional arguments: 0 expected, but 6 found - lib\screens\auth\forgot_password_screen.dart:336:29 - extra_positional_arguments_could_be_named
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:376:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:376:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:388:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:388:10 - named_function_expression
+  error - The method '_buildPhoneStep' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:391:16 - undefined_method
+  error - The method '_buildCodeStep' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:393:16 - undefined_method
+  error - The method '_buildPasswordStep' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:395:16 - undefined_method
+  error - The method '_buildPhoneStep' isn't defined for the type '_ForgotPasswordScreenState' - lib\screens\auth\forgot_password_screen.dart:397:16 - undefined_method
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:401:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:401:10 - named_function_expression
+  error - Undefined name 'authProvider' - lib\screens\auth\forgot_password_screen.dart:469:71 - undefined_identifier
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:476:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:476:10 - named_function_expression
+  error - Undefined name 'authProvider' - lib\screens\auth\forgot_password_screen.dart:532:50 - undefined_identifier
+  error - Undefined name 'authProvider' - lib\screens\auth\forgot_password_screen.dart:544:61 - undefined_identifier
+  error - Expected to find ',' - lib\screens\auth\forgot_password_screen.dart:551:3 - expected_token
+  error - Function expressions can't be named - lib\screens\auth\forgot_password_screen.dart:551:10 - named_function_expression
+  error - Undefined name 'authProvider' - lib\screens\auth\forgot_password_screen.dart:655:66 - undefined_identifier
+  error - Undefined name 'authProvider' - lib\screens\auth\phone_verification_screen.dart:226:27 - undefined_identifier
+  error - Undefined name 'authProvider' - lib\screens\auth\phone_verification_screen.dart:243:18 - undefined_identifier
+  error - The argument type 'Future<void> Function(AuthProvider)?' can't be assigned to the parameter type 'VoidCallback?'.  - lib\screens\auth\phone_verification_screen.dart:438:32 - argument_type_not_assignable
+warning - Unused import: 'package:provider/provider.dart' - lib\screens\driver\communication_screen.dart:2:8 - unused_import
+warning - Unused import: '../../providers/notification_provider.dart' - lib\screens\driver\communication_screen.dart:6:8 - unused_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\driver\communication_screen.dart:7:8 - unused_import
+warning - The value of the field '_isCalling' isn't used - lib\screens\driver\communication_screen.dart:43:8 - unused_field
+warning - Unused import: 'package:provider/provider.dart' - lib\screens\driver\documents_screen.dart:2:8 - unused_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\driver\documents_screen.dart:4:8 - unused_import
+warning - Unused import: 'package:provider/provider.dart' - lib\screens\driver\driver_profile_screen.dart:2:8 - unused_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\driver\driver_profile_screen.dart:5:8 - unused_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\driver\driver_verification_screen.dart:7:8 - unused_import
+  error - 1 positional argument expected by 'loadDriverStatistics', but 0 found - lib\screens\driver\earnings_details_screen.dart:76:47 - not_enough_positional_arguments
+   info - Don't use 'BuildContext's across async gaps - lib\screens\driver\earnings_details_screen.dart:89:28 - use_build_context_synchronously
+warning - Unused import: '../../core/theme/modern_theme.dart' - lib\screens\driver\earnings_withdrawal_screen.dart:4:8 - unused_import
+  error - 1 positional argument expected by 'loadDriverStatistics', but 0 found - lib\screens\driver\earnings_withdrawal_screen.dart:122:47 - not_enough_positional_arguments
+  error - The getter 'todayEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:129:27 - undefined_getter
+  error - The getter 'todayTrips' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:130:24 - undefined_getter
+  error - The getter 'todayHours' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:131:24 - undefined_getter
+  error - The getter 'weeklyEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:135:27 - undefined_getter
+  error - The getter 'weeklyTrips' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:136:24 - undefined_getter
+  error - The getter 'weeklyHours' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:137:24 - undefined_getter
+  error - The getter 'monthlyEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:141:27 - undefined_getter
+  error - The getter 'monthlyTrips' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:142:24 - undefined_getter
+  error - The getter 'monthlyHours' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:143:24 - undefined_getter
+  error - The getter 'totalEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:147:27 - undefined_getter
+  error - The getter 'totalTrips' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:148:24 - undefined_getter
+  error - The getter 'totalHours' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:149:24 - undefined_getter
+  error - 1 positional argument expected by 'loadWithdrawalHistory', but 0 found - lib\screens\driver\earnings_withdrawal_screen.dart:163:50 - not_enough_positional_arguments
+  error - The getter 'id' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:167:15 - undefined_getter
+  error - The getter 'amount' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:168:19 - undefined_getter
+  error - The getter 'fee' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:169:16 - undefined_getter
+  error - The getter 'netAmount' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:170:22 - undefined_getter
+  error - The getter 'method' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:171:19 - undefined_getter
+  error - The getter 'destination' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:172:24 - undefined_getter
+  error - The getter 'status' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:173:19 - undefined_getter
+  error - The getter 'createdAt' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:174:22 - undefined_getter
+  error - The getter 'processedAt' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:175:24 - undefined_getter
+  error - The named parameter 'accountDetails' is required, but there's no corresponding argument - lib\screens\driver\earnings_withdrawal_screen.dart:197:28 - missing_required_argument
+  error - The named parameter 'userId' is required, but there's no corresponding argument - lib\screens\driver\earnings_withdrawal_screen.dart:197:28 - missing_required_argument
+  error - The named parameter 'bankName' isn't defined - lib\screens\driver\earnings_withdrawal_screen.dart:200:9 - undefined_named_parameter
+  error - The named parameter 'accountNumber' isn't defined - lib\screens\driver\earnings_withdrawal_screen.dart:201:9 - undefined_named_parameter
+  error - The named parameter 'phoneNumber' isn't defined - lib\screens\driver\earnings_withdrawal_screen.dart:202:9 - undefined_named_parameter
+  error - The getter 'totalEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\earnings_withdrawal_screen.dart:566:52 - undefined_getter
+warning - Unused import: 'package:provider/provider.dart' - lib\screens\driver\metrics_screen.dart:2:8 - unused_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\driver\metrics_screen.dart:5:8 - unused_import
+warning - Unused import: '../../providers/ride_provider.dart' - lib\screens\driver\metrics_screen.dart:6:8 - unused_import
+warning - Unused import: '../../providers/location_provider.dart' - lib\screens\driver\modern_driver_home.dart:12:8 - unused_import
+  error - The argument type 'Consumer<AuthProvider>' can't be assigned to the parameter type 'PreferredSizeWidget?'.  - lib\screens\driver\modern_driver_home.dart:259:15 - argument_type_not_assignable
+   info - Don't use 'BuildContext's across async gaps - lib\screens\driver\modern_driver_home.dart:328:54 - use_build_context_synchronously
+warning - Unused import: 'package:provider/provider.dart' - lib\screens\driver\navigation_screen.dart:2:8 - unused_import
+warning - Unused import: '../../providers/location_provider.dart' - lib\screens\driver\navigation_screen.dart:7:8 - unused_import
+warning - Unused import: '../../providers/ride_provider.dart' - lib\screens\driver\navigation_screen.dart:8:8 - unused_import
+   info - 'setMapStyle' is deprecated and shouldn't be used. Use GoogleMap.style instead - lib\screens\driver\navigation_screen.dart:766:21 - deprecated_member_use
+warning - The value of the field '_isLoading' isn't used - lib\screens\driver\transactions_history_screen.dart:38:8 - unused_field
+  error - The method 'loadTransactionHistory' isn't defined for the type 'WalletProvider' - lib\screens\driver\transactions_history_screen.dart:91:24 - undefined_method
+  error - 1 positional argument expected by 'loadDriverStatistics', but 0 found - lib\screens\driver\transactions_history_screen.dart:92:43 - not_enough_positional_arguments
+  error - The argument type 'DateTime?' can't be assigned to the parameter type 'DateTime'.  - lib\screens\driver\transactions_history_screen.dart:100:17 - argument_type_not_assignable
+  error - The argument type 'double?' can't be assigned to the parameter type 'double'.  - lib\screens\driver\transactions_history_screen.dart:101:19 - argument_type_not_assignable
+  error - The operator '*' can't be unconditionally invoked because the receiver can be 'null' - lib\screens\driver\transactions_history_screen.dart:111:33 - unchecked_use_of_nullable_value
+  error - The operator '*' can't be unconditionally invoked because the receiver can be 'null' - lib\screens\driver\transactions_history_screen.dart:112:34 - unchecked_use_of_nullable_value
+  error - The getter 'id' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:115:26 - undefined_getter
+  error - The getter 'createdAt' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:117:28 - undefined_getter
+  error - The getter 'amount' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:118:30 - undefined_getter
+  error - The getter 'status' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:119:30 - undefined_getter
+  error - The getter 'status' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:120:30 - undefined_getter
+  error - The getter 'method' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:122:40 - undefined_getter
+  error - The getter 'destination' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:123:35 - undefined_getter
+  error - The getter 'totalEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:133:32 - undefined_getter
+  error - The getter 'totalTrips' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:134:29 - undefined_getter
+  error - The getter 'weeklyEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:137:27 - undefined_getter
+  error - The getter 'weeklyEarnings' isn't defined for the type 'Map<String, dynamic>' - lib\screens\driver\transactions_history_screen.dart:138:27 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\driver\transactions_history_screen.dart:149:28 - use_build_context_synchronously
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:552:36 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:553:37 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:554:34 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:555:36 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:556:36 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:557:34 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:611:40 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:612:48 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:613:50 - undefined_identifier
+  error - Undefined name 'vehicleProvider' - lib\screens\driver\vehicle_management_screen.dart:614:50 - undefined_identifier
+  error - The name '_saveChanges' is already defined - lib\screens\driver\vehicle_management_screen.dart:1047:8 - duplicate_definition
+warning - Unused import: '../../core/theme/modern_theme.dart' - lib\screens\passenger\emergency_sos_screen.dart:5:8 - unused_import
+  error - The method 'initializeLocation' isn't defined for the type 'LocationProvider' - lib\screens\passenger\emergency_sos_screen.dart:59:24 - undefined_method
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\emergency_sos_screen.dart:111:31 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\emergency_sos_screen.dart:138:31 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\emergency_sos_screen.dart:821:35 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\favorites_screen.dart:472:30 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\favorites_screen.dart:889:33 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\favorites_screen.dart:891:40 - use_build_context_synchronously
+  error - The method 'requestLocationPermission' isn't defined for the type 'LocationProvider' - lib\screens\passenger\modern_passenger_home.dart:97:28 - undefined_method
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:101:52 - use_build_context_synchronously
+warning - The value of the local variable 'paymentProvider' isn't used - lib\screens\passenger\modern_passenger_home.dart:104:13 - unused_local_variable
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:104:60 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:107:54 - use_build_context_synchronously
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\modern_passenger_home.dart:123:49 - undefined_getter
+  error - Undefined name 'Trip' - lib\screens\passenger\modern_passenger_home.dart:129:24 - undefined_identifier
+  error - The method 'updateCurrentTrip' isn't defined for the type 'RideProvider' - lib\screens\passenger\modern_passenger_home.dart:133:24 - undefined_method
+  error - Undefined class 'Trip' - lib\screens\passenger\modern_passenger_home.dart:142:32 - undefined_class
+warning - The value of the local variable 'rideProvider' isn't used - lib\screens\passenger\modern_passenger_home.dart:191:13 - unused_local_variable
+  error - The getter 'currentPosition' isn't defined for the type 'LocationProvider' - lib\screens\passenger\modern_passenger_home.dart:211:48 - undefined_getter
+  error - The getter 'currentPosition' isn't defined for the type 'LocationProvider' - lib\screens\passenger\modern_passenger_home.dart:214:30 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:215:32 - use_build_context_synchronously
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\modern_passenger_home.dart:227:29 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\modern_passenger_home.dart:228:46 - dead_null_aware_expression
+  error - The getter 'phoneNumber' isn't defined for the type 'UserModel' - lib\screens\passenger\modern_passenger_home.dart:229:32 - undefined_getter
+  error - The getter 'photoURL' isn't defined for the type 'UserModel' - lib\screens\passenger\modern_passenger_home.dart:230:32 - undefined_getter
+  error - The getter 'selectedPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\modern_passenger_home.dart:242:42 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:260:28 - use_build_context_synchronously
+  error - The method 'cancelTrip' isn't defined for the type 'RideProvider' - lib\screens\passenger\modern_passenger_home.dart:292:26 - undefined_method
+  error - The getter 'currentPosition' isn't defined for the type 'LocationProvider' - lib\screens\passenger\modern_passenger_home.dart:362:46 - undefined_getter
+  error - The getter 'mapStyle' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:374:49 - undefined_getter
+  error - The method 'ModernButton' isn't defined for the type '_ModernPassengerHomeScreenState' - lib\screens\passenger\modern_passenger_home.dart:494:19 - undefined_method
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:547:41 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:550:43 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:564:47 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:572:49 - undefined_getter
+  error - The getter 'selectedPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\modern_passenger_home.dart:589:44 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:609:34 - undefined_getter
+  error - Undefined class 'Trip' - lib\screens\passenger\modern_passenger_home.dart:625:31 - undefined_class
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:643:38 - undefined_getter
+  error - The getter 'currentOffers' isn't defined for the type 'RideProvider' - lib\screens\passenger\modern_passenger_home.dart:775:45 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\modern_passenger_home.dart:860:28 - use_build_context_synchronously
+  error - The getter 'photoURL' isn't defined for the type 'UserModel' - lib\screens\passenger\modern_passenger_home.dart:882:32 - undefined_getter
+  error - The constructor being called isn't a const constructor - lib\screens\passenger\modern_passenger_home.dart:976:49 - const_with_non_const
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:1010:59 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:1049:25 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:1050:25 - undefined_getter
+  error - The getter 'primary' isn't defined for the type 'ModernTheme' - lib\screens\passenger\modern_passenger_home.dart:1062:67 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:76:70 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:77:69 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:112:97 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:115:92 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:118:90 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_method_selection_screen.dart:121:93 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_method_selection_screen.dart:153:18 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_method_selection_screen.dart:214:18 - use_build_context_synchronously
+warning - The declaration '_startPaymentStatusMonitoring' isn't referenced - lib\screens\passenger\payment_method_selection_screen.dart:241:8 - unused_element
+  error - Undefined name '_currentPaymentId' - lib\screens\passenger\payment_method_selection_screen.dart:242:9 - undefined_identifier
+  error - Undefined name '_paymentService' - lib\screens\passenger\payment_method_selection_screen.dart:246:36 - undefined_identifier
+  error - Undefined name '_currentPaymentId' - lib\screens\passenger\payment_method_selection_screen.dart:246:71 - undefined_identifier
+  error - Undefined name '_paymentService' - lib\screens\passenger\payment_method_selection_screen.dart:332:40 - undefined_identifier
+  error - Undefined name '_paymentService' - lib\screens\passenger\payment_method_selection_screen.dart:397:40 - undefined_identifier
+  error - The getter 'selectedPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\payment_method_selection_screen.dart:744:48 - undefined_getter
+  error - The getter 'selectedPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\payment_method_selection_screen.dart:868:39 - undefined_getter
+  error - Expected an identifier - lib\screens\passenger\payment_method_selection_screen.dart:868:96 - missing_identifier
+  error - Expected to find ']' - lib\screens\passenger\payment_method_selection_screen.dart:869:46 - expected_token
+  error - The getter 'selectedPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\payment_method_selection_screen.dart:975:54 - undefined_getter
+  error - The method 'selectPaymentMethod' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\payment_method_selection_screen.dart:980:52 - undefined_method
+warning - The '!' will have no effect because the receiver can't be null - lib\screens\passenger\payment_method_selection_screen.dart:1092:109 - unnecessary_non_null_assertion
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:58:35 - undefined_getter
+  error - Undefined name 'Logger' - lib\screens\passenger\payment_methods_screen.dart:60:9 - undefined_identifier
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:64:72 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:65:71 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:66:76 - undefined_getter
+  error - Undefined name 'Logger' - lib\screens\passenger\payment_methods_screen.dart:70:9 - undefined_identifier
+  error - Undefined name 'Logger' - lib\screens\passenger\payment_methods_screen.dart:73:9 - undefined_identifier
+  error - Undefined name '_defaultMethodId' - lib\screens\passenger\payment_methods_screen.dart:491:36 - undefined_identifier
+  error - The getter 'color' isn't defined for the type 'PaymentMethod' - lib\screens\passenger\payment_methods_screen.dart:508:29 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1062:35 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1065:41 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1070:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1077:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1113:52 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1114:58 - use_build_context_synchronously
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1116:35 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1119:41 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1124:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1131:28 - use_build_context_synchronously
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1172:47 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1174:55 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1282:35 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\payment_methods_screen.dart:1297:41 - undefined_getter
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1303:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\payment_methods_screen.dart:1310:28 - use_build_context_synchronously
+  error - The getter 'currentUserData' isn't defined for the type 'UserProvider' - lib\screens\passenger\profile_edit_screen.dart:110:33 - undefined_getter
+  error - The named parameter 'fullName' is required, but there's no corresponding argument - lib\screens\passenger\profile_edit_screen.dart:959:27 - missing_required_argument
+  error - The named parameter 'id' is required, but there's no corresponding argument - lib\screens\passenger\profile_edit_screen.dart:959:27 - missing_required_argument
+  error - The named parameter 'phone' is required, but there's no corresponding argument - lib\screens\passenger\profile_edit_screen.dart:959:27 - missing_required_argument
+  error - The named parameter 'uid' isn't defined - lib\screens\passenger\profile_edit_screen.dart:960:9 - undefined_named_parameter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\passenger\profile_edit_screen.dart:960:40 - undefined_getter
+  error - The named parameter 'firstName' isn't defined - lib\screens\passenger\profile_edit_screen.dart:961:9 - undefined_named_parameter
+  error - The named parameter 'lastName' isn't defined - lib\screens\passenger\profile_edit_screen.dart:962:9 - undefined_named_parameter
+  error - The named parameter 'phoneNumber' isn't defined - lib\screens\passenger\profile_edit_screen.dart:964:9 - undefined_named_parameter
+  error - The named parameter 'birthDate' isn't defined - lib\screens\passenger\profile_edit_screen.dart:965:9 - undefined_named_parameter
+  error - The named parameter 'gender' isn't defined - lib\screens\passenger\profile_edit_screen.dart:966:9 - undefined_named_parameter
+  error - The named parameter 'documentType' isn't defined - lib\screens\passenger\profile_edit_screen.dart:967:9 - undefined_named_parameter
+  error - The named parameter 'documentNumber' isn't defined - lib\screens\passenger\profile_edit_screen.dart:968:9 - undefined_named_parameter
+  error - The named parameter 'profileImageUrl' isn't defined - lib\screens\passenger\profile_edit_screen.dart:969:9 - undefined_named_parameter
+  error - The named parameter 'emergencyContact' isn't defined - lib\screens\passenger\profile_edit_screen.dart:970:9 - undefined_named_parameter
+  error - The named parameter 'preferences' isn't defined - lib\screens\passenger\profile_edit_screen.dart:974:9 - undefined_named_parameter
+  error - Undefined name 'UserType' - lib\screens\passenger\profile_edit_screen.dart:980:19 - undefined_identifier
+  error - The method 'updateUserProfile' isn't defined for the type 'UserProvider' - lib\screens\passenger\profile_edit_screen.dart:987:42 - undefined_method
+  error - The method 'loadPromotions' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:58:27 - undefined_method
+  error - The method 'loadLoyaltyProgram' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:59:27 - undefined_method
+  error - The getter 'user' isn't defined for the type 'AuthProvider' - lib\screens\passenger\promotions_screen.dart:59:59 - undefined_getter
+  error - The method 'loadPromotions' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:111:39 - undefined_method
+  error - The method 'loadLoyaltyProgram' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:112:39 - undefined_method
+  error - The getter 'user' isn't defined for the type 'AuthProvider' - lib\screens\passenger\promotions_screen.dart:112:71 - undefined_getter
+  error - The getter 'promotions' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:125:44 - undefined_getter
+  error - The getter 'loyaltyProgram' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:126:45 - undefined_getter
+  error - The method 'loadPromotions' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:138:29 - undefined_method
+  error - The method 'loadLoyaltyProgram' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:139:29 - undefined_method
+  error - The getter 'user' isn't defined for the type 'AuthProvider' - lib\screens\passenger\promotions_screen.dart:139:61 - undefined_getter
+  error - The getter 'applyPromotionCode' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:141:45 - undefined_getter
+  error - The getter 'usePromotion' isn't defined for the type 'PaymentProvider' - lib\screens\passenger\promotions_screen.dart:142:43 - undefined_getter
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\passenger\ratings_history_screen.dart:6:8 - unused_import
+  error - The method 'loadRatingsHistory' isn't defined for the type 'RideProvider' - lib\screens\passenger\ratings_history_screen.dart:53:26 - undefined_method
+  error - The getter 'ratingsHistory' isn't defined for the type 'RideProvider' - lib\screens\passenger\ratings_history_screen.dart:83:38 - undefined_getter
+  error - The argument type 'double' can't be assigned to the parameter type 'int'.  - lib\screens\passenger\ratings_history_screen.dart:196:22 - argument_type_not_assignable
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:420:35 - undefined_getter
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:421:64 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:430:34 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:437:61 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:478:52 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:478:95 - dead_null_aware_expression
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\passenger\ratings_history_screen.dart:488:49 - invalid_null_aware_operator
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:629:39 - undefined_getter
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:630:68 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\ratings_history_screen.dart:639:38 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:670:51 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:670:97 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:670:145 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:672:51 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:672:125 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:673:87 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\ratings_history_screen.dart:673:130 - dead_null_aware_expression
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\passenger\ratings_history_screen.dart:675:51 - invalid_null_aware_operator
+warning - Unused import: 'dart:math' - lib\screens\passenger\tracking_screen.dart:5:8 - unused_import
+  error - The getter 'previousTripStatus' isn't defined for the type 'RideProvider' - lib\screens\passenger\tracking_screen.dart:156:26 - undefined_getter
+  error - The method 'updateTripStatus' isn't defined for the type 'RideProvider' - lib\screens\passenger\tracking_screen.dart:367:36 - undefined_method
+  error - The getter 'driverPhoto' isn't defined for the type 'TripModel' - lib\screens\passenger\tracking_screen.dart:393:48 - undefined_getter
+  error - The getter 'driverPhoto' isn't defined for the type 'TripModel' - lib\screens\passenger\tracking_screen.dart:394:50 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\tracking_screen.dart:408:39 - undefined_getter
+  error - The argument type 'Object' can't be assigned to the parameter type 'String'.  - lib\screens\passenger\tracking_screen.dart:447:29 - argument_type_not_assignable
+  error - The getter 'vehiclePlate' isn't defined for the type 'TripModel' - lib\screens\passenger\tracking_screen.dart:463:37 - undefined_getter
+warning - The value of the local variable 'shareUrl' isn't used - lib\screens\passenger\tracking_screen.dart:703:11 - unused_local_variable
+  error - The method 'shareRealtimeLocation' isn't defined for the type 'LocationProvider' - lib\screens\passenger\tracking_screen.dart:703:39 - undefined_method
+  error - The method 'cancelTrip' isn't defined for the type 'RideProvider' - lib\screens\passenger\tracking_screen.dart:822:50 - undefined_method
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\tracking_screen.dart:828:31 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\tracking_screen.dart:829:38 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\tracking_screen.dart:836:38 - use_build_context_synchronously
+  error - The method 'completeTrip' isn't defined for the type 'RideProvider' - lib\screens\passenger\tracking_screen.dart:855:40 - undefined_method
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\tracking_screen.dart:858:21 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\passenger\tracking_screen.dart:862:28 - use_build_context_synchronously
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\passenger\trip_details_screen.dart:6:8 - unused_import
+   info - The type of the right operand ('TripStatus') isn't a subtype or a supertype of the left operand ('String') - lib\screens\passenger\trip_details_screen.dart:258:41 - unrelated_type_equality_checks
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\passenger\trip_details_screen.dart:334:55 - invalid_null_aware_operator
+warning - The receiver can't be null, so the null-aware operator '?.' is unnecessary - lib\screens\passenger\trip_details_screen.dart:348:56 - invalid_null_aware_operator
+  error - The getter 'estimatedDuration' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:353:39 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:358:63 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:403:41 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:428:46 - dead_null_aware_expression
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:494:45 - undefined_getter
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:495:45 - undefined_getter
+  error - The getter 'driverPhotoUrl' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:497:35 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:499:35 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:514:34 - undefined_getter
+  error - The argument type 'Object' can't be assigned to the parameter type 'String'.  - lib\screens\passenger\trip_details_screen.dart:571:19 - argument_type_not_assignable
+  error - The getter 'vehiclePlate' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:575:32 - undefined_getter
+  error - The getter 'vehiclePlate' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:583:34 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:603:73 - dead_null_aware_expression
+  error - The getter 'actualFare' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:604:27 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:604:78 - dead_null_aware_expression
+  error - The getter 'actualFare' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:604:97 - undefined_getter
+  error - The getter 'actualFare' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:605:55 - undefined_getter
+  error - The getter 'actualFare' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:606:26 - undefined_getter
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:607:65 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:620:66 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\screens\passenger\trip_details_screen.dart:663:69 - dead_null_aware_expression
+  error - The getter 'driverAcceptedAt' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:664:24 - undefined_getter
+  error - The getter 'driverAcceptedAt' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:665:58 - undefined_getter
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:844:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:846:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:848:12 - constant_pattern_never_matches_value_type
+  error - There's no constant named 'driverAccepted' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:849:23 - undefined_enum_constant
+  error - There's no constant named 'driverArrived' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:850:23 - undefined_enum_constant
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:864:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:866:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:868:12 - constant_pattern_never_matches_value_type
+  error - There's no constant named 'driverAccepted' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:870:23 - undefined_enum_constant
+  error - There's no constant named 'driverArrived' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:872:23 - undefined_enum_constant
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:881:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:883:12 - constant_pattern_never_matches_value_type
+warning - The matched value type 'String' can never be equal to this constant of type 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:885:12 - constant_pattern_never_matches_value_type
+  error - There's no constant named 'driverAccepted' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:887:23 - undefined_enum_constant
+  error - There's no constant named 'driverArrived' in 'TripStatus' - lib\screens\passenger\trip_details_screen.dart:889:23 - undefined_enum_constant
+  error - The getter 'name' isn't defined for the type 'String' - lib\screens\passenger\trip_details_screen.dart:892:47 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:958:50 - undefined_getter
+  error - The getter 'driverName' isn't defined for the type 'TripModel' - lib\screens\passenger\trip_details_screen.dart:967:57 - undefined_getter
+   info - The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\screens\passenger\trip_history_screen.dart:3:8 - unnecessary_import
+warning - Unused import: '../../providers/auth_provider.dart' - lib\screens\passenger\trip_history_screen.dart:6:8 - unused_import
+warning - Unused import: '../../services/firebase_service.dart' - lib\screens\passenger\trip_history_screen.dart:8:8 - unused_import
+warning - Unused import: '../../utils/logger.dart' - lib\screens\passenger\trip_history_screen.dart:9:8 - unused_import
+  error - Undefined name '_shareApp' - lib\screens\shared\about_screen.dart:77:24 - undefined_identifier
+  error - The method '_buildHeaderSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:90:19 - undefined_method
+  error - The method '_buildAppInfoSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:93:19 - undefined_method
+  error - The method '_buildCompanySection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:96:19 - undefined_method
+  error - The method '_buildLegalSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:99:19 - undefined_method
+  error - The method '_buildContactSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:102:19 - undefined_method
+  error - The method '_buildTechnicalSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:105:19 - undefined_method
+  error - The method '_buildSocialMediaSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:108:19 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:120:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:120:10 - named_function_expression
+  error - Too many positional arguments: 0 expected, but 11 found - lib\screens\shared\about_screen.dart:120:29 - extra_positional_arguments_could_be_named
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:202:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:202:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:203:12 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:208:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:213:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:218:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:223:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:228:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:233:9 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:242:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:242:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:243:12 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:248:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:253:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:258:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:263:9 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:272:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:272:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:273:12 - undefined_method
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:278:9 - undefined_method
+  error - Undefined name '_showTermsAndConditions' - lib\screens\shared\about_screen.dart:282:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:284:9 - undefined_method
+  error - Undefined name '_showPrivacyPolicy' - lib\screens\shared\about_screen.dart:288:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:290:9 - undefined_method
+  error - Undefined name '_showCookiePolicy' - lib\screens\shared\about_screen.dart:294:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:296:9 - undefined_method
+  error - Undefined name '_showLicenses' - lib\screens\shared\about_screen.dart:300:11 - undefined_identifier
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:302:9 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:311:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:311:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:312:12 - undefined_method
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:317:9 - undefined_method
+  error - Undefined name '_contactSupport' - lib\screens\shared\about_screen.dart:321:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:323:9 - undefined_method
+  error - Undefined name '_contactSales' - lib\screens\shared\about_screen.dart:327:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:329:9 - undefined_method
+  error - Undefined name '_callEmergency' - lib\screens\shared\about_screen.dart:333:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:335:9 - undefined_method
+  error - Undefined name '_showOfficeLocation' - lib\screens\shared\about_screen.dart:339:11 - undefined_identifier
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:341:9 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:351:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:351:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:352:12 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:357:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:362:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:367:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:372:9 - undefined_method
+  error - The method '_buildInfoTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:377:9 - undefined_method
+  error - The method '_buildActionTile' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:382:9 - undefined_method
+  error - Undefined name '_showChangelog' - lib\screens\shared\about_screen.dart:386:11 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:392:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:392:10 - named_function_expression
+  error - The method '_buildSection' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:393:12 - undefined_method
+  error - The method '_buildSocialButton' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:401:13 - undefined_method
+  error - Undefined name '_openFacebook' - lib\screens\shared\about_screen.dart:405:15 - undefined_identifier
+  error - The method '_buildSocialButton' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:407:13 - undefined_method
+  error - Undefined name '_openTwitter' - lib\screens\shared\about_screen.dart:411:15 - undefined_identifier
+  error - The method '_buildSocialButton' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:413:13 - undefined_method
+  error - Undefined name '_openInstagram' - lib\screens\shared\about_screen.dart:417:15 - undefined_identifier
+  error - The method '_buildSocialButton' isn't defined for the type '_AboutScreenState' - lib\screens\shared\about_screen.dart:419:13 - undefined_method
+  error - Undefined name '_openLinkedIn' - lib\screens\shared\about_screen.dart:423:15 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:442:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:442:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:482:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:482:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:507:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:507:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\about_screen.dart:533:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\about_screen.dart:533:10 - named_function_expression
+  error - Expected to find ')' - lib\screens\shared\about_screen.dart:565:3 - expected_token
+  error - The getter 'address' isn't defined for the type 'LatLng' - lib\screens\shared\chat_screen.dart:204:18 - undefined_getter
+  error - The getter 'uid' isn't defined for the type 'UserModel' - lib\screens\shared\chat_screen.dart:433:75 - undefined_getter
+  error - The getter 'isSendingMessage' isn't defined for the type 'ChatProvider' - lib\screens\shared\chat_screen.dart:780:41 - undefined_getter
+  error - The getter 'isSendingMessage' isn't defined for the type 'ChatProvider' - lib\screens\shared\chat_screen.dart:786:45 - undefined_getter
+  error - The getter 'isSendingMessage' isn't defined for the type 'ChatProvider' - lib\screens\shared\chat_screen.dart:787:40 - undefined_getter
+  error - The method '_buildSearchBar' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:70:34 - undefined_method
+  error - The method '_buildTabContent' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:74:20 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:81:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:81:10 - named_function_expression
+  error - Too many positional arguments: 0 expected, but 6 found - lib\screens\shared\help_center_screen.dart:81:25 - extra_positional_arguments_could_be_named
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:103:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:103:10 - named_function_expression
+  error - The method '_buildFAQList' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:106:16 - undefined_method
+  error - The method '_buildContactOptions' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:108:16 - undefined_method
+  error - The method '_buildGuides' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:110:16 - undefined_method
+  error - The method '_buildFAQList' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:112:16 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:116:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:116:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:147:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:147:10 - named_function_expression
+  error - The method '_buildContactCard' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:151:9 - undefined_method
+  error - The method '_buildContactCard' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:158:9 - undefined_method
+  error - The method '_buildContactCard' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:165:9 - undefined_method
+  error - The method '_buildContactCard' isn't defined for the type '_HelpCenterScreenState' - lib\screens\shared\help_center_screen.dart:172:9 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:183:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:183:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\help_center_screen.dart:199:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\help_center_screen.dart:199:10 - named_function_expression
+  error - Expected to find ')' - lib\screens\shared\help_center_screen.dart:227:3 - expected_token
+warning - Unused import: '../../core/theme/modern_theme.dart' - lib\screens\shared\live_tracking_map_screen.dart:4:8 - unused_import
+warning - Unused import: 'package:geolocator/geolocator.dart' - lib\screens\shared\map_picker_screen.dart:3:8 - unused_import
+warning - Unused import: '../../core/theme/modern_theme.dart' - lib\screens\shared\map_picker_screen.dart:6:8 - unused_import
+warning - The declaration '_onMapTapped' isn't referenced - lib\screens\shared\map_picker_screen.dart:89:8 - unused_element
+warning - Unused import: '../../core/theme/modern_theme.dart' - lib\screens\shared\notifications_screen.dart:4:8 - unused_import
+warning - The value of the local variable 'ratingData' isn't used - lib\screens\shared\rating_dialog.dart:169:13 - unused_local_variable
+  error - The method 'submitRating' isn't defined for the type 'RideProvider' - lib\screens\shared\rating_dialog.dart:179:42 - undefined_method
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\shared\settings_screen.dart:961:29 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\shared\settings_screen.dart:962:36 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\shared\settings_screen.dart:1031:36 - use_build_context_synchronously
+  error - The name 'SupportTicket' isn't a type, so it can't be used as a type argument - lib\screens\shared\support_screen.dart:23:8 - non_type_as_type_argument
+  error - The name 'FAQ' isn't a type, so it can't be used as a type argument - lib\screens\shared\support_screen.dart:24:8 - non_type_as_type_argument
+  error - The method 'SupportTicket' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:76:9 - undefined_method
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:80:21 - undefined_identifier
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:81:21 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:82:19 - undefined_identifier
+  error - The method 'TicketResponse' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:86:13 - undefined_method
+  error - The method 'TicketResponse' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:92:13 - undefined_method
+  error - The method 'SupportTicket' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:100:9 - undefined_method
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:104:21 - undefined_identifier
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:105:21 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:106:19 - undefined_identifier
+  error - The method 'TicketResponse' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:110:13 - undefined_method
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:121:9 - undefined_method
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:128:9 - undefined_method
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:135:9 - undefined_method
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:142:9 - undefined_method
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:149:9 - undefined_method
+  error - The method '_buildLoadingState' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:195:28 - undefined_method
+  error - The method '_buildTabViews' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:195:51 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:200:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:200:10 - named_function_expression
+  error - Too many positional arguments: 0 expected, but 17 found - lib\screens\shared\support_screen.dart:200:28 - extra_positional_arguments_could_be_named
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:220:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:220:10 - named_function_expression
+  error - The method '_buildFAQsTab' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:228:15 - undefined_method
+  error - The method '_buildTicketsTab' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:229:15 - undefined_method
+  error - The method '_buildNewTicketTab' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:230:15 - undefined_method
+  error - The method '_buildContactTab' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:231:15 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:239:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:239:10 - named_function_expression
+  error - The property 'category' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\shared\support_screen.dart:240:47 - unchecked_use_of_nullable_value
+  error - The method '_buildCategoryChip' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:272:26 - undefined_method
+  error - The method '_buildCategoryChip' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:274:24 - undefined_method
+  error - The method '_buildFAQCard' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:287:22 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:295:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:295:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:314:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:314:10 - named_function_expression
+  error - Undefined class 'FAQ' - lib\screens\shared\support_screen.dart:314:24 - undefined_class
+  error - Local variable '_markFAQHelpful' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:371:40 - referenced_before_declaration
+  error - Local variable '_markFAQHelpful' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:376:40 - referenced_before_declaration
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:388:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:388:10 - named_function_expression
+  error - The method '_buildTicketCard' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:425:16 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:430:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:430:10 - named_function_expression
+  error - Undefined class 'SupportTicket' - lib\screens\shared\support_screen.dart:430:27 - undefined_class
+  error - Local variable '_viewTicketDetails' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:437:22 - referenced_before_declaration
+  error - The method '_getStatusColor' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:449:30 - undefined_method
+  error - The method '_getStatusText' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:453:23 - undefined_method
+  error - The method '_getStatusColor' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:457:32 - undefined_method
+  error - The method '_getCategoryIcon' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:493:21 - undefined_method
+  error - The method '_getCategoryText' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:499:21 - undefined_method
+  error - The method '_formatDateTime' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:513:21 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:545:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:545:10 - named_function_expression
+  error - Local variable '_submitTicket' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:694:28 - referenced_before_declaration
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:718:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:718:10 - named_function_expression
+  error - The method '_buildContactOption' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:724:11 - undefined_method
+  error - Local variable '_callSupport' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:730:13 - referenced_before_declaration
+  error - The method '_buildContactOption' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:732:11 - undefined_method
+  error - Local variable '_openLiveChat' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:738:13 - referenced_before_declaration
+  error - The method '_buildContactOption' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:740:11 - undefined_method
+  error - Local variable '_sendEmail' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:746:13 - referenced_before_declaration
+  error - The method '_buildContactOption' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:748:11 - undefined_method
+  error - Local variable '_openWhatsApp' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:754:13 - referenced_before_declaration
+  error - The method '_buildHourRow' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:778:17 - undefined_method
+  error - The method '_buildHourRow' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:779:17 - undefined_method
+  error - The method '_buildHourRow' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:780:17 - undefined_method
+  error - The method '_buildSocialButton' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:808:15 - undefined_method
+  error - The method '_buildSocialButton' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:809:15 - undefined_method
+  error - The method '_buildSocialButton' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:810:15 - undefined_method
+  error - The method '_buildSocialButton' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:811:15 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:819:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:819:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:891:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:891:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:915:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:915:10 - named_function_expression
+  error - Local variable '_openSocialMedia' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:917:20 - referenced_before_declaration
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:930:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:930:9 - named_function_expression
+  error - Undefined class 'TicketStatus' - lib\screens\shared\support_screen.dart:930:25 - undefined_class
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:932:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:934:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:936:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:938:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:943:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:943:10 - named_function_expression
+  error - Undefined class 'TicketStatus' - lib\screens\shared\support_screen.dart:943:25 - undefined_class
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:945:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:947:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:949:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:951:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:956:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:956:12 - named_function_expression
+  error - Undefined class 'SupportCategory' - lib\screens\shared\support_screen.dart:956:29 - undefined_class
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:958:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:960:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:962:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:964:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:966:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:968:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:973:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:973:10 - named_function_expression
+  error - Undefined class 'SupportCategory' - lib\screens\shared\support_screen.dart:973:27 - undefined_class
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:975:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:977:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:979:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:981:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:983:12 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:985:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:990:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:990:10 - named_function_expression
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1001:3 - expected_token
+warning - Dead code - lib\screens\shared\support_screen.dart:1003:3 - dead_code
+  error - Expected to find ')' - lib\screens\shared\support_screen.dart:1003:3 - expected_token
+   info - The local variable '_markFAQHelpful' starts with an underscore - lib\screens\shared\support_screen.dart:1003:8 - no_leading_underscores_for_local_identifiers
+  error - Undefined class 'FAQ' - lib\screens\shared\support_screen.dart:1003:24 - undefined_class
+  error - The property 'id' can't be unconditionally accessed because the receiver can be 'null' - lib\screens\shared\support_screen.dart:1005:47 - unchecked_use_of_nullable_value
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1007:24 - undefined_method
+   info - The local variable '_viewTicketDetails' starts with an underscore - lib\screens\shared\support_screen.dart:1025:8 - no_leading_underscores_for_local_identifiers
+  error - Undefined class 'SupportTicket' - lib\screens\shared\support_screen.dart:1025:27 - undefined_class
+  error - The method 'TicketDetailsScreen' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1029:31 - undefined_method
+   info - The local variable '_submitTicket' starts with an underscore - lib\screens\shared\support_screen.dart:1034:8 - no_leading_underscores_for_local_identifiers
+  error - The method 'SupportTicket' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1037:25 - undefined_method
+  error - Local variable '_parseCategoryFromString' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:1041:19 - referenced_before_declaration
+  error - Local variable '_parsePriorityFromString' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:1042:19 - referenced_before_declaration
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1043:17 - undefined_identifier
+  error - Undefined class 'SupportCategory' - lib\screens\shared\support_screen.dart:1069:3 - undefined_class
+   info - The local variable '_parseCategoryFromString' starts with an underscore - lib\screens\shared\support_screen.dart:1069:19 - no_leading_underscores_for_local_identifiers
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1072:16 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1074:16 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1076:16 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1078:16 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1080:16 - undefined_identifier
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1082:16 - undefined_identifier
+  error - Undefined class 'TicketPriority' - lib\screens\shared\support_screen.dart:1086:3 - undefined_class
+   info - The local variable '_parsePriorityFromString' starts with an underscore - lib\screens\shared\support_screen.dart:1086:18 - no_leading_underscores_for_local_identifiers
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:1089:16 - undefined_identifier
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:1091:16 - undefined_identifier
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:1093:16 - undefined_identifier
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:1095:16 - undefined_identifier
+   info - The local variable '_callSupport' starts with an underscore - lib\screens\shared\support_screen.dart:1099:8 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_openLiveChat' starts with an underscore - lib\screens\shared\support_screen.dart:1108:8 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_sendEmail' starts with an underscore - lib\screens\shared\support_screen.dart:1117:8 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_openWhatsApp' starts with an underscore - lib\screens\shared\support_screen.dart:1126:8 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_openSocialMedia' starts with an underscore - lib\screens\shared\support_screen.dart:1135:8 - no_leading_underscores_for_local_identifiers
+  error - Classes can't be declared inside other classes - lib\screens\shared\support_screen.dart:1146:1 - class_in_class
+  error - Expected a class member - lib\screens\shared\support_screen.dart:1146:27 - expected_class_member
+   info - Missing type annotation - lib\screens\shared\support_screen.dart:1146:35 - strict_top_level_inference
+   info - The variable name 'StatelessWidget' isn't a lowerCamelCase identifier - lib\screens\shared\support_screen.dart:1146:35 - non_constant_identifier_names
+  error - Methods must have an explicit list of parameters - lib\screens\shared\support_screen.dart:1146:35 - missing_method_parameters
+  error - Undefined class 'SupportTicket' - lib\screens\shared\support_screen.dart:1147:9 - undefined_class
+  error - The name 'TicketDetailsScreen' isn't a class - lib\screens\shared\support_screen.dart:1149:9 - creation_with_non_type
+  error - The getter 'key' isn't defined in a superclass of '_SupportScreenState' - lib\screens\shared\support_screen.dart:1149:36 - undefined_super_member
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1149:50 - expected_token
+  error - The getter 'ticket' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1149:55 - undefined_getter
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1160:21 - read_potentially_unassigned_final
+  error - The method '_getStatusColor' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1189:34 - undefined_method
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1189:50 - read_potentially_unassigned_final
+  error - The method '_getStatusText' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1193:27 - undefined_method
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1193:42 - read_potentially_unassigned_final
+  error - The method '_getStatusColor' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1197:36 - undefined_method
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1197:52 - read_potentially_unassigned_final
+  error - The method '_formatDate' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1203:36 - undefined_method
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1203:48 - read_potentially_unassigned_final
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1213:21 - read_potentially_unassigned_final
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1222:21 - read_potentially_unassigned_final
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1235:17 - read_potentially_unassigned_final
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1245:18 - read_potentially_unassigned_final
+  error - The method '_buildResponseCard' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1245:53 - undefined_method
+  error - The final variable 'ticket' can't be read because it's potentially unassigned at this point - lib\screens\shared\support_screen.dart:1251:17 - read_potentially_unassigned_final
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1251:34 - undefined_identifier
+  error - Local variable '_addResponse' can't be referenced before it is declared - lib\screens\shared\support_screen.dart:1255:36 - referenced_before_declaration
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1274:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:1274:10 - named_function_expression
+  error - Too many positional arguments: 0 expected, but 5 found - lib\screens\shared\support_screen.dart:1274:28 - extra_positional_arguments_could_be_named
+  error - Undefined class 'TicketResponse' - lib\screens\shared\support_screen.dart:1274:29 - undefined_class
+  error - The method '_formatDateTime' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1328:25 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1353:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:1353:9 - named_function_expression
+  error - Undefined class 'TicketStatus' - lib\screens\shared\support_screen.dart:1353:25 - undefined_class
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1355:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1357:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1359:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1361:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1366:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:1366:10 - named_function_expression
+  error - Undefined class 'TicketStatus' - lib\screens\shared\support_screen.dart:1366:25 - undefined_class
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1368:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1370:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1372:12 - undefined_identifier
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1374:12 - undefined_identifier
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1379:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:1379:10 - named_function_expression
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1383:3 - expected_token
+  error - Function expressions can't be named - lib\screens\shared\support_screen.dart:1383:10 - named_function_expression
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1394:3 - expected_token
+warning - Dead code - lib\screens\shared\support_screen.dart:1396:3 - dead_code
+  error - Expected to find ')' - lib\screens\shared\support_screen.dart:1396:3 - expected_token
+   info - The local variable '_addResponse' starts with an underscore - lib\screens\shared\support_screen.dart:1396:8 - no_leading_underscores_for_local_identifiers
+  error - 'class' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1445:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1445:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1445:1 - expected_token
+  error - Undefined name 'class' - lib\screens\shared\support_screen.dart:1445:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1445:7 - expected_token
+  error - Undefined name 'SupportTicket' - lib\screens\shared\support_screen.dart:1445:7 - undefined_identifier
+warning - The value of the local variable 'id' isn't used - lib\screens\shared\support_screen.dart:1446:16 - unused_local_variable
+warning - The value of the local variable 'subject' isn't used - lib\screens\shared\support_screen.dart:1447:16 - unused_local_variable
+warning - The value of the local variable 'description' isn't used - lib\screens\shared\support_screen.dart:1448:16 - unused_local_variable
+  error - Undefined class 'SupportCategory' - lib\screens\shared\support_screen.dart:1449:9 - undefined_class
+warning - The value of the local variable 'category' isn't used - lib\screens\shared\support_screen.dart:1449:25 - unused_local_variable
+  error - Undefined class 'TicketPriority' - lib\screens\shared\support_screen.dart:1450:9 - undefined_class
+warning - The value of the local variable 'priority' isn't used - lib\screens\shared\support_screen.dart:1450:24 - unused_local_variable
+  error - Undefined class 'TicketStatus' - lib\screens\shared\support_screen.dart:1451:9 - undefined_class
+warning - The value of the local variable 'status' isn't used - lib\screens\shared\support_screen.dart:1451:22 - unused_local_variable
+warning - The value of the local variable 'createdAt' isn't used - lib\screens\shared\support_screen.dart:1452:18 - unused_local_variable
+warning - The value of the local variable 'updatedAt' isn't used - lib\screens\shared\support_screen.dart:1453:18 - unused_local_variable
+  error - The name 'TicketResponse' isn't a type, so it can't be used as a type argument - lib\screens\shared\support_screen.dart:1454:14 - non_type_as_type_argument
+warning - The value of the local variable 'responses' isn't used - lib\screens\shared\support_screen.dart:1454:30 - unused_local_variable
+  error - The method 'SupportTicket' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1456:3 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1457:14 - expected_token
+  error - The getter 'id' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1457:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1458:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1458:14 - expected_token
+  error - The getter 'subject' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1458:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1459:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1459:14 - expected_token
+  error - The getter 'description' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1459:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1460:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1460:14 - expected_token
+  error - The getter 'category' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1460:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1461:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1461:14 - expected_token
+  error - The getter 'priority' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1461:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1462:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1462:14 - expected_token
+  error - The getter 'status' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1462:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1463:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1463:14 - expected_token
+  error - The getter 'createdAt' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1463:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1464:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1464:14 - expected_token
+  error - The getter 'updatedAt' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1464:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1465:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1465:14 - expected_token
+  error - The getter 'responses' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1465:19 - undefined_getter
+  error - 'class' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1469:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1469:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1469:1 - expected_token
+  error - Undefined name 'class' - lib\screens\shared\support_screen.dart:1469:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1469:7 - expected_token
+  error - Undefined name 'TicketResponse' - lib\screens\shared\support_screen.dart:1469:7 - undefined_identifier
+warning - The value of the local variable 'id' isn't used - lib\screens\shared\support_screen.dart:1470:16 - unused_local_variable
+warning - The value of the local variable 'message' isn't used - lib\screens\shared\support_screen.dart:1471:16 - unused_local_variable
+warning - The value of the local variable 'isFromSupport' isn't used - lib\screens\shared\support_screen.dart:1472:14 - unused_local_variable
+warning - The value of the local variable 'createdAt' isn't used - lib\screens\shared\support_screen.dart:1473:18 - unused_local_variable
+  error - The method 'TicketResponse' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1475:3 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1476:14 - expected_token
+  error - The getter 'id' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1476:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1477:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1477:14 - expected_token
+  error - The getter 'message' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1477:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1478:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1478:14 - expected_token
+  error - The getter 'isFromSupport' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1478:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1479:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1479:14 - expected_token
+  error - The getter 'createdAt' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1479:19 - undefined_getter
+  error - 'class' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1483:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1483:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1483:1 - expected_token
+  error - Undefined name 'class' - lib\screens\shared\support_screen.dart:1483:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1483:7 - expected_token
+  error - Undefined name 'FAQ' - lib\screens\shared\support_screen.dart:1483:7 - undefined_identifier
+warning - The value of the local variable 'id' isn't used - lib\screens\shared\support_screen.dart:1484:16 - unused_local_variable
+warning - The value of the local variable 'question' isn't used - lib\screens\shared\support_screen.dart:1485:16 - unused_local_variable
+warning - The value of the local variable 'answer' isn't used - lib\screens\shared\support_screen.dart:1486:16 - unused_local_variable
+warning - The value of the local variable 'category' isn't used - lib\screens\shared\support_screen.dart:1487:16 - unused_local_variable
+warning - The value of the local variable 'isHelpful' isn't used - lib\screens\shared\support_screen.dart:1488:15 - unused_local_variable
+  error - The method 'FAQ' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1490:3 - undefined_method
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1491:14 - expected_token
+  error - The getter 'id' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1491:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1492:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1492:14 - expected_token
+  error - The getter 'question' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1492:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1493:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1493:14 - expected_token
+  error - The getter 'answer' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1493:19 - undefined_getter
+warning - Two elements in a set literal shouldn't be equal - lib\screens\shared\support_screen.dart:1494:5 - equal_elements_in_set
+  error - Expected to find ',' - lib\screens\shared\support_screen.dart:1494:14 - expected_token
+  error - The getter 'category' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1494:19 - undefined_getter
+  error - The getter 'isHelpful' isn't defined for the type '_SupportScreenState' - lib\screens\shared\support_screen.dart:1495:10 - undefined_getter
+  error - 'enum' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1499:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1499:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1499:1 - expected_token
+  error - Undefined name 'enum' - lib\screens\shared\support_screen.dart:1499:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1499:6 - expected_token
+  error - Undefined name 'SupportCategory' - lib\screens\shared\support_screen.dart:1499:6 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1500:3 - expected_token
+  error - Undefined name 'general' - lib\screens\shared\support_screen.dart:1500:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1500:10 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1500:10 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1501:3 - expected_token
+  error - Undefined name 'trip' - lib\screens\shared\support_screen.dart:1501:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1501:7 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1501:7 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1502:3 - expected_token
+  error - Undefined name 'payment' - lib\screens\shared\support_screen.dart:1502:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1502:10 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1502:10 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1503:3 - expected_token
+  error - Undefined name 'account' - lib\screens\shared\support_screen.dart:1503:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1503:10 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1503:10 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1504:3 - expected_token
+  error - Undefined name 'technical' - lib\screens\shared\support_screen.dart:1504:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1504:12 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1504:12 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1505:3 - expected_token
+  error - Undefined name 'other' - lib\screens\shared\support_screen.dart:1505:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1505:8 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1505:8 - unexpected_token
+  error - 'enum' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1508:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1508:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1508:1 - expected_token
+  error - Undefined name 'enum' - lib\screens\shared\support_screen.dart:1508:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1508:6 - expected_token
+  error - Undefined name 'TicketPriority' - lib\screens\shared\support_screen.dart:1508:6 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1509:3 - expected_token
+  error - Undefined name 'low' - lib\screens\shared\support_screen.dart:1509:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1509:6 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1509:6 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1510:3 - expected_token
+  error - Undefined name 'medium' - lib\screens\shared\support_screen.dart:1510:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1510:9 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1510:9 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1511:3 - expected_token
+  error - Undefined name 'high' - lib\screens\shared\support_screen.dart:1511:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1511:7 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1511:7 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1512:3 - expected_token
+  error - Undefined name 'urgent' - lib\screens\shared\support_screen.dart:1512:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1512:9 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1512:9 - unexpected_token
+  error - 'enum' can't be used as an identifier because it's a keyword - lib\screens\shared\support_screen.dart:1515:1 - expected_identifier_but_got_keyword
+  error - Expected a statement - lib\screens\shared\support_screen.dart:1515:1 - missing_statement
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1515:1 - expected_token
+  error - Undefined name 'enum' - lib\screens\shared\support_screen.dart:1515:1 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1515:6 - expected_token
+  error - Undefined name 'TicketStatus' - lib\screens\shared\support_screen.dart:1515:6 - undefined_identifier
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1516:3 - expected_token
+  error - Undefined name 'open' - lib\screens\shared\support_screen.dart:1516:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1516:7 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1516:7 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1517:3 - expected_token
+  error - Undefined name 'inProgress' - lib\screens\shared\support_screen.dart:1517:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1517:13 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1517:13 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1518:3 - expected_token
+  error - Undefined name 'resolved' - lib\screens\shared\support_screen.dart:1518:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1518:11 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1518:11 - unexpected_token
+  error - Expected to find ';' - lib\screens\shared\support_screen.dart:1519:3 - expected_token
+  error - Undefined name 'closed' - lib\screens\shared\support_screen.dart:1519:3 - undefined_identifier
+  error - Expected an identifier - lib\screens\shared\support_screen.dart:1519:9 - missing_identifier
+  error - Unexpected text ',' - lib\screens\shared\support_screen.dart:1519:9 - unexpected_token
+  error - Expected to find '}' - lib\screens\shared\support_screen.dart:1520:2 - expected_token
+warning - The value of the local variable 'isPassenger' isn't used - lib\screens\shared\trip_details_screen.dart:304:15 - unused_local_variable
+  error - Too many positional arguments: 0 expected, but 1 found - lib\screens\shared\trip_tracking_screen.dart:348:39 - extra_positional_arguments
+  error - The argument type 'LatLng?' can't be assigned to the parameter type 'Position?'.  - lib\screens\shared\trip_tracking_screen.dart:482:43 - argument_type_not_assignable
+warning - The value of the local variable 'currentLocationLatLng' isn't used - lib\screens\shared\trip_tracking_screen.dart:688:11 - unused_local_variable
+   info - Use interpolation to compose strings and values - migrate_to_provider.dart:106:9 - prefer_interpolation_to_compose_strings
+

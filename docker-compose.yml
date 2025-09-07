@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Flutter Web App
+  flutter-web:
+    build:
+      context: ./app
+      dockerfile: ../docker/flutter.dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - FLUTTER_ENV=development
+    volumes:
+      - ./app:/workspace
+    depends_on:
+      - backend
+    networks:
+      - oasis-network
+
+  # Node.js Backend
+  backend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:-postgresql://oasis_user:oasis_pass@postgres:5432/oasis_taxi}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_PRIVATE_KEY_ID=${FIREBASE_PRIVATE_KEY_ID}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_CLIENT_ID=${FIREBASE_CLIENT_ID}
+      - FIREBASE_AUTH_URI=${FIREBASE_AUTH_URI}
+      - FIREBASE_TOKEN_URI=${FIREBASE_TOKEN_URI}
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./node_modules:/app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - oasis-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oasis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oasis_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-oasis_taxi}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - oasis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oasis_user} -d ${POSTGRES_DB:-oasis_taxi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - oasis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  oasis-network:
+    driver: bridge
