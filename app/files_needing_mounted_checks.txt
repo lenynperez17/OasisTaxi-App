@@ -1,8 +1,0 @@
-  Necesita revisión manual: lib/core/utils/navigation_helper.dart
-  Necesita revisión manual: lib/screens/driver/earnings_withdrawal_screen.dart
-  Necesita revisión manual: lib/screens/passenger/emergency_sos_screen.dart
-  Necesita revisión manual: lib/screens/passenger/favorites_screen.dart
-  Necesita revisión manual: lib/screens/passenger/profile_edit_screen.dart
-  Necesita revisión manual: lib/screens/passenger/trip_history_screen.dart
-  Necesita revisión manual: lib/screens/shared/trip_tracking_screen.dart
-  Necesita revisión manual: lib/utils/navigation_helper.dart
