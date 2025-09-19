@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 
 class LocationService {
   static final LocationService _instance = LocationService._internal();
@@ -10,8 +10,9 @@ class LocationService {
   LocationService._internal();
 
   Position? _currentPosition;
-  StreamController<Position> _locationStreamController = StreamController<Position>.broadcast();
-  
+  StreamController<Position> _locationStreamController =
+      StreamController<Position>.broadcast();
+
   Stream<Position> get locationStream => _locationStreamController.stream;
   Position? get currentPosition => _currentPosition;
 
@@ -23,7 +24,8 @@ class LocationService {
         await getCurrentLocation();
         AppLogger.info('LocationService inicializado correctamente');
       } else {
-        AppLogger.warning('LocationService no pudo inicializarse - permisos denegados');
+        AppLogger.warning(
+            'LocationService no pudo inicializarse - permisos denegados');
       }
     } catch (e) {
       AppLogger.error('Error inicializando LocationService', e);
@@ -70,7 +72,7 @@ class LocationService {
           distanceFilter: 10,
         ),
       );
-      
+
       _locationStreamController.add(_currentPosition!);
       return _currentPosition;
     } catch (e) {
@@ -153,6 +155,22 @@ class LocationService {
       start.longitude > end.longitude ? start.longitude : end.longitude,
     );
     return LatLngBounds(southwest: southwest, northeast: northeast);
+  }
+
+  // Obtener direcci\u00f3n legible desde coordenadas
+  Future<String?> getReadableAddress(double latitude, double longitude) async {
+    try {
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        return '${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? ''}, ${place.country ?? ''}';
+      }
+      return null;
+    } catch (e) {
+      AppLogger.error('Error obteniendo direcci\u00f3n', e);
+      return null;
+    }
   }
 
   void dispose() {

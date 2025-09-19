@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 
 class RealMapWidget extends StatefulWidget {
   final Function(LatLng)? onLocationSelected;
@@ -29,19 +28,23 @@ class RealMapWidget extends StatefulWidget {
   });
 
   @override
-  State<RealMapWidget> createState() => _RealMapWidgetState();
+  State<RealMapWidget> createState() => RealMapWidgetState();
 }
 
-class _RealMapWidgetState extends State<RealMapWidget> {
+class RealMapWidgetState extends State<RealMapWidget> {
   GoogleMapController? _controller;
   final Set<Marker> _markers = {};
   bool _isLoading = true;
-  LatLng _currentCenter = const LatLng(-12.0464, -77.0428); // Lima, Perú por defecto
+  LatLng _currentCenter =
+      const LatLng(-12.0464, -77.0428); // Lima, Perú por defecto
 
   @override
   void initState() {
     super.initState();
-    _initializeMap();
+    // Postergar inicialización del mapa para evitar setState durante build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeMap();
+    });
   }
 
   Future<void> _initializeMap() async {
@@ -54,11 +57,11 @@ class _RealMapWidgetState extends State<RealMapWidget> {
       }
 
       _updateMarkers();
-      
+
       setState(() {
         _isLoading = false;
       });
-      
+
       AppLogger.info('Mapa real inicializado correctamente');
     } catch (e) {
       AppLogger.error('Error inicializando mapa real', e);
@@ -85,7 +88,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
       );
 
       _currentCenter = LatLng(position.latitude, position.longitude);
-      AppLogger.info('Ubicación actual obtenida: ${_currentCenter.latitude}, ${_currentCenter.longitude}');
+      AppLogger.info(
+          'Ubicación actual obtenida: ${_currentCenter.latitude}, ${_currentCenter.longitude}');
     } catch (e) {
       AppLogger.warning('No se pudo obtener la ubicación actual', e);
       // Mantener Lima, Perú como centro por defecto
@@ -101,7 +105,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
         Marker(
           markerId: const MarkerId('pickup'),
           position: widget.pickupLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
           infoWindow: const InfoWindow(
             title: 'Punto de recogida',
             snippet: 'Aquí te recogeremos',
@@ -147,7 +152,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
 
   Future<void> _zoomIn() async {
     if (_controller == null) return;
-    
+
     try {
       await _controller!.animateCamera(CameraUpdate.zoomIn());
     } catch (e) {
@@ -157,7 +162,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
 
   Future<void> _zoomOut() async {
     if (_controller == null) return;
-    
+
     try {
       await _controller!.animateCamera(CameraUpdate.zoomOut());
     } catch (e) {
@@ -168,7 +173,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
   @override
   void didUpdateWidget(RealMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Actualizar marcadores si las ubicaciones cambiaron
     if (widget.pickupLocation != oldWidget.pickupLocation ||
         widget.dropoffLocation != oldWidget.dropoffLocation) {
@@ -221,15 +226,16 @@ class _RealMapWidgetState extends State<RealMapWidget> {
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
-          gestureRecognizers: widget.enableInteraction 
-            ? <Factory<OneSequenceGestureRecognizer>>{} 
-            : <Factory<OneSequenceGestureRecognizer>>{},
+          gestureRecognizers: widget.enableInteraction
+              ? <Factory<OneSequenceGestureRecognizer>>{}
+              : <Factory<OneSequenceGestureRecognizer>>{},
           onTap: widget.enableInteraction && widget.onLocationSelected != null
-            ? (LatLng position) {
-                widget.onLocationSelected!(position);
-                AppLogger.info('Ubicación seleccionada: ${position.latitude}, ${position.longitude}');
-              }
-            : null,
+              ? (LatLng position) {
+                  widget.onLocationSelected!(position);
+                  AppLogger.info(
+                      'Ubicación seleccionada: ${position.latitude}, ${position.longitude}');
+                }
+              : null,
         ),
 
         // Controles del mapa
@@ -248,7 +254,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
                 child: const Icon(Icons.add, color: Colors.black87),
               ),
               const SizedBox(height: 8),
-              
+
               // Botón de zoom out
               FloatingActionButton(
                 mini: true,
@@ -258,7 +264,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
                 child: const Icon(Icons.remove, color: Colors.black87),
               ),
               const SizedBox(height: 8),
-              
+
               // Botón de ubicación actual
               if (widget.showCurrentLocation)
                 FloatingActionButton(

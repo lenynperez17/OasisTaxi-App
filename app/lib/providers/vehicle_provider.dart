@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 import '../services/firebase_service.dart';
 
 /// Provider para gestión completa de vehículos, documentos, mantenimiento y recordatorios
@@ -46,7 +46,7 @@ class VehicleProvider extends ChangeNotifier {
 
     try {
       AppLogger.info('Cargando datos del vehículo para driver: $driverId');
-      
+
       // Cargar en paralelo
       await Future.wait([
         _loadBasicVehicleInfo(driverId),
@@ -144,7 +144,8 @@ class VehicleProvider extends ChangeNotifier {
           .map((doc) => MaintenanceRecord.fromFirestore(doc))
           .toList();
 
-      AppLogger.info('Registros de mantenimiento cargados: ${_maintenanceRecords.length}');
+      AppLogger.info(
+          'Registros de mantenimiento cargados: ${_maintenanceRecords.length}');
     } catch (e) {
       AppLogger.error('Error cargando mantenimiento', e);
     }
@@ -183,14 +184,16 @@ class VehicleProvider extends ChangeNotifier {
   }
 
   // Actualizar información básica del vehículo
-  Future<bool> updateVehicleInfo(String driverId, Map<String, dynamic> newData) async {
+  Future<bool> updateVehicleInfo(
+      String driverId, Map<String, dynamic> newData) async {
     _isSaving = true;
     _error = null;
     notifyListeners();
 
     try {
       // Validar datos básicos
-      if (newData['plate'] == null || newData['plate'].toString().isEmpty == true) {
+      if (newData['plate'] == null ||
+          newData['plate'].toString().isEmpty == true) {
         _error = 'La placa del vehículo es obligatoria';
         _isSaving = false;
         notifyListeners();
@@ -247,7 +250,7 @@ class VehicleProvider extends ChangeNotifier {
 
       // Subir con progreso
       final uploadTask = ref.putFile(photoFile);
-      
+
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
         _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
         notifyListeners();
@@ -259,7 +262,7 @@ class VehicleProvider extends ChangeNotifier {
       // Actualizar lista de fotos
       final currentPhotos = List<String>.from(_vehicleData['photos'] ?? []);
       currentPhotos.add(downloadUrl);
-      
+
       await updateVehicleInfo(driverId, {'photos': currentPhotos});
 
       AppLogger.info('Foto del vehículo subida exitosamente');
@@ -292,7 +295,7 @@ class VehicleProvider extends ChangeNotifier {
 
     try {
       String? documentUrl;
-      
+
       // Si hay archivo, subirlo
       if (documentFile != null) {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -321,7 +324,8 @@ class VehicleProvider extends ChangeNotifier {
         'type': type,
         'number': number,
         'issueDate': Timestamp.fromDate(issueDate),
-        'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
+        'expiryDate':
+            expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
         'documentUrl': documentUrl,
         'status': 'valid',
         'createdAt': FieldValue.serverTimestamp(),
@@ -337,9 +341,10 @@ class VehicleProvider extends ChangeNotifier {
         documentUrl: documentUrl,
         status: DocumentStatus.valid,
       );
-      
+
       _documents.add(newDoc);
-      _documents.sort((a, b) => (a.expiryDate ?? DateTime.now()).compareTo(b.expiryDate ?? DateTime.now()));
+      _documents.sort((a, b) => (a.expiryDate ?? DateTime.now())
+          .compareTo(b.expiryDate ?? DateTime.now()));
 
       AppLogger.info('Documento agregado: $type');
       _isSaving = false;
@@ -398,7 +403,7 @@ class VehicleProvider extends ChangeNotifier {
         nextDue: nextDue,
         notes: notes,
       );
-      
+
       _maintenanceRecords.insert(0, newRecord); // Agregar al inicio
 
       // Crear recordatorio si hay próximo mantenimiento
@@ -466,7 +471,7 @@ class VehicleProvider extends ChangeNotifier {
         priority: priority,
         completed: false,
       );
-      
+
       _reminders.add(newReminder);
       _reminders.sort((a, b) => a.date.compareTo(b.date));
 
@@ -511,6 +516,217 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  // Comment 2: Add missing update methods
+  // Update maintenance record
+  Future<bool> updateMaintenanceRecord(String driverId, String recordId, Map<String, dynamic> updates) async {
+    _isSaving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('vehicle')
+          .doc('maintenance')
+          .collection('records')
+          .doc(recordId)
+          .update({
+        ...updates,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local state
+      final index = _maintenanceRecords.indexWhere((r) => r.id == recordId);
+      if (index != -1) {
+        // Reload the specific record to get updated data
+        await loadMaintenanceRecords(driverId);
+      }
+
+      AppLogger.info('Maintenance record updated: $recordId');
+      _isSaving = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Error updating maintenance record: $e';
+      AppLogger.error('Error updating maintenance', e);
+      _isSaving = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Update reminder
+  Future<bool> updateReminder(String driverId, String reminderId, Map<String, dynamic> updates) async {
+    _isSaving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('vehicle')
+          .doc('reminders')
+          .collection('list')
+          .doc(reminderId)
+          .update({
+        ...updates,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local state
+      final index = _reminders.indexWhere((r) => r.id == reminderId);
+      if (index != -1) {
+        // Reload reminders to get updated data
+        await loadReminders(driverId);
+      }
+
+      AppLogger.info('Reminder updated: $reminderId');
+      _isSaving = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Error updating reminder: $e';
+      AppLogger.error('Error updating reminder', e);
+      _isSaving = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Delete reminder
+  Future<bool> deleteReminder(String driverId, String reminderId) async {
+    try {
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('vehicle')
+          .doc('reminders')
+          .collection('list')
+          .doc(reminderId)
+          .delete();
+
+      // Remove from local state
+      _reminders.removeWhere((r) => r.id == reminderId);
+      notifyListeners();
+
+      AppLogger.info('Reminder deleted: $reminderId');
+      return true;
+    } catch (e) {
+      _error = 'Error deleting reminder: $e';
+      AppLogger.error('Error deleting reminder', e);
+      return false;
+    }
+  }
+
+
+  // Remove vehicle photo
+  Future<bool> removeVehiclePhoto(String driverId, int index) async {
+    try {
+      // Remove photo at index
+      if (_vehicleData.containsKey('photos') && _vehicleData['photos'] is List) {
+        final photos = List<String>.from(_vehicleData['photos']);
+        if (index >= photos.length) {
+          _error = 'Invalid photo index';
+          return false;
+        }
+
+        // Store the photo URL to potentially delete from Storage
+        final photoUrl = photos[index];
+        photos.removeAt(index);
+
+        // Update Firestore
+        await _firestore.collection('drivers').doc(driverId)
+            .collection('vehicle').doc('info')
+            .update({'photos': photos});
+
+        // Update local state
+        _vehicleData['photos'] = photos;
+        notifyListeners();
+
+        // Optionally delete from Firebase Storage
+        // Note: Only if photoUrl is a Storage URL
+        if (photoUrl.contains('firebasestorage.googleapis.com')) {
+          try {
+            // Parse the URL to get the path and delete the file
+            // This is optional and can be uncommented if needed
+            // final ref = FirebaseStorage.instance.refFromURL(photoUrl);
+            // await ref.delete();
+            AppLogger.info('Photo removed from list: $photoUrl');
+          } catch (storageError) {
+            AppLogger.warning('Could not delete Storage file', storageError);
+            // Don't fail the operation if Storage deletion fails
+          }
+        }
+
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Error removing photo: $e';
+      AppLogger.error('Error removing photo', e);
+      return false;
+    }
+  }
+
+  // Public wrapper for loading maintenance records
+  Future<void> loadMaintenanceRecords(String driverId) async {
+    await _loadMaintenanceRecords(driverId);
+  }
+
+  // Public wrapper for loading reminders
+  Future<void> loadReminders(String driverId) async {
+    await _loadReminders(driverId);
+  }
+
+  // Update vehicle info
+  Future<bool> updateVehicle(String driverId, Map<String, dynamic> updates) async {
+    // Validate required fields
+    if (driverId.isEmpty) {
+      _error = 'Driver ID is required';
+      notifyListeners();
+      return false;
+    }
+
+    if (updates.isEmpty) {
+      _error = 'No updates provided';
+      notifyListeners();
+      return false;
+    }
+
+    _isSaving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Update in Firestore
+      await _firestore
+          .collection('drivers')
+          .doc(driverId)
+          .collection('vehicle')
+          .doc('info')
+          .update({
+        ...updates,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local state only after successful Firestore update
+      _vehicleData.addAll(updates);
+
+      AppLogger.info('Vehicle info updated successfully for driver: $driverId');
+      _isSaving = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Error updating vehicle: $e';
+      AppLogger.error('Error updating vehicle for driver $driverId', e);
+      _isSaving = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Eliminar documento
   Future<bool> deleteDocument(String driverId, String documentId) async {
     try {
@@ -541,27 +757,30 @@ class VehicleProvider extends ChangeNotifier {
     final cutoffDate = DateTime.now().add(Duration(days: daysAhead));
     return _documents.where((doc) {
       if (doc.expiryDate == null) return false;
-      return doc.expiryDate!.isBefore(cutoffDate) && doc.expiryDate!.isAfter(DateTime.now());
+      return doc.expiryDate!.isBefore(cutoffDate) &&
+          doc.expiryDate!.isAfter(DateTime.now());
     }).toList();
   }
 
   // Obtener recordatorios de alta prioridad
   List<Reminder> getHighPriorityReminders() {
-    return _reminders.where((reminder) => 
-      reminder.priority == Priority.high && !reminder.completed
-    ).toList();
+    return _reminders
+        .where((reminder) =>
+            reminder.priority == Priority.high && !reminder.completed)
+        .toList();
   }
 
   // Obtener resumen del vehículo
   Map<String, dynamic> getVehicleSummary() {
     return {
       'totalDocuments': _documents.length,
-      'validDocuments': _documents.where((doc) => doc.status == DocumentStatus.valid).length,
+      'validDocuments':
+          _documents.where((doc) => doc.status == DocumentStatus.valid).length,
       'expiringDocuments': getExpiringDocuments().length,
       'totalMaintenanceRecords': _maintenanceRecords.length,
       'totalCostThisYear': _maintenanceRecords
           .where((record) => record.date.year == DateTime.now().year)
-          .fold(0.0, (double sum, record) => sum + record.cost),
+          .fold(0.0, (double total, record) => total + record.cost),
       'pendingReminders': _reminders.where((r) => !r.completed).length,
       'highPriorityReminders': getHighPriorityReminders().length,
     };
@@ -615,24 +834,24 @@ class VehicleDocument {
       type: data['type'] ?? '',
       number: data['number'] ?? '',
       issueDate: (data['issueDate'] as Timestamp).toDate(),
-      expiryDate: data['expiryDate'] != null 
-          ? (data['expiryDate'] as Timestamp).toDate() 
+      expiryDate: data['expiryDate'] != null
+          ? (data['expiryDate'] as Timestamp).toDate()
           : null,
       documentUrl: data['documentUrl'],
       status: _getDocumentStatus(data),
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as Timestamp).toDate() 
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
           : null,
     );
   }
 
   static DocumentStatus _getDocumentStatus(Map<String, dynamic> data) {
     if (data['expiryDate'] == null) return DocumentStatus.valid;
-    
+
     final expiryDate = (data['expiryDate'] as Timestamp).toDate();
     final now = DateTime.now();
     final daysDiff = expiryDate.difference(now).inDays;
-    
+
     if (daysDiff < 0) return DocumentStatus.expired;
     if (daysDiff <= 30) return DocumentStatus.expiringSoon;
     return DocumentStatus.valid;
@@ -703,12 +922,12 @@ class MaintenanceRecord {
       mileage: data['mileage'] ?? 0,
       cost: (data['cost'] ?? 0).toDouble(),
       workshop: data['workshop'] ?? '',
-      nextDue: data['nextDue'] != null 
-          ? (data['nextDue'] as Timestamp).toDate() 
+      nextDue: data['nextDue'] != null
+          ? (data['nextDue'] as Timestamp).toDate()
           : null,
       notes: data['notes'],
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as Timestamp).toDate() 
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
           : null,
     );
   }
@@ -764,13 +983,16 @@ class Reminder {
       type: ReminderType.values[data['type'] ?? 0],
       priority: Priority.values[data['priority'] ?? 2],
       completed: data['completed'] ?? false,
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as Timestamp).toDate() 
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] as Timestamp).toDate()
           : null,
     );
   }
+
 }
 
 enum DocumentStatus { valid, expiringSoon, expired, pending }
+
 enum ReminderType { document, maintenance, payment, other }
+
 enum Priority { high, medium, low }

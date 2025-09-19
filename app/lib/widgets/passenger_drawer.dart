@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
+import '../screens/shared/settings_screen.dart';
+import '../providers/auth_provider.dart';
+import '../utils/app_logger.dart';
 
 class PassengerDrawer extends StatelessWidget {
   const PassengerDrawer({super.key});
@@ -55,60 +59,88 @@ class PassengerDrawer extends StatelessWidget {
                       color: AppColors.oasisTurquoise,
                     ),
                   ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Juan Pérez',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(height: 16),
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      final user = authProvider.currentUser;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.fullName ?? 'Usuario',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            user?.email ?? 'Sin correo registrado',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'juan.perez@email.com',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
-                    ),
-                  ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: Colors.amber,
-                          size: 16,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '4.8',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                    child: IntrinsicWidth(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber,
+                            size: 14,
                           ),
-                        ),
-                        Text(
-                          ' • 156 viajes',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 12,
+                          const SizedBox(width: 3),
+                          Consumer<AuthProvider>(
+                            builder: (context, authProvider, child) {
+                              final user = authProvider.currentUser;
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${user?.rating ?? 5.0}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      ' • ${user?.totalTrips ?? 0} viajes',
+                                      style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.9),
+                                        fontSize: 11,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // Opciones del menú
             Expanded(
               child: ListView(
@@ -118,8 +150,10 @@ class PassengerDrawer extends StatelessWidget {
                     icon: Icons.person_outline,
                     title: 'Mi perfil',
                     onTap: () {
+                      AppLogger.info('Botón mi perfil presionado');
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/profile');
+                      Navigator.pushNamed(context, '/passenger/profile');
+                      AppLogger.info('Navegación a perfil ejecutada');
                     },
                   ),
                   _buildMenuItem(
@@ -130,50 +164,50 @@ class PassengerDrawer extends StatelessWidget {
                       Navigator.pushNamed(context, '/passenger/trip-history');
                     },
                   ),
-                  _buildMenuItem(
-                    icon: Icons.account_balance_wallet,
-                    title: 'Mi Billetera',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/wallet');
-                    },
-                  ),
+                  // _buildMenuItem(
+                  //   icon: Icons.account_balance_wallet,
+                  //   title: 'Mi Billetera',
+                  //   onTap: () {
+                  //     Navigator.pop(context);
+                  //     Navigator.pushNamed(context, '/wallet');
+                  //   },
+                  // ),
                   _buildMenuItem(
                     icon: Icons.payment,
                     title: 'Métodos de pago',
-                    badge: '2',
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/payment-methods');
+                      Navigator.pushNamed(
+                          context, '/passenger/payment-methods');
                     },
                   ),
-                  _buildMenuItem(
-                    icon: Icons.local_offer,
-                    title: 'Promociones',
-                    badge: 'Nuevo',
-                    badgeColor: Color(0xFF10B981),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/promotions');
-                    },
-                  ),
-                  _buildMenuItem(
-                    icon: Icons.favorite,
-                    title: 'Lugares favoritos',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/favorites');
-                    },
-                  ),
+                  // _buildMenuItem(
+                  //   icon: Icons.local_offer,
+                  //   title: 'Promociones',
+                  //   badge: 'Nuevo',
+                  //   badgeColor: Color(0xFF10B981),
+                  //   onTap: () {
+                  //     Navigator.pop(context);
+                  //     Navigator.pushNamed(context, '/passenger/promotions'); // ELIMINADO
+                  //   },
+                  // ),
+                  // _buildMenuItem(
+                  //   icon: Icons.favorite,
+                  //   title: 'Lugares favoritos',
+                  //   onTap: () {
+                  //     Navigator.pop(context);
+                  //     Navigator.pushNamed(context, '/passenger/favorites'); // ELIMINADO
+                  //   },
+                  // ),
                   Divider(height: 1),
-                  _buildMenuItem(
-                    icon: Icons.help_outline,
-                    title: 'Ayuda y soporte',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/help');
-                    },
-                  ),
+                  // _buildMenuItem(
+                  //   icon: Icons.help_outline,
+                  //   title: 'Ayuda y soporte',
+                  //   onTap: () {
+                  //     Navigator.pop(context);
+                  //     Navigator.pushNamed(context, '/help'); // NO EXISTE
+                  //   },
+                  // ),
                   _buildMenuItem(
                     icon: Icons.info_outline,
                     title: 'Acerca de Oasis Taxi',
@@ -182,18 +216,33 @@ class PassengerDrawer extends StatelessWidget {
                       _showAboutDialog(context);
                     },
                   ),
+                  // Botón de configuración - Solución simplificada
                   _buildMenuItem(
-                    icon: Icons.settings,
+                    icon: Icons.settings_rounded,
                     title: 'Configuración',
                     onTap: () {
+                      AppLogger.info('Botón configuración presionado');
+                      // Cerrar el drawer primero
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/settings');
+                      // Navegar directamente con MaterialPageRoute (como el botón rojo que SÍ funciona)
+                      Navigator.of(context)
+                          .push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              SettingsScreen(userType: 'passenger'),
+                        ),
+                      )
+                          .then((_) {
+                        AppLogger.info('Navegación a configuración completada');
+                      }).catchError((error) {
+                        AppLogger.error('Error en navegación', error);
+                      });
                     },
                   ),
                 ],
               ),
             ),
-            
+
             // Botón de cerrar sesión
             Container(
               decoration: BoxDecoration(
@@ -208,7 +257,7 @@ class PassengerDrawer extends StatelessWidget {
                 ),
                 title: Text(
                   'Cerrar sesión',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.red,
                     fontWeight: FontWeight.w600,
                   ),
@@ -218,10 +267,10 @@ class PassengerDrawer extends StatelessWidget {
                 },
               ),
             ),
-            
+
             // Versión de la app
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'Versión 1.0.0',
                 style: TextStyle(
@@ -248,14 +297,14 @@ class PassengerDrawer extends StatelessWidget {
       leading: Icon(icon, color: AppColors.oasisTurquoise),
       title: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
       ),
       trailing: badge != null
           ? Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: badgeColor ?? AppColors.oasisTurquoise,
                 borderRadius: BorderRadius.circular(12),
@@ -288,7 +337,10 @@ class PassengerDrawer extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.oasisTurquoise, AppColors.oasisTurquoiseLight],
+                  colors: [
+                    AppColors.oasisTurquoise,
+                    AppColors.oasisTurquoiseLight
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -298,7 +350,7 @@ class PassengerDrawer extends StatelessWidget {
                 size: 24,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('Oasis Taxi'),
           ],
         ),
@@ -308,9 +360,9 @@ class PassengerDrawer extends StatelessWidget {
           children: [
             Text(
               'Tu servicio de taxi confiable y seguro.',
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'Versión: 1.0.0',
               style: TextStyle(color: Colors.grey[600]),

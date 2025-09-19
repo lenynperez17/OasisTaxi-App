@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Production configuration with SSL pinning -->
+
+    <!-- Domain security configurations for OasisTaxi -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Firebase domains -->
+        <domain includeSubdomains="true">firebaseapp.com</domain>
+        <domain includeSubdomains="true">firebase.com</domain>
+        <domain includeSubdomains="true">firebaseio.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+
+        <!-- OasisTaxi production domains -->
+        <domain includeSubdomains="true">oasistaxiperu.com</domain>
+        <domain includeSubdomains="true">api.oasistaxiperu.com</domain>
+
+        <!-- Pin sets for certificate pinning -->
+        <pin-set expiration="2025-12-31">
+            <!-- Firebase/Google pins -->
+            <!-- GTS Root R1 -->
+            <pin digest="SHA-256">Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=</pin>
+            <!-- GTS Root R2 -->
+            <pin digest="SHA-256">CLOmM1/OXvSPjw5UOYbAf9GKOxImEp9hhku9W90fHMk=</pin>
+            <!-- GTS CA 1C3 -->
+            <pin digest="SHA-256">W5rhIQ2ZbJKFkRvsGDwQVS/H/NSixP33+Z/fpJ0O25Q=</pin>
+            <!-- Backup pin -->
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+        </pin-set>
+
+        <!-- Trust anchors -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- MercadoPago domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">mercadopago.com</domain>
+        <domain includeSubdomains="true">mercadopago.com.pe</domain>
+        <domain includeSubdomains="true">mercadolibre.com</domain>
+
+        <pin-set expiration="2025-12-31">
+            <!-- MercadoPago certificate pins -->
+            <!-- DigiCert Global Root CA -->
+            <pin digest="SHA-256">r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=</pin>
+            <!-- DigiCert SHA2 Secure Server CA -->
+            <pin digest="SHA-256">5kJvNEMw0KjrCAu7eXY5HmQkP/Ulb5/OlyMoIIWDGA=</pin>
+            <!-- Backup pin -->
+            <pin digest="SHA-256">K87oWBWM9UZfyddvDfoxL+8lpNyoUB2ptGtn0fv6G2Q=</pin>
+        </pin-set>
+
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Google Maps domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">maps.googleapis.com</domain>
+        <domain includeSubdomains="true">maps.gstatic.com</domain>
+        <domain includeSubdomains="true">maps.google.com</domain>
+
+        <pin-set expiration="2025-12-31">
+            <!-- Google pins -->
+            <pin digest="SHA-256">Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=</pin>
+            <pin digest="SHA-256">CLOmM1/OXvSPjw5UOYbAf9GKOxImEp9hhku9W90fHMk=</pin>
+        </pin-set>
+
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Debug configuration (only for development) -->
+    <debug-overrides>
+        <trust-anchors>
+            <!-- Allow user-installed certificates in debug builds -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <!-- Base configuration -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

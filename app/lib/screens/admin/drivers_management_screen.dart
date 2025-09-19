@@ -1,143 +1,102 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/modern_theme.dart';
+
+// Enums y clases auxiliares necesarias
+enum DriverStatus { active, inactive, suspended, pending }
+
+class Document {
+  final String type;
+  final String status;
+  final DateTime? expiry;
+
+  Document({required this.type, required this.status, this.expiry});
+}
+
+// Clase Driver extendida para panel de administración
+class Driver {
+  final String id;
+  final String name;
+  final String email;
+  final String phone;
+  final String photo;
+  DriverStatus status; // Cambiado a no-final para poder modificar
+  final double rating;
+  final int totalTrips;
+  final DateTime? joinDate;
+  final Vehicle vehicle;
+  final List<Document> documents;
+  final double earnings;
+  final double commission;
+  final DateTime? lastTrip;
+
+  Driver({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.photo,
+    required this.status,
+    required this.rating,
+    required this.totalTrips,
+    this.joinDate,
+    required this.vehicle,
+    required this.documents,
+    required this.earnings,
+    required this.commission,
+    this.lastTrip,
+  });
+}
+
+// Clase Vehicle para compatibilidad
+class Vehicle {
+  final String brand;
+  final String model;
+  final int year;
+  final String plate;
+  final String color;
+
+  Vehicle({
+    required this.brand,
+    required this.model,
+    required this.year,
+    required this.plate,
+    required this.color,
+  });
+}
 
 class DriversManagementScreen extends StatefulWidget {
   const DriversManagementScreen({super.key});
 
   @override
-  _DriversManagementScreenState createState() => _DriversManagementScreenState();
+  DriversManagementScreenState createState() => DriversManagementScreenState();
 }
 
-class _DriversManagementScreenState extends State<DriversManagementScreen>
+class DriversManagementScreenState extends State<DriversManagementScreen>
     with TickerProviderStateMixin {
   late AnimationController _listController;
   late AnimationController _statsController;
   late TabController _tabController;
-  
+
   String _searchQuery = '';
   String _selectedStatus = 'all';
   String _sortBy = 'name';
-  
+
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Lista de conductores desde Firebase
   List<Driver> _drivers = [];
   bool _isLoading = true;
-  
-  // Datos mock temporales que serán reemplazados
-  final List<Driver> _mockDrivers = [
-    Driver(
-      id: 'D001',
-      name: 'Juan Pérez García',
-      email: 'juan.perez@email.com',
-      phone: '+51 999 888 777',
-      photo: '', // Se obtiene del perfil del conductor desde Firebase
-      status: DriverStatus.active,
-      rating: 4.8,
-      totalTrips: 1250,
-      joinDate: DateTime(2023, 1, 15),
-      vehicle: Vehicle(
-        brand: 'Toyota',
-        model: 'Corolla',
-        year: 2020,
-        plate: 'ABC-123',
-        color: 'Blanco',
-      ),
-      documents: [
-        Document(type: 'Licencia', status: 'verified', expiry: DateTime(2025, 6, 30)),
-        Document(type: 'SOAT', status: 'verified', expiry: DateTime(2024, 12, 31)),
-        Document(type: 'Antecedentes', status: 'verified', expiry: DateTime(2024, 8, 15)),
-      ],
-      earnings: 15750.50,
-      commission: 3150.10,
-      lastTrip: DateTime.now().subtract(Duration(hours: 2)),
-    ),
-    Driver(
-      id: 'D002',
-      name: 'María López Sánchez',
-      email: 'maria.lopez@email.com',
-      phone: '+51 988 777 666',
-      photo: '', // Se obtiene del perfil del conductor desde Firebase
-      status: DriverStatus.pending,
-      rating: 0.0,
-      totalTrips: 0,
-      joinDate: DateTime.now(),
-      vehicle: Vehicle(
-        brand: 'Nissan',
-        model: 'Sentra',
-        year: 2021,
-        plate: 'XYZ-456',
-        color: 'Negro',
-      ),
-      documents: [
-        Document(type: 'Licencia', status: 'pending', expiry: DateTime(2025, 3, 15)),
-        Document(type: 'SOAT', status: 'pending', expiry: DateTime(2024, 11, 30)),
-        Document(type: 'Antecedentes', status: 'rejected', expiry: null),
-      ],
-      earnings: 0,
-      commission: 0,
-      lastTrip: null,
-    ),
-    Driver(
-      id: 'D003',
-      name: 'Carlos Rodríguez',
-      email: 'carlos.rodriguez@email.com',
-      phone: '+51 977 666 555',
-      photo: '', // Se obtiene del perfil del conductor desde Firebase
-      status: DriverStatus.inactive,
-      rating: 4.5,
-      totalTrips: 890,
-      joinDate: DateTime(2023, 5, 20),
-      vehicle: Vehicle(
-        brand: 'Hyundai',
-        model: 'Accent',
-        year: 2019,
-        plate: 'DEF-789',
-        color: 'Gris',
-      ),
-      documents: [
-        Document(type: 'Licencia', status: 'expired', expiry: DateTime(2024, 1, 10)),
-        Document(type: 'SOAT', status: 'verified', expiry: DateTime(2024, 10, 20)),
-        Document(type: 'Antecedentes', status: 'verified', expiry: DateTime(2024, 7, 5)),
-      ],
-      earnings: 11230.75,
-      commission: 2246.15,
-      lastTrip: DateTime.now().subtract(Duration(days: 30)),
-    ),
-    Driver(
-      id: 'D004',
-      name: 'Ana Martínez',
-      email: 'ana.martinez@email.com',
-      phone: '+51 966 555 444',
-      photo: '', // Se obtiene del perfil del conductor desde Firebase
-      status: DriverStatus.suspended,
-      rating: 3.2,
-      totalTrips: 450,
-      joinDate: DateTime(2023, 8, 10),
-      vehicle: Vehicle(
-        brand: 'Kia',
-        model: 'Rio',
-        year: 2020,
-        plate: 'GHI-012',
-        color: 'Rojo',
-      ),
-      documents: [
-        Document(type: 'Licencia', status: 'verified', expiry: DateTime(2025, 2, 28)),
-        Document(type: 'SOAT', status: 'verified', expiry: DateTime(2024, 9, 15)),
-        Document(type: 'Antecedentes', status: 'verified', expiry: DateTime(2024, 6, 20)),
-      ],
-      earnings: 6750.25,
-      commission: 1350.05,
-      lastTrip: DateTime.now().subtract(Duration(days: 7)),
-    ),
-  ];
-  
+
+  // Lista de conductores desde Firebase
+  // final List<Driver> _mockDrivers = []; // No usado actualmente
+
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('DriversManagementScreen', 'initState');
     _listController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
@@ -147,32 +106,32 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       vsync: this,
     );
     _tabController = TabController(length: 4, vsync: this);
-    
+
     _listController.forward();
     _statsController.forward();
-    
+
     // Cargar conductores desde Firebase
     _loadDriversFromFirebase();
   }
-  
+
   Future<void> _loadDriversFromFirebase() async {
     try {
       setState(() {
         _isLoading = true;
       });
-      
+
       // Obtener conductores desde Firebase
       final QuerySnapshot driversSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'driver')
           .orderBy('createdAt', descending: true)
           .get();
-      
+
       List<Driver> loadedDrivers = [];
-      
+
       for (var doc in driversSnapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
+
         // Obtener vehículo del conductor si existe
         Vehicle? vehicle;
         if (data['vehicleId'] != null) {
@@ -180,28 +139,28 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
               .collection('vehicles')
               .doc(data['vehicleId'])
               .get();
-          
+
           if (vehicleDoc.exists) {
             final vehicleData = vehicleDoc.data() as Map<String, dynamic>;
             vehicle = Vehicle(
               brand: vehicleData['brand'] ?? 'Sin marca',
               model: vehicleData['model'] ?? 'Sin modelo',
               year: vehicleData['year'] ?? 2020,
-              plate: vehicleData['plate'] ?? 'XXX-000',
+              plate: vehicleData['plate'] ?? 'SIN-PLACA',
               color: vehicleData['color'] ?? 'Sin color',
             );
           }
         }
-        
+
         // Si no hay vehículo, usar uno por defecto
         vehicle ??= Vehicle(
           brand: 'Por registrar',
           model: 'Por registrar',
           year: DateTime.now().year,
-          plate: 'XXX-000',
+          plate: 'SIN-PLACA',
           color: 'Por registrar',
         );
-        
+
         // Obtener documentos del conductor
         List<Document> documents = [];
         if (data['documents'] != null && data['documents'] is List) {
@@ -209,13 +168,13 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
             documents.add(Document(
               type: docData['type'] ?? 'Desconocido',
               status: docData['status'] ?? 'pending',
-              expiry: docData['expiry'] != null 
+              expiry: docData['expiry'] != null
                   ? (docData['expiry'] as Timestamp).toDate()
                   : null,
             ));
           }
         }
-        
+
         // Si no hay documentos, agregar los requeridos por defecto
         if (documents.isEmpty) {
           documents = [
@@ -224,21 +183,21 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
             Document(type: 'Antecedentes', status: 'pending', expiry: null),
           ];
         }
-        
+
         // Calcular estadísticas desde la colección de rides
         int totalTrips = 0;
         double totalEarnings = 0;
         double totalCommission = 0;
         DateTime? lastTripDate;
-        
+
         final ridesSnapshot = await _firestore
             .collection('rides')
             .where('driverId', isEqualTo: doc.id)
             .orderBy('createdAt', descending: true)
             .get();
-        
+
         totalTrips = ridesSnapshot.docs.length;
-        
+
         for (var rideDoc in ridesSnapshot.docs) {
           final rideData = rideDoc.data();
           if (rideData['fare'] != null) {
@@ -247,11 +206,13 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
             totalCommission += fare * 0.20; // 20% de comisión
           }
         }
-        
+
         if (ridesSnapshot.docs.isNotEmpty) {
-          lastTripDate = (ridesSnapshot.docs.first.data()['completedAt'] as Timestamp?)?.toDate();
+          lastTripDate =
+              (ridesSnapshot.docs.first.data()['completedAt'] as Timestamp?)
+                  ?.toDate();
         }
-        
+
         // Determinar estado del conductor
         DriverStatus status;
         if (data['isSuspended'] == true) {
@@ -263,7 +224,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
         } else {
           status = DriverStatus.active;
         }
-        
+
         loadedDrivers.add(Driver(
           id: doc.id,
           name: data['displayName'] ?? 'Sin nombre',
@@ -273,7 +234,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           status: status,
           rating: (data['rating'] ?? 5.0).toDouble(),
           totalTrips: totalTrips,
-          joinDate: data['createdAt'] != null 
+          joinDate: data['createdAt'] != null
               ? (data['createdAt'] as Timestamp).toDate()
               : DateTime.now(),
           vehicle: vehicle,
@@ -283,49 +244,50 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           lastTrip: lastTripDate,
         ));
       }
-      
+
       setState(() {
         _drivers = loadedDrivers;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error cargando conductores: $e');
+      AppLogger.error('cargando conductores', e);
       setState(() {
         _isLoading = false;
       });
-      
+
       // Mostrar error al usuario
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar conductores: $e'),
-            backgroundColor: ModernTheme.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar conductores: $e'),
+          backgroundColor: ModernTheme.error,
+        ),
+      );
     }
   }
-  
+
   List<Driver> get _filteredDrivers {
     var filtered = _drivers;
-    
+
     // Filtrar por búsqueda
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((driver) {
         return driver.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               driver.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               driver.phone.contains(_searchQuery) ||
-               driver.vehicle.plate.toLowerCase().contains(_searchQuery.toLowerCase());
+            driver.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            driver.phone.contains(_searchQuery) ||
+            driver.vehicle.plate
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase());
       }).toList();
     }
-    
+
     // Filtrar por estado
     if (_selectedStatus != 'all') {
       filtered = filtered.where((driver) {
         return driver.status.toString().split('.').last == _selectedStatus;
       }).toList();
     }
-    
+
     // Ordenar
     filtered.sort((a, b) {
       switch (_sortBy) {
@@ -341,16 +303,20 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           return 0;
       }
     });
-    
+
     return filtered;
   }
-  
+
   Map<String, dynamic> get _statistics {
-    final activeDrivers = _drivers.where((d) => d.status == DriverStatus.active).length;
-    final pendingDrivers = _drivers.where((d) => d.status == DriverStatus.pending).length;
-    final totalEarnings = _drivers.fold<double>(0, (sum, d) => sum + d.earnings);
-    final totalCommission = _drivers.fold<double>(0, (sum, d) => sum + d.commission);
-    
+    final activeDrivers =
+        _drivers.where((d) => d.status == DriverStatus.active).length;
+    final pendingDrivers =
+        _drivers.where((d) => d.status == DriverStatus.pending).length;
+    final totalEarnings =
+        _drivers.fold<double>(0, (accumulator, d) => accumulator + d.earnings);
+    final totalCommission = _drivers.fold<double>(
+        0, (accumulator, d) => accumulator + d.commission);
+
     return {
       'total': _drivers.length,
       'active': activeDrivers,
@@ -359,8 +325,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       'commission': totalCommission,
     };
   }
-  
-  
+
   @override
   void dispose() {
     _listController.dispose();
@@ -369,11 +334,11 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
     _searchController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final stats = _statistics;
-    
+
     return Scaffold(
       backgroundColor: ModernTheme.backgroundLight,
       appBar: AppBar(
@@ -405,7 +370,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   CircularProgressIndicator(
                     color: ModernTheme.oasisGreen,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     'Cargando conductores...',
                     style: TextStyle(
@@ -420,164 +385,172 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
               onRefresh: _loadDriversFromFirebase,
               color: ModernTheme.oasisGreen,
               child: Column(
-        children: [
-          // Estadísticas
-          AnimatedBuilder(
-            animation: _statsController,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, -50 * (1 - _statsController.value)),
-                child: Opacity(
-                  opacity: _statsController.value,
-                  child: Container(
+                children: [
+                  // Estadísticas
+                  AnimatedBuilder(
+                    animation: _statsController,
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: Offset(0, -50 * (1 - _statsController.value)),
+                        child: Opacity(
+                          opacity: _statsController.value,
+                          child: Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  ModernTheme.oasisGreen,
+                                  ModernTheme.oasisGreen.withBlue(30),
+                                ],
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildStatCard(
+                                    'Total', '${stats['total']}', Icons.group),
+                                _buildStatCard('Activos', '${stats['active']}',
+                                    Icons.check_circle),
+                                _buildStatCard('Pendientes',
+                                    '${stats['pending']}', Icons.pending),
+                                _buildStatCard(
+                                  'Ganancias',
+                                  'S/ ${(stats['earnings'] / 1000).toStringAsFixed(1)}K',
+                                  Icons.attach_money,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Barra de búsqueda
+                  Container(
                     padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          ModernTheme.oasisGreen,
-                          ModernTheme.oasisGreen.withBlue(30),
-                        ],
-                      ),
-                    ),
+                    color: Colors.white,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildStatCard('Total', '${stats['total']}', Icons.group),
-                        _buildStatCard('Activos', '${stats['active']}', Icons.check_circle),
-                        _buildStatCard('Pendientes', '${stats['pending']}', Icons.pending),
-                        _buildStatCard(
-                          'Ganancias',
-                          '\$${(stats['earnings'] / 1000).toStringAsFixed(1)}K',
-                          Icons.attach_money,
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Buscar por nombre, email, teléfono o placa...',
+                              prefixIcon: Icon(Icons.search,
+                                  color: ModernTheme.oasisGreen),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: ModernTheme.backgroundLight,
+                            ),
+                            onChanged: (value) {
+                              setState(() => _searchQuery = value);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.sort, color: ModernTheme.oasisGreen),
+                          onSelected: (value) {
+                            setState(() => _sortBy = value);
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(value: 'name', child: Text('Nombre')),
+                            PopupMenuItem(
+                                value: 'rating', child: Text('Calificación')),
+                            PopupMenuItem(
+                                value: 'trips', child: Text('Viajes')),
+                            PopupMenuItem(
+                                value: 'earnings', child: Text('Ganancias')),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-          
-          // Barra de búsqueda
-          Container(
-            padding: EdgeInsets.all(16),
-            color: Colors.white,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Buscar por nombre, email, teléfono o placa...',
-                      prefixIcon: Icon(Icons.search, color: ModernTheme.oasisGreen),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: ModernTheme.backgroundLight,
+
+                  // Tabs de estado
+                  Container(
+                    color: Colors.white,
+                    child: TabBar(
+                      controller: _tabController,
+                      labelColor: ModernTheme.oasisGreen,
+                      unselectedLabelColor: ModernTheme.textSecondary,
+                      indicatorColor: ModernTheme.oasisGreen,
+                      onTap: (index) {
+                        setState(() {
+                          switch (index) {
+                            case 0:
+                              _selectedStatus = 'all';
+                              break;
+                            case 1:
+                              _selectedStatus = 'active';
+                              break;
+                            case 2:
+                              _selectedStatus = 'pending';
+                              break;
+                            case 3:
+                              _selectedStatus = 'inactive';
+                              break;
+                          }
+                        });
+                      },
+                      tabs: [
+                        Tab(text: 'Todos'),
+                        Tab(text: 'Activos'),
+                        Tab(text: 'Pendientes'),
+                        Tab(text: 'Inactivos'),
+                      ],
                     ),
-                    onChanged: (value) {
-                      setState(() => _searchQuery = value);
-                    },
                   ),
-                ),
-                SizedBox(width: 12),
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.sort, color: ModernTheme.oasisGreen),
-                  onSelected: (value) {
-                    setState(() => _sortBy = value);
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(value: 'name', child: Text('Nombre')),
-                    PopupMenuItem(value: 'rating', child: Text('Calificación')),
-                    PopupMenuItem(value: 'trips', child: Text('Viajes')),
-                    PopupMenuItem(value: 'earnings', child: Text('Ganancias')),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // Tabs de estado
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: ModernTheme.oasisGreen,
-              unselectedLabelColor: ModernTheme.textSecondary,
-              indicatorColor: ModernTheme.oasisGreen,
-              onTap: (index) {
-                setState(() {
-                  switch (index) {
-                    case 0:
-                      _selectedStatus = 'all';
-                      break;
-                    case 1:
-                      _selectedStatus = 'active';
-                      break;
-                    case 2:
-                      _selectedStatus = 'pending';
-                      break;
-                    case 3:
-                      _selectedStatus = 'inactive';
-                      break;
-                  }
-                });
-              },
-              tabs: [
-                Tab(text: 'Todos'),
-                Tab(text: 'Activos'),
-                Tab(text: 'Pendientes'),
-                Tab(text: 'Inactivos'),
-              ],
-            ),
-          ),
-          
-          // Lista de conductores
-          Expanded(
-            child: AnimatedBuilder(
-              animation: _listController,
-              builder: (context, child) {
-                return ListView.builder(
-                  padding: EdgeInsets.all(16),
-                  itemCount: _filteredDrivers.length,
-                  itemBuilder: (context, index) {
-                    final driver = _filteredDrivers[index];
-                    final delay = index * 0.1;
-                    final animation = Tween<double>(
-                      begin: 0,
-                      end: 1,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: _listController,
-                        curve: Interval(
-                          delay,
-                          delay + 0.5,
-                          curve: Curves.easeOutBack,
-                        ),
-                      ),
-                    );
-                    
-                    return AnimatedBuilder(
-                      animation: animation,
+
+                  // Lista de conductores
+                  Expanded(
+                    child: AnimatedBuilder(
+                      animation: _listController,
                       builder: (context, child) {
-                        return Transform.translate(
-                          offset: Offset(50 * (1 - animation.value), 0),
-                          child: Opacity(
-                            opacity: animation.value,
-                            child: _buildDriverCard(driver),
-                          ),
+                        return ListView.builder(
+                          padding: EdgeInsets.all(16),
+                          itemCount: _filteredDrivers.length,
+                          itemBuilder: (context, index) {
+                            final driver = _filteredDrivers[index];
+                            final delay = index * 0.1;
+                            final animation = Tween<double>(
+                              begin: 0,
+                              end: 1,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: _listController,
+                                curve: Interval(
+                                  delay,
+                                  delay + 0.5,
+                                  curve: Curves.easeOutBack,
+                                ),
+                              ),
+                            );
+
+                            return AnimatedBuilder(
+                              animation: animation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(50 * (1 - animation.value), 0),
+                                  child: Opacity(
+                                    opacity: animation.value,
+                                    child: _buildDriverCard(driver),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addNewDriver,
@@ -587,7 +560,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   Widget _buildStatCard(String label, String value, IconData icon) {
     return Column(
       children: [
@@ -599,7 +572,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           ),
           child: Icon(icon, color: Colors.white, size: 20),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -618,7 +591,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ],
     );
   }
-  
+
   Widget _buildDriverCard(Driver driver) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -658,7 +631,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                       ),
                     ],
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -690,9 +663,9 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   _buildStatusBadge(driver.status),
                 ],
               ),
-              
-              SizedBox(height: 16),
-              
+
+              const SizedBox(height: 16),
+
               // Información del vehículo
               Container(
                 padding: EdgeInsets.all(12),
@@ -702,8 +675,9 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.directions_car, color: ModernTheme.textSecondary, size: 20),
-                    SizedBox(width: 8),
+                    Icon(Icons.directions_car,
+                        color: ModernTheme.textSecondary, size: 20),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${driver.vehicle.brand} ${driver.vehicle.model} ${driver.vehicle.year}',
@@ -727,28 +701,38 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   ],
                 ),
               ),
-              
-              SizedBox(height: 12),
-              
+
+              const SizedBox(height: 12),
+
               // Estadísticas
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMiniStat(Icons.star, driver.rating.toString(), 'Rating', Colors.amber),
-                  _buildMiniStat(Icons.route, driver.totalTrips.toString(), 'Viajes', ModernTheme.primaryBlue),
-                  _buildMiniStat(Icons.attach_money, '\$${(driver.earnings / 1000).toStringAsFixed(1)}K', 'Ganancias', ModernTheme.success),
+                  _buildMiniStat(Icons.star, driver.rating.toString(), 'Rating',
+                      Colors.amber),
+                  _buildMiniStat(Icons.route, driver.totalTrips.toString(),
+                      'Viajes', ModernTheme.primaryBlue),
+                  _buildMiniStat(
+                      Icons.attach_money,
+                      'S/ ${(driver.earnings / 1000).toStringAsFixed(1)}K',
+                      'Ganancias',
+                      ModernTheme.success),
                   if (driver.lastTrip != null)
-                    _buildMiniStat(Icons.access_time, _formatLastTrip(driver.lastTrip!), 'Último', ModernTheme.info),
+                    _buildMiniStat(
+                        Icons.access_time,
+                        _formatLastTrip(driver.lastTrip!),
+                        'Último',
+                        ModernTheme.info),
                 ],
               ),
-              
-              SizedBox(height: 12),
-              
+
+              const SizedBox(height: 12),
+
               // Documentos
               _buildDocumentsRow(driver.documents),
-              
-              SizedBox(height: 12),
-              
+
+              const SizedBox(height: 12),
+
               // Acciones
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -757,9 +741,10 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                     TextButton.icon(
                       onPressed: () => _rejectDriver(driver),
                       icon: Icon(Icons.close, color: ModernTheme.error),
-                      label: Text('Rechazar', style: TextStyle(color: ModernTheme.error)),
+                      label: Text('Rechazar',
+                          style: TextStyle(color: ModernTheme.error)),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () => _approveDriver(driver),
                       icon: Icon(Icons.check, color: Colors.white),
@@ -772,7 +757,8 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                     TextButton.icon(
                       onPressed: () => _suspendDriver(driver),
                       icon: Icon(Icons.block, color: ModernTheme.warning),
-                      label: Text('Suspender', style: TextStyle(color: ModernTheme.warning)),
+                      label: Text('Suspender',
+                          style: TextStyle(color: ModernTheme.warning)),
                     ),
                   ] else if (driver.status == DriverStatus.suspended) ...[
                     ElevatedButton.icon(
@@ -796,11 +782,11 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   Widget _buildStatusBadge(DriverStatus status) {
     String text;
     Color color;
-    
+
     switch (status) {
       case DriverStatus.active:
         text = 'Activo';
@@ -819,7 +805,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
         color = ModernTheme.error;
         break;
     }
-    
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -837,15 +823,16 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
-  Widget _buildMiniStat(IconData icon, String value, String label, Color color) {
+
+  Widget _buildMiniStat(
+      IconData icon, String value, String label, Color color) {
     return Column(
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 16, color: color),
-            SizedBox(width: 4),
+            const SizedBox(width: 4),
             Text(
               value,
               style: TextStyle(
@@ -865,12 +852,12 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ],
     );
   }
-  
+
   Widget _buildDocumentsRow(List<Document> documents) {
     return Row(
       children: [
         Icon(Icons.description, size: 16, color: ModernTheme.textSecondary),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Text(
           'Documentos:',
           style: TextStyle(
@@ -878,13 +865,13 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
             color: ModernTheme.textSecondary,
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Row(
             children: documents.map((doc) {
               Color color;
               IconData icon;
-              
+
               switch (doc.status) {
                 case 'verified':
                   color = ModernTheme.success;
@@ -906,7 +893,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   color = ModernTheme.textSecondary;
                   icon = Icons.help;
               }
-              
+
               return Padding(
                 padding: EdgeInsets.only(right: 8),
                 child: Tooltip(
@@ -920,7 +907,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ],
     );
   }
-  
+
   Color _getStatusColor(DriverStatus status) {
     switch (status) {
       case DriverStatus.active:
@@ -933,11 +920,11 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
         return ModernTheme.error;
     }
   }
-  
+
   String _formatLastTrip(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inHours < 1) {
       return '${difference.inMinutes}m';
     } else if (difference.inDays < 1) {
@@ -946,7 +933,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       return '${difference.inDays}d';
     }
   }
-  
+
   void _showDriverDetails(Driver driver) {
     showModalBottomSheet(
       context: context,
@@ -955,7 +942,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       builder: (context) => DriverDetailsModal(driver: driver),
     );
   }
-  
+
   void _showDriverOptions(Driver driver) {
     showModalBottomSheet(
       context: context,
@@ -995,7 +982,8 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
             ),
             ListTile(
               leading: Icon(Icons.delete, color: ModernTheme.error),
-              title: Text('Eliminar conductor', style: TextStyle(color: ModernTheme.error)),
+              title: Text('Eliminar conductor',
+                  style: TextStyle(color: ModernTheme.error)),
               onTap: () {
                 Navigator.pop(context);
                 _deleteDriver(driver);
@@ -1006,12 +994,12 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   void _approveDriver(Driver driver) {
     setState(() {
       driver.status = DriverStatus.active;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Conductor aprobado exitosamente'),
@@ -1019,7 +1007,7 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   void _rejectDriver(Driver driver) {
     showDialog(
       context: context,
@@ -1058,14 +1046,15 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   void _suspendDriver(Driver driver) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Suspender Conductor'),
-        content: Text('¿Estás seguro de que deseas suspender a este conductor?'),
+        content:
+            Text('¿Estás seguro de que deseas suspender a este conductor?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -1073,8 +1062,9 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           ),
           ElevatedButton(
             onPressed: () async {
+              if (!mounted) return;
               Navigator.pop(context);
-              
+
               try {
                 // Actualizar en Firebase
                 await _firestore.collection('users').doc(driver.id).update({
@@ -1082,33 +1072,26 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   'isActive': false,
                   'suspendedAt': FieldValue.serverTimestamp(),
                 });
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Conductor suspendido correctamente'),
-                    backgroundColor: ModernTheme.warning,
-                  ),
-                );
-                
+
+                _showSnackBar(
+                    'Conductor suspendido correctamente', ModernTheme.warning);
+
                 // Recargar conductores
                 _loadDriversFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al suspender conductor: $e'),
-                    backgroundColor: ModernTheme.error,
-                  ),
-                );
+                _showSnackBar(
+                    'Error al suspender conductor: $e', ModernTheme.error);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: ModernTheme.warning),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: ModernTheme.warning),
             child: Text('Suspender'),
           ),
         ],
       ),
     );
   }
-  
+
   void _activateDriver(Driver driver) async {
     try {
       // Actualizar en Firebase
@@ -1118,17 +1101,19 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
         'isVerified': true,
         'activatedAt': FieldValue.serverTimestamp(),
       });
-      
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Conductor activado correctamente'),
           backgroundColor: ModernTheme.success,
         ),
       );
-      
+
       // Recargar conductores
       _loadDriversFromFirebase();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al activar conductor: $e'),
@@ -1137,19 +1122,19 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       );
     }
   }
-  
+
   void _editDriver(Driver driver) {
     // Implementar edición
   }
-  
+
   void _showDriverHistory(Driver driver) {
     // Implementar historial
   }
-  
+
   void _sendMessage(Driver driver) {
     // Implementar mensajería
   }
-  
+
   void _deleteDriver(Driver driver) {
     showDialog(
       context: context,
@@ -1165,37 +1150,29 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              
+
               try {
                 // Eliminar de Firebase
                 await _firestore.collection('users').doc(driver.id).delete();
-                
+
                 // También eliminar el vehículo asociado si existe
                 final vehicleSnapshot = await _firestore
                     .collection('vehicles')
                     .where('driverId', isEqualTo: driver.id)
                     .get();
-                
+
                 for (var doc in vehicleSnapshot.docs) {
                   await doc.reference.delete();
                 }
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Conductor eliminado correctamente'),
-                    backgroundColor: ModernTheme.error,
-                  ),
-                );
-                
+
+                _showSnackBar(
+                    'Conductor eliminado correctamente', ModernTheme.error);
+
                 // Recargar conductores
                 _loadDriversFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al eliminar conductor: $e'),
-                    backgroundColor: ModernTheme.error,
-                  ),
-                );
+                _showSnackBar(
+                    'Error al eliminar conductor: $e', ModernTheme.error);
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: ModernTheme.error),
@@ -1205,15 +1182,15 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
-  
+
   void _addNewDriver() {
     // Implementar agregar conductor
   }
-  
+
   void _showFilterDialog() {
     // Implementar filtros avanzados
   }
-  
+
   void _exportData() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1222,14 +1199,27 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
       ),
     );
   }
+
+  void _showSnackBar(String message, Color backgroundColor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
 }
 
 // Modal de detalles del conductor
 class DriverDetailsModal extends StatelessWidget {
   final Driver driver;
-  
+
   const DriverDetailsModal({super.key, required this.driver});
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1250,7 +1240,7 @@ class DriverDetailsModal extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Container(
             padding: EdgeInsets.all(20),
@@ -1264,7 +1254,7 @@ class DriverDetailsModal extends StatelessWidget {
                   radius: 40,
                   backgroundImage: NetworkImage(driver.photo),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1295,7 +1285,7 @@ class DriverDetailsModal extends StatelessWidget {
               ],
             ),
           ),
-          
+
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(20),
@@ -1314,9 +1304,9 @@ class DriverDetailsModal extends StatelessWidget {
                       _buildInfoRow('Color', driver.vehicle.color),
                     ],
                   ),
-                  
-                  SizedBox(height: 20),
-                  
+
+                  const SizedBox(height: 20),
+
                   // Documentos
                   _buildSection(
                     'Documentos',
@@ -1325,20 +1315,26 @@ class DriverDetailsModal extends StatelessWidget {
                       return _buildDocumentRow(doc);
                     }).toList(),
                   ),
-                  
-                  SizedBox(height: 20),
-                  
+
+                  const SizedBox(height: 20),
+
                   // Estadísticas
                   _buildSection(
                     'Estadísticas',
                     Icons.bar_chart,
                     [
                       _buildInfoRow('Calificación', '${driver.rating} ⭐'),
-                      _buildInfoRow('Viajes totales', driver.totalTrips.toString()),
-                      _buildInfoRow('Ganancias', '\$${driver.earnings.toStringAsFixed(2)}'),
-                      _buildInfoRow('Comisión', '\$${driver.commission.toStringAsFixed(2)}'),
-                      _buildInfoRow('Fecha de registro', 
-                        '${driver.joinDate.day}/${driver.joinDate.month}/${driver.joinDate.year}'),
+                      _buildInfoRow(
+                          'Viajes totales', driver.totalTrips.toString()),
+                      _buildInfoRow('Ganancias',
+                          'S/ ${driver.earnings.toStringAsFixed(2)}'),
+                      _buildInfoRow('Comisión',
+                          'S/ ${driver.commission.toStringAsFixed(2)}'),
+                      _buildInfoRow(
+                          'Fecha de registro',
+                          driver.joinDate != null
+                              ? '${driver.joinDate!.day}/${driver.joinDate!.month}/${driver.joinDate!.year}'
+                              : 'No disponible'),
                     ],
                   ),
                 ],
@@ -1349,7 +1345,7 @@ class DriverDetailsModal extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildSection(String title, IconData icon, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1357,7 +1353,7 @@ class DriverDetailsModal extends StatelessWidget {
         Row(
           children: [
             Icon(icon, color: ModernTheme.oasisGreen),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               title,
               style: TextStyle(
@@ -1367,7 +1363,7 @@ class DriverDetailsModal extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1379,7 +1375,7 @@ class DriverDetailsModal extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -1392,11 +1388,11 @@ class DriverDetailsModal extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildDocumentRow(Document doc) {
     Color statusColor;
     String statusText;
-    
+
     switch (doc.status) {
       case 'verified':
         statusColor = ModernTheme.success;
@@ -1418,7 +1414,7 @@ class DriverDetailsModal extends StatelessWidget {
         statusColor = ModernTheme.textSecondary;
         statusText = 'Desconocido';
     }
-    
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1442,7 +1438,7 @@ class DriverDetailsModal extends StatelessWidget {
             ),
           ),
           if (doc.expiry != null) ...[
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Exp: ${doc.expiry!.day}/${doc.expiry!.month}/${doc.expiry!.year}',
               style: TextStyle(
@@ -1455,69 +1451,4 @@ class DriverDetailsModal extends StatelessWidget {
       ),
     );
   }
-}
-
-// Modelos
-enum DriverStatus { active, inactive, pending, suspended }
-
-class Driver {
-  String id;
-  String name;
-  String email;
-  String phone;
-  String photo;
-  DriverStatus status;
-  double rating;
-  int totalTrips;
-  DateTime joinDate;
-  Vehicle vehicle;
-  List<Document> documents;
-  double earnings;
-  double commission;
-  DateTime? lastTrip;
-  
-  Driver({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.phone,
-    required this.photo,
-    required this.status,
-    required this.rating,
-    required this.totalTrips,
-    required this.joinDate,
-    required this.vehicle,
-    required this.documents,
-    required this.earnings,
-    required this.commission,
-    this.lastTrip,
-  });
-}
-
-class Vehicle {
-  String brand;
-  String model;
-  int year;
-  String plate;
-  String color;
-  
-  Vehicle({
-    required this.brand,
-    required this.model,
-    required this.year,
-    required this.plate,
-    required this.color,
-  });
-}
-
-class Document {
-  String type;
-  String status;
-  DateTime? expiry;
-  
-  Document({
-    required this.type,
-    required this.status,
-    this.expiry,
-  });
 }

@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../core/theme/modern_theme.dart';
@@ -21,10 +20,10 @@ class AnimatedPulseButton extends StatefulWidget {
   });
 
   @override
-  _AnimatedPulseButtonState createState() => _AnimatedPulseButtonState();
+  AnimatedPulseButtonState createState() => AnimatedPulseButtonState();
 }
 
-class _AnimatedPulseButtonState extends State<AnimatedPulseButton>
+class AnimatedPulseButtonState extends State<AnimatedPulseButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -120,7 +119,7 @@ class _AnimatedPulseButtonState extends State<AnimatedPulseButton>
                                 color: Colors.white,
                                 size: 22,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                             ],
                             Text(
                               widget.text,
@@ -158,10 +157,10 @@ class AnimatedElevatedCard extends StatefulWidget {
   });
 
   @override
-  _AnimatedElevatedCardState createState() => _AnimatedElevatedCardState();
+  AnimatedElevatedCardState createState() => AnimatedElevatedCardState();
 }
 
-class _AnimatedElevatedCardState extends State<AnimatedElevatedCard>
+class AnimatedElevatedCardState extends State<AnimatedElevatedCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _elevationAnimation;
@@ -248,10 +247,10 @@ class ModernLoadingIndicator extends StatefulWidget {
   });
 
   @override
-  _ModernLoadingIndicatorState createState() => _ModernLoadingIndicatorState();
+  ModernLoadingIndicatorState createState() => ModernLoadingIndicatorState();
 }
 
-class _ModernLoadingIndicatorState extends State<ModernLoadingIndicator>
+class ModernLoadingIndicatorState extends State<ModernLoadingIndicator>
     with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _scaleController;
@@ -305,7 +304,8 @@ class _ModernLoadingIndicatorState extends State<ModernLoadingIndicator>
                 gradient: LinearGradient(
                   colors: [
                     widget.color ?? ModernTheme.primaryOrange,
-                    (widget.color ?? ModernTheme.primaryOrange).withValues(alpha: 0.3),
+                    (widget.color ?? ModernTheme.primaryOrange)
+                        .withValues(alpha: 0.3),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -340,12 +340,11 @@ class AnimatedFloatingActionMenu extends StatefulWidget {
   });
 
   @override
-  _AnimatedFloatingActionMenuState createState() =>
-      _AnimatedFloatingActionMenuState();
+  AnimatedFloatingActionMenuState createState() =>
+      AnimatedFloatingActionMenuState();
 }
 
-class _AnimatedFloatingActionMenuState
-    extends State<AnimatedFloatingActionMenu>
+class AnimatedFloatingActionMenuState extends State<AnimatedFloatingActionMenu>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _expandAnimation;
@@ -390,7 +389,7 @@ class _AnimatedFloatingActionMenuState
         ...widget.items.asMap().entries.map((entry) {
           int index = entry.key;
           FloatingMenuItem item = entry.value;
-          
+
           return AnimatedBuilder(
             animation: _expandAnimation,
             builder: (context, child) {
@@ -462,11 +461,10 @@ class PriceNegotiationSlider extends StatefulWidget {
   });
 
   @override
-  _PriceNegotiationSliderState createState() =>
-      _PriceNegotiationSliderState();
+  PriceNegotiationSliderState createState() => PriceNegotiationSliderState();
 }
 
-class _PriceNegotiationSliderState extends State<PriceNegotiationSlider>
+class PriceNegotiationSliderState extends State<PriceNegotiationSlider>
     with SingleTickerProviderStateMixin {
   late double _currentPrice;
   late AnimationController _pulseController;
@@ -476,7 +474,7 @@ class _PriceNegotiationSliderState extends State<PriceNegotiationSlider>
   void initState() {
     super.initState();
     _currentPrice = widget.suggestedPrice;
-    
+
     _pulseController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
@@ -527,7 +525,7 @@ class _PriceNegotiationSliderState extends State<PriceNegotiationSlider>
             );
           },
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: ModernTheme.primaryOrange,

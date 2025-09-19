@@ -1,8 +1,15 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/oasis_button.dart';
+import '../../widgets/common/oasis_app_bar.dart';
+import '../../services/security_integration_service.dart';
+import '../../utils/app_logger.dart';
 
 enum CardType { visa, mastercard, amex, discover, other }
+
 enum PaymentMethodType { card, cash, wallet, paypal }
 
 class PaymentMethod {
@@ -37,132 +44,228 @@ class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({super.key});
 
   @override
-  _PaymentMethodsScreenState createState() => _PaymentMethodsScreenState();
+  PaymentMethodsScreenState createState() => PaymentMethodsScreenState();
 }
 
-class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
+class PaymentMethodsScreenState extends State<PaymentMethodsScreen>
     with TickerProviderStateMixin {
   late AnimationController _listAnimationController;
   late AnimationController _cardFlipController;
   late AnimationController _fabAnimationController;
-  
-  String _defaultMethodId = 'PM001';
-  
-  final List<PaymentMethod> _paymentMethods = [
-    PaymentMethod(
-      id: 'PM001',
-      type: PaymentMethodType.card,
-      name: 'Visa •••• 1234',
-      cardNumber: '4111 1111 1111 1234',
-      cardHolder: 'JUAN PEREZ',
-      expiryDate: '12/25',
-      cardType: CardType.visa,
-      isDefault: true,
-      icon: Icons.credit_card,
-      color: Colors.blue,
-    ),
-    PaymentMethod(
-      id: 'PM002',
-      type: PaymentMethodType.card,
-      name: 'MasterCard •••• 5678',
-      cardNumber: '5500 0000 0000 5678',
-      cardHolder: 'JUAN PEREZ',
-      expiryDate: '08/26',
-      cardType: CardType.mastercard,
-      isDefault: false,
-      icon: Icons.credit_card,
-      color: Colors.orange,
-    ),
-    PaymentMethod(
-      id: 'PM003',
-      type: PaymentMethodType.cash,
-      name: 'Efectivo',
-      isDefault: false,
-      icon: Icons.money,
-      color: ModernTheme.success,
-    ),
-    PaymentMethod(
-      id: 'PM004',
-      type: PaymentMethodType.wallet,
-      name: 'Billetera Oasis',
-      walletBalance: '45.80',
-      isDefault: false,
-      icon: Icons.account_balance_wallet,
-      color: ModernTheme.oasisGreen,
-    ),
-    PaymentMethod(
-      id: 'PM005',
-      type: PaymentMethodType.paypal,
-      name: 'PayPal',
-      isDefault: false,
-      icon: Icons.payment,
-      color: Colors.indigo,
-    ),
-  ];
-  
-  final List<Map<String, dynamic>> _transactionHistory = [
-    {
-      'id': 'T001',
-      'date': DateTime.now().subtract(Duration(hours: 2)),
-      'amount': 25.50,
-      'method': 'Visa •••• 1234',
-      'status': 'completed',
-      'tripId': 'V001',
-    },
-    {
-      'id': 'T002',
-      'date': DateTime.now().subtract(Duration(days: 1)),
-      'amount': 18.75,
-      'method': 'Efectivo',
-      'status': 'completed',
-      'tripId': 'V002',
-    },
-    {
-      'id': 'T003',
-      'date': DateTime.now().subtract(Duration(days: 2)),
-      'amount': 32.00,
-      'method': 'Billetera Oasis',
-      'status': 'completed',
-      'tripId': 'V003',
-    },
-    {
-      'id': 'T004',
-      'date': DateTime.now().subtract(Duration(days: 3)),
-      'amount': 22.50,
-      'method': 'MasterCard •••• 5678',
-      'status': 'failed',
-      'tripId': 'V004',
-    },
-    {
-      'id': 'T005',
-      'date': DateTime.now().subtract(Duration(days: 4)),
-      'amount': 15.00,
-      'method': 'PayPal',
-      'status': 'completed',
-      'tripId': 'V005',
-    },
-  ];
-  
+
+  String _defaultMethodId = 'cash';
+  bool _isLoading = true;
+  double _walletBalance = 0.0;
+
+  List<PaymentMethod> _paymentMethods = [];
+  List<Map<String, dynamic>> _transactionHistory = [];
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('PaymentMethodsScreen', 'initState');
+
     _listAnimationController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    
+
     _cardFlipController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fabAnimationController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     )..forward();
+
+    _loadPaymentMethods();
+    _loadTransactionHistory();
   }
-  
+
+  Future<void> _loadPaymentMethods() async {
+    setState(() => _isLoading = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Cargar métodos de pago desde Firebase
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('payment_methods')
+            .orderBy('createdAt', descending: true)
+            .get();
+
+        // Cargar balance de billetera
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        setState(() {
+          _walletBalance = (userDoc.data()?['walletBalance'] ?? 0.0).toDouble();
+
+          _paymentMethods = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return PaymentMethod(
+              id: doc.id,
+              type: _getPaymentType(data['type'] ?? 'cash'),
+              name: data['name'] ?? '',
+              cardNumber: data['cardNumber'],
+              cardHolder: data['cardHolder'],
+              expiryDate: data['expiryDate'],
+              cardType: data['cardType'] != null
+                  ? _getCardType(data['cardType'])
+                  : null,
+              isDefault: data['isDefault'] ?? false,
+              icon: _getPaymentIcon(data['type'] ?? 'cash'),
+              color: _getPaymentColor(data['type'] ?? 'cash'),
+              walletBalance: null,
+            );
+          }).toList();
+
+          // Agregar método de efectivo si no existe
+          if (!_paymentMethods.any((m) => m.type == PaymentMethodType.cash)) {
+            _paymentMethods.add(PaymentMethod(
+              id: 'cash',
+              type: PaymentMethodType.cash,
+              name: 'Efectivo',
+              isDefault: _paymentMethods.isEmpty,
+              icon: Icons.money,
+              color: ModernTheme.success,
+              walletBalance: null,
+            ));
+          }
+
+          // Agregar billetera Oasis
+          _paymentMethods.insert(
+              0,
+              PaymentMethod(
+                id: 'wallet',
+                type: PaymentMethodType.wallet,
+                name: 'Billetera Oasis',
+                walletBalance: _walletBalance.toStringAsFixed(2),
+                isDefault: false,
+                icon: Icons.account_balance_wallet,
+                color: ModernTheme.oasisGreen,
+              ));
+
+          // Establecer método predeterminado
+          final defaultMethod = _paymentMethods.firstWhere(
+            (m) => m.isDefault,
+            orElse: () => _paymentMethods.first,
+          );
+          _defaultMethodId = defaultMethod.id;
+        });
+      }
+    } catch (e) {
+      AppLogger.error('cargando métodos de pago', e);
+      // Por defecto, solo efectivo
+      setState(() {
+        _paymentMethods = [
+          PaymentMethod(
+            id: 'cash',
+            type: PaymentMethodType.cash,
+            name: 'Efectivo',
+            isDefault: true,
+            icon: Icons.money,
+            color: ModernTheme.success,
+            walletBalance: null,
+          ),
+        ];
+        _defaultMethodId = 'cash';
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadTransactionHistory() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('transactions')
+            .orderBy('date', descending: true)
+            .limit(20)
+            .get();
+
+        setState(() {
+          _transactionHistory = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'date': (data['date'] as Timestamp).toDate(),
+              'amount': (data['amount'] ?? 0.0).toDouble(),
+              'method': data['method'] ?? 'Efectivo',
+              'status': data['status'] ?? 'completed',
+              'tripId': data['tripId'] ?? '',
+            };
+          }).toList();
+        });
+      }
+    } catch (e) {
+      AppLogger.error('cargando historial', e);
+    }
+  }
+
+  PaymentMethodType _getPaymentType(String type) {
+    switch (type) {
+      case 'card':
+        return PaymentMethodType.card;
+      case 'wallet':
+        return PaymentMethodType.wallet;
+      case 'paypal':
+        return PaymentMethodType.paypal;
+      default:
+        return PaymentMethodType.cash;
+    }
+  }
+
+  CardType _getCardType(String type) {
+    switch (type) {
+      case 'visa':
+        return CardType.visa;
+      case 'mastercard':
+        return CardType.mastercard;
+      case 'amex':
+        return CardType.amex;
+      case 'discover':
+        return CardType.discover;
+      default:
+        return CardType.other;
+    }
+  }
+
+  IconData _getPaymentIcon(String type) {
+    switch (type) {
+      case 'card':
+        return Icons.credit_card;
+      case 'wallet':
+        return Icons.account_balance_wallet;
+      case 'paypal':
+        return Icons.payment;
+      default:
+        return Icons.money;
+    }
+  }
+
+  Color _getPaymentColor(String type) {
+    switch (type) {
+      case 'card':
+        return Colors.blue;
+      case 'wallet':
+        return ModernTheme.oasisGreen;
+      case 'paypal':
+        return Colors.indigo;
+      default:
+        return ModernTheme.success;
+    }
+  }
+
   @override
   void dispose() {
     _listAnimationController.dispose();
@@ -170,23 +273,31 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
     _fabAnimationController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: ModernTheme.backgroundLight,
+        appBar: OasisAppBar.standard(
+          title: 'Métodos de Pago',
+          showBackButton: true,
+        ),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
+          ),
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: ModernTheme.backgroundLight,
-        appBar: AppBar(
-          backgroundColor: ModernTheme.oasisGreen,
-          title: Text(
-            'Métodos de Pago',
-            style: TextStyle(color: Colors.white),
-          ),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
+        appBar: OasisAppBar.standard(
+          title: 'Métodos de Pago',
+          showBackButton: true,
           actions: [
             IconButton(
               icon: Icon(Icons.help_outline, color: Colors.white),
@@ -214,14 +325,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
           builder: (context, child) {
             return Transform.scale(
               scale: _fabAnimationController.value,
-              child: FloatingActionButton.extended(
+              child: OasisButton.primary(
+                text: 'Agregar Método',
+                icon: Icons.add,
                 onPressed: _addPaymentMethod,
-                backgroundColor: ModernTheme.oasisGreen,
-                icon: Icon(Icons.add, color: Colors.white),
-                label: Text(
-                  'Agregar Método',
-                  style: TextStyle(color: Colors.white),
-                ),
+                size: OasisButtonSize.large,
               ),
             );
           },
@@ -229,7 +337,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildPaymentMethodsTab() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -238,9 +346,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         children: [
           // Balance card for wallet
           _buildWalletBalance(),
-          
-          SizedBox(height: 24),
-          
+
+          const SizedBox(height: 24),
+
           // Payment methods section
           Text(
             'Métodos Guardados',
@@ -250,14 +358,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
+
           // Payment methods list
           ..._paymentMethods.asMap().entries.map((entry) {
             final index = entry.key;
             final method = entry.value;
             final delay = index * 0.1;
-            
+
             return AnimatedBuilder(
               animation: _listAnimationController,
               builder: (context, child) {
@@ -274,7 +382,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                     ),
                   ),
                 );
-                
+
                 return Transform.translate(
                   offset: Offset(50 * (1 - animation.value), 0),
                   child: Opacity(
@@ -287,18 +395,18 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               },
             );
           }),
-          
-          SizedBox(height: 24),
-          
+
+          const SizedBox(height: 24),
+
           // Security info
           _buildSecurityInfo(),
-          
-          SizedBox(height: 80),
+
+          const SizedBox(height: 80),
         ],
       ),
     );
   }
-  
+
   Widget _buildHistoryTab() {
     return ListView.builder(
       padding: EdgeInsets.all(16),
@@ -307,19 +415,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         if (index == 0) {
           return _buildHistorySummary();
         }
-        
+
         final transaction = _transactionHistory[index - 1];
         return _buildTransactionCard(transaction);
       },
     );
   }
-  
+
   Widget _buildWalletBalance() {
-    final wallet = _paymentMethods.firstWhere(
-      (m) => m.type == PaymentMethodType.wallet,
-      orElse: () => _paymentMethods.first,
-    );
-    
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -349,9 +452,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                       fontSize: 14,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  AppSpacing.verticalSpaceXS,
                   Text(
-                    'S/ ${wallet.walletBalance ?? "0.00"}',
+                    'S/ ${_walletBalance.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 32,
@@ -374,36 +477,22 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
+                child: OasisButton.secondary(
+                  text: 'Recargar',
+                  icon: Icons.add,
                   onPressed: _rechargeWallet,
-                  icon: Icon(Icons.add),
-                  label: Text('Recargar'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: ModernTheme.oasisGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                 ),
               ),
-              SizedBox(width: 12),
+              AppSpacing.horizontalSpaceSM,
               Expanded(
-                child: OutlinedButton.icon(
+                child: OasisButton.outlined(
+                  text: 'Historial',
+                  icon: Icons.history,
                   onPressed: _viewWalletHistory,
-                  icon: Icon(Icons.history),
-                  label: Text('Historial'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -412,10 +501,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildCreditCard(PaymentMethod method) {
     final isDefault = method.id == _defaultMethodId;
-    
+
     return GestureDetector(
       onTap: () => _showCardDetails(method),
       onLongPress: () => _setDefaultMethod(method),
@@ -445,7 +534,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 painter: CardPatternPainter(),
               ),
             ),
-            
+
             // Card content
             Padding(
               padding: EdgeInsets.all(20),
@@ -478,7 +567,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                         ),
                     ],
                   ),
-                  
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -491,7 +579,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                           fontFamily: 'monospace',
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -540,7 +628,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 ],
               ),
             ),
-            
+
             // Delete button
             Positioned(
               top: 8,
@@ -555,10 +643,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildPaymentMethodCard(PaymentMethod method) {
     final isDefault = method.id == _defaultMethodId;
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -622,7 +710,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                     child: Row(
                       children: [
                         Icon(Icons.star, size: 20),
-                        SizedBox(width: 12),
+                        AppSpacing.horizontalSpaceSM,
                         Text('Hacer predeterminado'),
                       ],
                     ),
@@ -633,8 +721,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                     child: Row(
                       children: [
                         Icon(Icons.delete, size: 20, color: ModernTheme.error),
-                        SizedBox(width: 12),
-                        Text('Eliminar', style: TextStyle(color: ModernTheme.error)),
+                        AppSpacing.horizontalSpaceSM,
+                        Text('Eliminar',
+                            style: TextStyle(color: ModernTheme.error)),
                       ],
                     ),
                   ),
@@ -650,19 +739,22 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildHistorySummary() {
     final totalSpent = _transactionHistory.fold<double>(
-      0, (sum, t) => sum + (t['amount'] as double));
-    final successfulTransactions = _transactionHistory
-      .where((t) => t['status'] == 'completed').length;
-    
+        0, (total, t) => total + (t['amount'] as double));
+    final successfulTransactions =
+        _transactionHistory.where((t) => t['status'] == 'completed').length;
+
     return Container(
       margin: EdgeInsets.only(bottom: 20),
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [ModernTheme.primaryBlue, ModernTheme.primaryBlue.withValues(alpha: 0.8)],
+          colors: [
+            ModernTheme.primaryBlue,
+            ModernTheme.primaryBlue.withValues(alpha: 0.8)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -678,7 +770,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -703,12 +795,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildSummaryItem(String label, String value, IconData icon) {
     return Column(
       children: [
         Icon(icon, color: Colors.white70, size: 24),
-        SizedBox(height: 8),
+        AppSpacing.verticalSpaceXS,
         Text(
           value,
           style: TextStyle(
@@ -727,10 +819,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ],
     );
   }
-  
+
   Widget _buildTransactionCard(Map<String, dynamic> transaction) {
     final isSuccess = transaction['status'] == 'completed';
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -743,7 +835,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
           padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: (isSuccess ? ModernTheme.success : ModernTheme.error)
-              .withValues(alpha: 0.1),
+                .withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -781,7 +873,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: (isSuccess ? ModernTheme.success : ModernTheme.error)
-                  .withValues(alpha: 0.1),
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -799,7 +891,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildSecurityInfo() {
     return Container(
       padding: EdgeInsets.all(16),
@@ -811,7 +903,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       child: Row(
         children: [
           Icon(Icons.security, color: ModernTheme.info),
-          SizedBox(width: 12),
+          AppSpacing.horizontalSpaceSM,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -837,7 +929,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   List<Color> _getCardGradient(CardType type) {
     switch (type) {
       case CardType.visa:
@@ -852,7 +944,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         return [Colors.grey.shade600, Colors.grey.shade400];
     }
   }
-  
+
   Widget _getCardLogo(CardType type) {
     String logoText;
     switch (type) {
@@ -871,7 +963,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       default:
         logoText = 'CARD';
     }
-    
+
     return Text(
       logoText,
       style: TextStyle(
@@ -882,7 +974,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   String _getMethodDescription(PaymentMethodType type) {
     switch (type) {
       case PaymentMethodType.cash:
@@ -895,11 +987,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         return 'Método de pago';
     }
   }
-  
+
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inHours < 24) {
       return 'Hoy, ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
@@ -908,21 +1000,96 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       return '${date.day}/${date.month}/${date.year}';
     }
   }
-  
-  void _setDefaultMethod(PaymentMethod method) {
-    setState(() {
-      _defaultMethodId = method.id;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${method.name} es ahora tu método predeterminado'),
-        backgroundColor: ModernTheme.success,
-      ),
-    );
+
+  void _setDefaultMethod(PaymentMethod method) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Actualizar en Firebase
+        final batch = FirebaseFirestore.instance.batch();
+
+        // Quitar default de todos
+        final methods = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('payment_methods')
+            .get();
+
+        for (var doc in methods.docs) {
+          batch.update(doc.reference, {'isDefault': false});
+        }
+
+        // Establecer nuevo default
+        if (method.id != 'cash' && method.id != 'wallet') {
+          batch.update(
+            FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('payment_methods')
+                .doc(method.id),
+            {'isDefault': true},
+          );
+        }
+
+        await batch.commit();
+
+        // Actualizar preferencia de usuario
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'defaultPaymentMethod': method.id});
+      }
+
+      setState(() {
+        _defaultMethodId = method.id;
+        // Actualizar estado local
+        for (int i = 0; i < _paymentMethods.length; i++) {
+          _paymentMethods[i] = PaymentMethod(
+            id: _paymentMethods[i].id,
+            type: _paymentMethods[i].type,
+            name: _paymentMethods[i].name,
+            cardNumber: _paymentMethods[i].cardNumber,
+            cardHolder: _paymentMethods[i].cardHolder,
+            expiryDate: _paymentMethods[i].expiryDate,
+            cardType: _paymentMethods[i].cardType,
+            isDefault: _paymentMethods[i].id == method.id,
+            icon: _paymentMethods[i].icon,
+            color: _paymentMethods[i].color,
+            walletBalance: _paymentMethods[i].walletBalance,
+          );
+        }
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${method.name} es ahora tu método predeterminado'),
+          backgroundColor: ModernTheme.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al actualizar método predeterminado'),
+          backgroundColor: ModernTheme.error,
+        ),
+      );
+    }
   }
-  
+
   void _deletePaymentMethod(PaymentMethod method) {
+    if (method.type == PaymentMethodType.cash ||
+        method.type == PaymentMethodType.wallet) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se puede eliminar este método de pago'),
+          backgroundColor: ModernTheme.warning,
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -932,37 +1099,48 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         title: Text('Eliminar método de pago'),
         content: Text('¿Estás seguro de que deseas eliminar ${method.name}?'),
         actions: [
-          TextButton(
+          OasisButton.text(
+            text: 'Cancelar',
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _paymentMethods.removeWhere((m) => m.id == method.id);
-                if (_defaultMethodId == method.id && _paymentMethods.isNotEmpty) {
-                  _defaultMethodId = _paymentMethods.first.id;
-                }
-              });
+          OasisButton.danger(
+            text: 'Eliminar',
+            onPressed: () async {
               Navigator.pop(context);
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Método de pago eliminado'),
-                  backgroundColor: ModernTheme.error,
-                ),
-              );
+
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  // Eliminar de Firebase
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('payment_methods')
+                      .doc(method.id)
+                      .delete();
+
+                  setState(() {
+                    _paymentMethods.removeWhere((m) => m.id == method.id);
+                    if (_defaultMethodId == method.id &&
+                        _paymentMethods.isNotEmpty) {
+                      _defaultMethodId = _paymentMethods.first.id;
+                    }
+                  });
+
+                  _showSnackBar(
+                      'Método de pago eliminado', ModernTheme.success);
+                }
+              } catch (e) {
+                _showSnackBar(
+                    'Error al eliminar método de pago', ModernTheme.error);
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
-            ),
-            child: Text('Eliminar'),
           ),
         ],
       ),
     );
   }
-  
+
   void _handleMethodAction(PaymentMethod method, String action) {
     switch (action) {
       case 'default':
@@ -973,7 +1151,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         break;
     }
   }
-  
+
   void _addPaymentMethod() {
     showModalBottomSheet(
       context: context,
@@ -1002,7 +1180,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   void _showCardDetails(PaymentMethod method) {
     _cardFlipController.forward().then((_) {
       Future.delayed(Duration(seconds: 2), () {
@@ -1010,8 +1188,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       });
     });
   }
-  
+
   void _rechargeWallet() {
+    final TextEditingController amountController = TextEditingController();
+
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
@@ -1029,8 +1209,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 24),
-            
+            const SizedBox(height: 24),
+
             // Amount chips
             Wrap(
               spacing: 12,
@@ -1038,22 +1218,18 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 return ChoiceChip(
                   label: Text('S/ $amount'),
                   selected: false,
-                  onSelected: (selected) {
+                  onSelected: (selected) async {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Recargando S/ $amount...'),
-                        backgroundColor: ModernTheme.success,
-                      ),
-                    );
+                    await _processRecharge(amount.toDouble());
                   },
                 );
               }).toList(),
             ),
-            
-            SizedBox(height: 16),
-            
+
+            const SizedBox(height: 16),
+
             TextField(
+              controller: amountController,
               decoration: InputDecoration(
                 labelText: 'Monto personalizado',
                 prefixText: 'S/ ',
@@ -1063,34 +1239,99 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
               ),
               keyboardType: TextInputType.number,
             ),
-            
-            SizedBox(height: 24),
-            
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Procesando recarga...'),
-                    backgroundColor: ModernTheme.oasisGreen,
-                  ),
-                );
+
+            const SizedBox(height: 24),
+
+            OasisButton.primary(
+              text: 'Recargar',
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text) ?? 0;
+                if (amount > 0) {
+                  Navigator.pop(context);
+                  await _processRecharge(amount);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ingrese un monto válido'),
+                      backgroundColor: ModernTheme.error,
+                    ),
+                  );
+                }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ModernTheme.oasisGreen,
-                minimumSize: Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('Recargar'),
+              size: OasisButtonSize.large,
             ),
           ],
         ),
       ),
     );
   }
-  
+
+  Future<void> _processRecharge(double amount) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Actualizar balance en Firebase
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'walletBalance': FieldValue.increment(amount),
+        });
+
+        // Registrar transacción
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('transactions')
+            .add({
+          'amount': amount,
+          'type': 'recharge',
+          'method': 'Recarga de billetera',
+          'status': 'completed',
+          'date': FieldValue.serverTimestamp(),
+          'description': 'Recarga de billetera Oasis',
+        });
+
+        // Actualizar UI
+        setState(() {
+          _walletBalance += amount;
+          // Actualizar balance en el método de pago de billetera
+          final walletIndex =
+              _paymentMethods.indexWhere((m) => m.id == 'wallet');
+          if (walletIndex != -1) {
+            _paymentMethods[walletIndex] = PaymentMethod(
+              id: 'wallet',
+              type: PaymentMethodType.wallet,
+              name: 'Billetera Oasis',
+              walletBalance: _walletBalance.toStringAsFixed(2),
+              isDefault: _paymentMethods[walletIndex].isDefault,
+              icon: Icons.account_balance_wallet,
+              color: ModernTheme.oasisGreen,
+            );
+          }
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Recarga de S/ ${amount.toStringAsFixed(2)} exitosa'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+
+        // Recargar historial de transacciones
+        _loadTransactionHistory();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al recargar billetera'),
+          backgroundColor: ModernTheme.error,
+        ),
+      );
+    }
+  }
+
   void _viewWalletHistory() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1099,7 +1340,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   void _showTransactionDetails(Map<String, dynamic> transaction) {
     showModalBottomSheet(
       context: context,
@@ -1123,7 +1364,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 ),
               ),
             ),
-            
             Text(
               'Detalles de Transacción',
               style: TextStyle(
@@ -1131,25 +1371,24 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            
-            SizedBox(height: 20),
-            
+            const SizedBox(height: 20),
             _buildDetailRow('ID Transacción', transaction['id']),
             _buildDetailRow('Viaje', transaction['tripId']),
             _buildDetailRow('Fecha', _formatDate(transaction['date'])),
             _buildDetailRow('Método', transaction['method']),
-            _buildDetailRow('Monto', 'S/ ${transaction['amount'].toStringAsFixed(2)}'),
+            _buildDetailRow(
+                'Monto', 'S/ ${transaction['amount'].toStringAsFixed(2)}'),
             _buildDetailRow(
               'Estado',
               transaction['status'] == 'completed' ? 'Exitoso' : 'Fallido',
             ),
-            
-            SizedBox(height: 24),
-            
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: OasisButton.outlined(
+                    text: 'Descargar',
+                    icon: Icons.download,
                     onPressed: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1159,13 +1398,13 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                         ),
                       );
                     },
-                    icon: Icon(Icons.download),
-                    label: Text('Descargar'),
                   ),
                 ),
-                SizedBox(width: 12),
+                AppSpacing.horizontalSpaceSM,
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: OasisButton.primary(
+                    text: 'Ayuda',
+                    icon: Icons.help,
                     onPressed: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1175,11 +1414,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
                         ),
                       );
                     },
-                    icon: Icon(Icons.help),
-                    label: Text('Ayuda'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ModernTheme.oasisGreen,
-                    ),
                   ),
                 ),
               ],
@@ -1189,7 +1423,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
@@ -1214,7 +1448,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
-  
+
   void _showHelp() {
     showDialog(
       context: context,
@@ -1225,7 +1459,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
         title: Row(
           children: [
             Icon(Icons.help_outline, color: ModernTheme.oasisGreen),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text('Ayuda'),
           ],
         ),
@@ -1248,15 +1482,15 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
           ],
         ),
         actions: [
-          TextButton(
+          OasisButton.text(
+            text: 'Entendido',
             onPressed: () => Navigator.pop(context),
-            child: Text('Entendido'),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildHelpItem(String text) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -1266,32 +1500,45 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen>
       ),
     );
   }
+
+  void _showSnackBar(String message, Color backgroundColor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
 }
 
 // Add payment method sheet
 class AddPaymentMethodSheet extends StatefulWidget {
   final ScrollController scrollController;
   final Function(PaymentMethod) onMethodAdded;
-  
+
   const AddPaymentMethodSheet({
     super.key,
     required this.scrollController,
     required this.onMethodAdded,
   });
-  
+
   @override
-  _AddPaymentMethodSheetState createState() => _AddPaymentMethodSheetState();
+  AddPaymentMethodSheetState createState() => AddPaymentMethodSheetState();
 }
 
-class _AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
-  final _formKey = GlobalKey<FormState>();
+class AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _cardNumberController = TextEditingController();
   final _cardHolderController = TextEditingController();
   final _expiryController = TextEditingController();
   final _cvvController = TextEditingController();
-  
+
   final CardType _selectedCardType = CardType.visa;
-  
+
   @override
   void dispose() {
     _cardNumberController.dispose();
@@ -1300,7 +1547,7 @@ class _AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
     _cvvController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1321,7 +1568,6 @@ class _AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
                 ),
               ),
             ),
-            
             Text(
               'Agregar Tarjeta',
               style: TextStyle(
@@ -1329,110 +1575,56 @@ class _AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            
-            SizedBox(height: 24),
-            
-            TextFormField(
+            const SizedBox(height: 24),
+            SecurityIntegrationService.buildSecureTextField(
+              context: context,
               controller: _cardNumberController,
-              decoration: InputDecoration(
-                labelText: 'Número de tarjeta',
-                prefixIcon: Icon(Icons.credit_card),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              label: 'Número de tarjeta',
+              fieldType: 'creditcard',
+              prefixIcon: Icon(Icons.credit_card),
               keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Por favor ingresa el número de tarjeta';
-                }
-                return null;
-              },
             ),
-            
-            SizedBox(height: 16),
-            
-            TextFormField(
+            const SizedBox(height: 16),
+            SecurityIntegrationService.buildSecureTextField(
+              context: context,
               controller: _cardHolderController,
-              decoration: InputDecoration(
-                labelText: 'Titular de la tarjeta',
-                prefixIcon: Icon(Icons.person),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              textCapitalization: TextCapitalization.characters,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Por favor ingresa el nombre del titular';
-                }
-                return null;
-              },
+              label: 'Titular de la tarjeta',
+              fieldType: 'fullname',
+              prefixIcon: Icon(Icons.person),
             ),
-            
-            SizedBox(height: 16),
-            
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
+                  child: SecurityIntegrationService.buildSecureTextField(
+                    context: context,
                     controller: _expiryController,
-                    decoration: InputDecoration(
-                      labelText: 'MM/AA',
-                      prefixIcon: Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    keyboardType: TextInputType.datetime,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Requerido';
-                      }
-                      return null;
-                    },
+                    label: 'MM/AA',
+                    fieldType: 'cardexpiry',
+                    prefixIcon: Icon(Icons.calendar_today),
                   ),
                 ),
-                SizedBox(width: 16),
+                AppSpacing.horizontalSpaceMD,
                 Expanded(
-                  child: TextFormField(
+                  child: SecurityIntegrationService.buildSecureTextField(
+                    context: context,
                     controller: _cvvController,
-                    decoration: InputDecoration(
-                      labelText: 'CVV',
-                      prefixIcon: Icon(Icons.lock),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
+                    label: 'CVV',
+                    fieldType: 'cvv',
+                    prefixIcon: Icon(Icons.lock),
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Requerido';
-                      }
-                      return null;
-                    },
+                    keyboardType: TextInputType.number,
                   ),
                 ),
               ],
             ),
-            
-            SizedBox(height: 24),
-            
-            ElevatedButton(
+            const SizedBox(height: 24),
+            OasisButton.primary(
+              text: 'Agregar Tarjeta',
               onPressed: _addCard,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ModernTheme.oasisGreen,
-                minimumSize: Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('Agregar Tarjeta'),
+              size: OasisButtonSize.large,
             ),
-            
-            SizedBox(height: 16),
-            
+            const SizedBox(height: 16),
             Center(
               child: Text(
                 'Tus datos están seguros y encriptados',
@@ -1447,31 +1639,63 @@ class _AddPaymentMethodSheetState extends State<AddPaymentMethodSheet> {
       ),
     );
   }
-  
-  void _addCard() {
+
+  void _addCard() async {
     if (_formKey.currentState!.validate()) {
-      final newMethod = PaymentMethod(
-        id: 'PM${DateTime.now().millisecondsSinceEpoch}',
-        type: PaymentMethodType.card,
-        name: '${_selectedCardType.name.toUpperCase()} •••• ${_cardNumberController.text.substring(_cardNumberController.text.length - 4)}',
-        cardNumber: _cardNumberController.text,
-        cardHolder: _cardHolderController.text.toUpperCase(),
-        expiryDate: _expiryController.text,
-        cardType: _selectedCardType,
-        isDefault: false,
-        icon: Icons.credit_card,
-        color: Colors.blue,
-      );
-      
-      widget.onMethodAdded(newMethod);
-      Navigator.pop(context);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Tarjeta agregada exitosamente'),
-          backgroundColor: ModernTheme.success,
-        ),
-      );
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          // Guardar en Firebase
+          final docRef = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('payment_methods')
+              .add({
+            'type': 'card',
+            'name':
+                '${_selectedCardType.name.toUpperCase()} •••• ${_cardNumberController.text.substring(_cardNumberController.text.length - 4)}',
+            'cardNumber': _cardNumberController.text,
+            'cardHolder': _cardHolderController.text.toUpperCase(),
+            'expiryDate': _expiryController.text,
+            'cardType': _selectedCardType.name,
+            'isDefault': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+          final newMethod = PaymentMethod(
+            id: docRef.id,
+            type: PaymentMethodType.card,
+            name:
+                '${_selectedCardType.name.toUpperCase()} •••• ${_cardNumberController.text.substring(_cardNumberController.text.length - 4)}',
+            cardNumber: _cardNumberController.text,
+            cardHolder: _cardHolderController.text.toUpperCase(),
+            expiryDate: _expiryController.text,
+            cardType: _selectedCardType,
+            isDefault: false,
+            icon: Icons.credit_card,
+            color: Colors.blue,
+          );
+
+          widget.onMethodAdded(newMethod);
+          if (!mounted) return;
+          Navigator.pop(context);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Tarjeta agregada exitosamente'),
+              backgroundColor: ModernTheme.success,
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al agregar tarjeta'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
     }
   }
 }
@@ -1484,7 +1708,7 @@ class CardPatternPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    
+
     // Draw pattern
     for (int i = 0; i < 5; i++) {
       final y = size.height * (i + 1) / 6;
@@ -1494,7 +1718,7 @@ class CardPatternPainter extends CustomPainter {
         paint,
       );
     }
-    
+
     for (int i = 0; i < 8; i++) {
       final x = size.width * (i + 1) / 9;
       canvas.drawLine(
@@ -1504,7 +1728,7 @@ class CardPatternPainter extends CustomPainter {
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

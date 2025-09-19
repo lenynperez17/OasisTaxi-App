@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import '../utils/app_logger.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:io';
 import 'firebase_service.dart';
@@ -7,6 +7,42 @@ import 'notification_service.dart';
 /// Servicio completo para el sistema de chat
 /// ✅ IMPLEMENTACIÓN REAL COMPLETA
 /// Incluye: Firebase Realtime, Mensajes multimedia, Estado de lectura, Notificaciones
+///
+/// ARQUITECTURA DE DATOS:
+/// ====================
+/// Este servicio utiliza EXCLUSIVAMENTE Firebase Realtime Database para el chat.
+///
+/// DECISIÓN ARQUITECTÓNICA:
+/// - Firebase Realtime Database: Para mensajes de chat en tiempo real
+///   * Sincronización instantánea de mensajes
+///   * Presencia de usuarios online/offline
+///   * Estado de lectura/entrega de mensajes
+///   * Optimizado para datos que cambian frecuentemente
+///
+/// - Firestore: Se usa SOLO para datos de usuarios y viajes (NO para chat)
+///   * Información de perfil de usuarios
+///   * Detalles de viajes
+///   * Documentos y configuraciones
+///
+/// ESTRUCTURA DE DATOS EN REALTIME DATABASE:
+/// /chats/{chatId}/
+///   - participants: {userId1: true, userId2: true}
+///   - lastMessage: {...}
+///   - updatedAt: timestamp
+///
+/// /messages/{chatId}/{messageId}/
+///   - text: string
+///   - senderId: string
+///   - timestamp: number
+///   - read: boolean
+///   - type: 'text'|'image'|'location'
+///
+/// /presence/{userId}/
+///   - online: boolean
+///   - lastSeen: timestamp
+///
+/// NOTA: No mezclar Firestore y Realtime DB para el mismo dominio de datos.
+///       El chat está completamente en Realtime Database.
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
@@ -14,18 +50,18 @@ class ChatService {
 
   final FirebaseService _firebaseService = FirebaseService();
   final NotificationService _notificationService = NotificationService();
-  
+
   bool _initialized = false;
   String? _currentUserId;
   String? _currentUserRole;
   DatabaseReference? _database;
-  
+
   // Paths de Firebase Realtime Database
   static const String chatsPath = 'chats';
   static const String messagesPath = 'messages';
   static const String presencePath = 'presence';
   static const String chatMetadataPath = 'chat_metadata';
-  
+
   // Streams para mensajes en tiempo real
   final Map<String, Stream<List<ChatMessage>>> _chatStreams = {};
 
@@ -39,29 +75,29 @@ class ChatService {
     try {
       await _firebaseService.initialize();
       await _notificationService.initialize();
-      
+
       _currentUserId = userId;
       _currentUserRole = userRole;
-      
+
       // Inicializar Firebase Realtime Database
       _database = FirebaseDatabase.instance.ref();
-      
+
       // Configurar presencia del usuario
       await _setupUserPresence();
-      
+
       _initialized = true;
-      debugPrint('💬 ChatService: Service initialized successfully for user $userId');
-      
-      await _firebaseService.analytics.logEvent(
+      AppLogger.debug(
+          '💬 ChatService: Service initialized successfully for user $userId');
+
+      await _firebaseService.analytics?.logEvent(
         name: 'chat_service_initialized',
         parameters: {
           'user_id': userId,
           'user_role': userRole,
         },
       );
-      
     } catch (e) {
-      debugPrint('💬 ChatService: Error initializing - $e');
+      AppLogger.debug('💬 ChatService: Error initializing - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       rethrow;
     }
@@ -77,11 +113,12 @@ class ChatService {
   }) async {
     try {
       if (_database == null) {
-        debugPrint('💬 ChatService: Database not initialized');
+        AppLogger.debug('💬 ChatService: Database not initialized');
         return false;
       }
 
-      final messageId = _database!.child(messagesPath).child(rideId).push().key!;
+      final messageId =
+          _database!.child(messagesPath).child(rideId).push().key!;
       final chatMessage = ChatMessage(
         id: messageId,
         rideId: rideId,
@@ -107,9 +144,9 @@ class ChatService {
       // Enviar notificación al destinatario
       await _sendMessageNotification(rideId, senderRole, senderName, message);
 
-      debugPrint('💬 ChatService: Text message sent in ride $rideId');
-      
-      await _firebaseService.analytics.logEvent(
+      AppLogger.debug('💬 ChatService: Text message sent in ride $rideId');
+
+      await _firebaseService.analytics?.logEvent(
         name: 'chat_message_sent',
         parameters: {
           'ride_id': rideId,
@@ -120,7 +157,7 @@ class ChatService {
 
       return true;
     } catch (e) {
-      debugPrint('💬 ChatService: Error sending text message - $e');
+      AppLogger.debug('💬 ChatService: Error sending text message - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return false;
     }
@@ -138,17 +175,19 @@ class ChatService {
   }) async {
     try {
       if (_database == null) {
-        debugPrint('💬 ChatService: Database not initialized');
+        AppLogger.debug('💬 ChatService: Database not initialized');
         return false;
       }
 
       // Subir archivo a Firebase Storage
-      final uploadResult = await _uploadMediaFile(rideId, mediaFile, messageType);
+      final uploadResult =
+          await _uploadMediaFile(rideId, mediaFile, messageType);
       if (!uploadResult.success) {
         return false;
       }
 
-      final messageId = _database!.child(messagesPath).child(rideId).push().key!;
+      final messageId =
+          _database!.child(messagesPath).child(rideId).push().key!;
       final chatMessage = ChatMessage(
         id: messageId,
         rideId: rideId,
@@ -175,16 +214,19 @@ class ChatService {
 
       // Enviar notificación al destinatario
       await _sendMessageNotification(
-        rideId, 
-        senderRole, 
-        senderName, 
-        messageType == MessageType.image ? '📸 Imagen' : 
-        messageType == MessageType.audio ? '🎵 Audio' : '📁 Archivo'
-      );
+          rideId,
+          senderRole,
+          senderName,
+          messageType == MessageType.image
+              ? '📸 Imagen'
+              : messageType == MessageType.audio
+                  ? '🎵 Audio'
+                  : '📁 Archivo');
 
-      debugPrint('💬 ChatService: Multimedia message sent in ride $rideId');
-      
-      await _firebaseService.analytics.logEvent(
+      AppLogger.debug(
+          '💬 ChatService: Multimedia message sent in ride $rideId');
+
+      await _firebaseService.analytics?.logEvent(
         name: 'chat_message_sent',
         parameters: {
           'ride_id': rideId,
@@ -195,7 +237,7 @@ class ChatService {
 
       return true;
     } catch (e) {
-      debugPrint('💬 ChatService: Error sending multimedia message - $e');
+      AppLogger.debug('💬 ChatService: Error sending multimedia message - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return false;
     }
@@ -222,7 +264,7 @@ class ChatService {
   Future<void> markMessagesAsRead(String rideId, String userId) async {
     try {
       if (_database == null) {
-        debugPrint('💬 ChatService: Database not initialized');
+        AppLogger.debug('💬 ChatService: Database not initialized');
         return;
       }
 
@@ -235,33 +277,35 @@ class ChatService {
 
       if (messagesSnapshot.exists) {
         final Map<String, dynamic> updates = {};
-        
+
         for (final child in messagesSnapshot.children) {
           final messageData = Map<String, dynamic>.from(child.value as Map);
-          
+
           // Marcar como leído solo si no es el remitente y no está leído
-          if (messageData['senderId'] != userId && messageData['isRead'] == false) {
+          if (messageData['senderId'] != userId &&
+              messageData['isRead'] == false) {
             updates['$messagesPath/$rideId/${child.key}/isRead'] = true;
-            updates['$messagesPath/$rideId/${child.key}/readAt'] = DateTime.now().toIso8601String();
+            updates['$messagesPath/$rideId/${child.key}/readAt'] =
+                DateTime.now().toIso8601String();
           }
         }
 
         if (updates.isNotEmpty) {
           await _database!.update(updates);
-          debugPrint('💬 ChatService: ${updates.length ~/ 2} messages marked as read');
+          AppLogger.debug(
+              '💬 ChatService: ${updates.length ~/ 2} messages marked as read');
         }
       }
 
-      await _firebaseService.analytics.logEvent(
+      await _firebaseService.analytics?.logEvent(
         name: 'chat_messages_marked_read',
         parameters: {
           'ride_id': rideId,
           'user_id': userId,
         },
       );
-
     } catch (e) {
-      debugPrint('💬 ChatService: Error marking messages as read - $e');
+      AppLogger.debug('💬 ChatService: Error marking messages as read - $e');
       await _firebaseService.crashlytics.recordError(e, null);
     }
   }
@@ -290,7 +334,7 @@ class ChatService {
 
       return count;
     } catch (e) {
-      debugPrint('💬 ChatService: Error getting unread count - $e');
+      AppLogger.debug('💬 ChatService: Error getting unread count - $e');
       return 0;
     }
   }
@@ -309,10 +353,11 @@ class ChatService {
           .onValue
           .map((event) {
         final List<ChatMessage> messages = [];
-        
+
         if (event.snapshot.exists) {
-          final messagesData = Map<String, dynamic>.from(event.snapshot.value as Map);
-          
+          final messagesData =
+              Map<String, dynamic>.from(event.snapshot.value as Map);
+
           for (final entry in messagesData.entries) {
             try {
               final messageData = Map<String, dynamic>.from(entry.value);
@@ -320,11 +365,12 @@ class ChatService {
               final message = ChatMessage.fromRealtimeMap(messageData);
               messages.add(message);
             } catch (e) {
-              debugPrint('💬 ChatService: Error parsing message ${entry.key} - $e');
+              AppLogger.debug(
+                  '💬 ChatService: Error parsing message ${entry.key} - $e');
             }
           }
         }
-        
+
         // Ordenar por timestamp (más recientes primero)
         messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
         return messages;
@@ -392,7 +438,8 @@ class ChatService {
     required double latitude,
     required double longitude,
   }) async {
-    final message = '📍 Mi ubicación: https://maps.google.com/?q=$latitude,$longitude';
+    final message =
+        '📍 Mi ubicación: https://maps.google.com/?q=$latitude,$longitude';
     return sendMessage(
       rideId: rideId,
       senderId: senderId,
@@ -410,9 +457,9 @@ class ChatService {
         await _database!.child(chatMetadataPath).child(rideId).remove();
       }
       _chatStreams.remove(rideId);
-      debugPrint('💬 ChatService: Chat cleared for ride $rideId');
+      AppLogger.debug('💬 ChatService: Chat cleared for ride $rideId');
     } catch (e) {
-      debugPrint('💬 ChatService: Error clearing chat - $e');
+      AppLogger.debug('💬 ChatService: Error clearing chat - $e');
     }
   }
 
@@ -422,7 +469,7 @@ class ChatService {
 
     try {
       final presenceRef = _database!.child(presencePath).child(_currentUserId!);
-      
+
       // Configurar presencia online
       await presenceRef.set({
         'online': true,
@@ -437,9 +484,9 @@ class ChatService {
         'role': _currentUserRole,
       });
 
-      debugPrint('💬 ChatService: User presence configured');
+      AppLogger.debug('💬 ChatService: User presence configured');
     } catch (e) {
-      debugPrint('💬 ChatService: Error setting up presence - $e');
+      AppLogger.debug('💬 ChatService: Error setting up presence - $e');
     }
   }
 
@@ -456,12 +503,13 @@ class ChatService {
         'messageCount': {'increment': 1},
       });
     } catch (e) {
-      debugPrint('💬 ChatService: Error updating chat metadata - $e');
+      AppLogger.debug('💬 ChatService: Error updating chat metadata - $e');
     }
   }
 
   /// Enviar notificación de mensaje ✅ IMPLEMENTACIÓN REAL
-  Future<void> _sendMessageNotification(String rideId, String senderRole, String senderName, String message) async {
+  Future<void> _sendMessageNotification(String rideId, String senderRole,
+      String senderName, String message) async {
     try {
       // Usar el método disponible en NotificationService
       await _notificationService.showChatNotification(
@@ -469,17 +517,21 @@ class ChatService {
         message: message,
         chatId: rideId,
       );
-      
-      debugPrint('💬 ChatService: Chat notification sent for ride $rideId');
+
+      AppLogger.debug(
+          '💬 ChatService: Chat notification sent for ride $rideId');
     } catch (e) {
-      debugPrint('💬 ChatService: Error sending message notification - $e');
+      AppLogger.debug(
+          '💬 ChatService: Error sending message notification - $e');
     }
   }
 
   /// Subir archivo multimedia ✅ IMPLEMENTACIÓN REAL
-  Future<MediaUploadResult> _uploadMediaFile(String rideId, File file, MessageType messageType) async {
+  Future<MediaUploadResult> _uploadMediaFile(
+      String rideId, File file, MessageType messageType) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
       final storageRef = _firebaseService.storage
           .ref()
           .child('chat_media')
@@ -495,7 +547,7 @@ class ChatService {
         fileName: fileName,
       );
     } catch (e) {
-      debugPrint('💬 ChatService: Error uploading media file - $e');
+      AppLogger.debug('💬 ChatService: Error uploading media file - $e');
       return MediaUploadResult.error('Error subiendo archivo: $e');
     }
   }
@@ -503,7 +555,8 @@ class ChatService {
   /// Obtener estado de presencia de usuario ✅ IMPLEMENTACIÓN REAL
   Stream<UserPresence> getUserPresence(String userId) {
     if (_database == null) {
-      return Stream.value(UserPresence(online: false, lastSeen: DateTime.now()));
+      return Stream.value(
+          UserPresence(online: false, lastSeen: DateTime.now()));
     }
 
     return _database!.child(presencePath).child(userId).onValue.map((event) {
@@ -663,7 +716,8 @@ class MediaUploadResult {
   MediaUploadResult.success({
     required this.downloadUrl,
     required this.fileName,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
   MediaUploadResult.error(this.error)
       : success = false,
@@ -704,7 +758,7 @@ class ChatMetadata {
     return ChatMetadata(
       rideId: map['rideId'] ?? '',
       lastMessage: map['lastMessage'],
-      lastMessageTime: map['lastMessageTime'] != null 
+      lastMessageTime: map['lastMessageTime'] != null
           ? DateTime.tryParse(map['lastMessageTime'])
           : null,
       lastSender: map['lastSender'],

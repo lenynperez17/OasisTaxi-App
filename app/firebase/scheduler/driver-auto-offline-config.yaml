@@ -1,0 +1,653 @@
+# 🚗 CONFIGURACIÓN DE CLOUD SCHEDULER PARA AUTO-OFFLINE DE CONDUCTORES
+# OasisTaxi Perú - Sistema de Gestión Automática de Estado de Conductores
+# 
+# Este archivo define los trabajos de Cloud Scheduler para:
+# - Poner conductores inactivos en modo offline automáticamente
+# - Reactivar conductores que vuelven a estar disponibles
+# - Gestión de estado por zona horaria y horarios de trabajo
+# - Alertas a conductores sobre cambios de estado
+# - Optimización de disponibilidad por demanda
+
+# ═══════════════════════════════════════════════════════════════════
+# 🕐 JOB 1: AUTO-OFFLINE POR INACTIVIDAD (CADA 5 MINUTOS)
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-auto-offline-inactivity"
+description: "Auto-offline por inactividad de conductores - OasisTaxi"
+schedule: "*/5 * * * *" # Cada 5 minutos
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "auto_offline_inactivity",
+        "criteria": {
+          "inactivityThresholdMinutes": 15,
+          "lastLocationUpdateMinutes": 10,
+          "lastAppInteractionMinutes": 20,
+          "ignoreBusyDrivers": true,
+          "ignoreOnTrip": true
+        },
+        "actions": {
+          "setOffline": true,
+          "sendNotification": true,
+          "logEvent": true,
+          "updatePresence": true
+        },
+        "notifications": {
+          "title": "Estado cambiado a Offline",
+          "body": "Has sido puesto en modo offline por inactividad. Toca para volver online.",
+          "actionUrl": "oasistaxi://driver/availability"
+        },
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 3
+  max_retry_duration: "300s"
+  min_backoff_duration: "5s"
+  max_backoff_duration: "60s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🌙 JOB 2: AUTO-OFFLINE POR HORARIO NOCTURNO
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-auto-offline-night-hours"
+description: "Auto-offline durante horario nocturno de bajo tráfico - OasisTaxi"
+schedule: "0 2 * * *" # 2:00 AM todos los días
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "auto_offline_night_hours",
+        "timeWindow": {
+          "startHour": "02:00",
+          "endHour": "05:00",
+          "timezone": "America/Lima",
+          "applyWeekdays": true,
+          "applyWeekends": true
+        },
+        "criteria": {
+          "excludeNightShiftDrivers": true,
+          "excludeAirportDrivers": true,
+          "minimumTripsLastWeek": 0,
+          "allowOptOut": true
+        },
+        "actions": {
+          "setOffline": true,
+          "sendGentleNotification": true,
+          "scheduleReactivation": true,
+          "savePreferences": true
+        },
+        "notifications": {
+          "title": "Modo descanso activado 🌙",
+          "body": "Horario de bajo tráfico. Descansa, te reactivaremos a las 6 AM.",
+          "actionUrl": "oasistaxi://driver/night-mode"
+        },
+        "reactivation": {
+          "hour": "06:00",
+          "sendWakeUpNotification": true,
+          "respectDriverPreferences": true
+        },
+        "executedAt": "2024-01-01T02:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "180s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# ☀️ JOB 3: AUTO-REACTIVACIÓN MATUTINA
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-auto-reactivation-morning"
+description: "Reactivación automática en horario pico matutino - OasisTaxi"
+schedule: "0 6 * * *" # 6:00 AM todos los días
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "auto_reactivation_morning",
+        "timeWindow": {
+          "reactivationHour": "06:00",
+          "timezone": "America/Lima",
+          "weekdaysOnly": false
+        },
+        "criteria": {
+          "wasAutoOfflined": true,
+          "lastActiveYesterday": true,
+          "hasOptedIn": true,
+          "accountInGoodStanding": true
+        },
+        "actions": {
+          "setOnline": true,
+          "sendGoodMorningNotification": true,
+          "updateLocation": false,
+          "logReactivation": true
+        },
+        "notifications": {
+          "title": "¡Buenos días! 🌅",
+          "body": "Hora pico iniciando. ¿Listo para ganar? Estás online nuevamente.",
+          "actionUrl": "oasistaxi://driver/dashboard",
+          "includeEarningsGoal": true,
+          "includeDemandForecast": true
+        },
+        "incentives": {
+          "earlyBirdBonus": {
+            "enabled": true,
+            "bonusPercentage": 10,
+            "validUntil": "08:00"
+          }
+        },
+        "executedAt": "2024-01-01T06:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "180s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎯 JOB 4: OPTIMIZACIÓN POR DEMANDA (CADA 30 MINUTOS)
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-availability-optimization"
+description: "Optimización de disponibilidad basada en demanda - OasisTaxi"
+schedule: "*/30 * * * *" # Cada 30 minutos
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "availability_optimization",
+        "analysis": {
+          "analyzeDemandPatterns": true,
+          "predictUpcomingDemand": true,
+          "identifySupplyGaps": true,
+          "calculateOptimalDrivers": true
+        },
+        "actions": {
+          "suggestReactivation": true,
+          "identifyOverSupply": true,
+          "sendDemandAlerts": true,
+          "adjustSurgePricing": false
+        },
+        "zones": [
+          {
+            "name": "Lima Centro",
+            "coordinates": {"lat": -12.046374, "lng": -77.042793},
+            "radius": 5000,
+            "priority": "high"
+          },
+          {
+            "name": "Miraflores",
+            "coordinates": {"lat": -12.120000, "lng": -77.030000},
+            "radius": 3000,
+            "priority": "high"
+          },
+          {
+            "name": "San Isidro",
+            "coordinates": {"lat": -12.100000, "lng": -77.050000},
+            "radius": 3000,
+            "priority": "high"
+          },
+          {
+            "name": "Aeropuerto Jorge Chávez",
+            "coordinates": {"lat": -12.021903, "lng": -77.114711},
+            "radius": 2000,
+            "priority": "critical"
+          }
+        ],
+        "thresholds": {
+          "lowSupplyDriversPerKm2": 2,
+          "highDemandRequestsPerHour": 50,
+          "optimalResponseTimeMinutes": 5
+        },
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 3
+  max_retry_duration: "600s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 📱 JOB 5: DETECCIÓN DE APP EN BACKGROUND
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-app-background-detection"
+description: "Detección de app en background y gestión automática - OasisTaxi"
+schedule: "*/2 * * * *" # Cada 2 minutos
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "app_background_detection",
+        "detection": {
+          "checkAppState": true,
+          "lastHeartbeatThresholdMinutes": 3,
+          "locationUpdateThresholdMinutes": 5,
+          "fcmDeliveryStatus": true
+        },
+        "actions": {
+          "sendForegroundAlert": true,
+          "temporaryPause": true,
+          "logBackgroundEvent": true,
+          "updateDriverStatus": true
+        },
+        "alerts": {
+          "backgroundAlert": {
+            "title": "App en segundo plano detectada ⚠️",
+            "body": "Mantén la app activa para recibir solicitudes de viaje",
+            "actionUrl": "oasistaxi://driver/foreground",
+            "priority": "high",
+            "persistent": true
+          }
+        },
+        "gracePeriod": {
+          "pauseDurationMinutes": 10,
+          "maxBackgroundWarnings": 3,
+          "autoOfflineAfterWarnings": true
+        },
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 5
+  max_retry_duration: "120s"
+  min_backoff_duration: "2s"
+  max_backoff_duration: "30s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔄 JOB 6: LIMPIEZA DE ESTADOS HUÉRFANOS
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-status-cleanup"
+description: "Limpieza de estados de disponibilidad huérfanos - OasisTaxi"
+schedule: "0 */4 * * *" # Cada 4 horas
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "status_cleanup",
+        "cleanup": {
+          "orphanedSessions": true,
+          "staleLocations": true,
+          "inconsistentStates": true,
+          "expiredTokens": true
+        },
+        "criteria": {
+          "sessionAgeHours": 24,
+          "locationAgeHours": 6,
+          "inconsistencyThresholdMinutes": 30,
+          "tokenAgeHours": 168
+        },
+        "actions": {
+          "resetToOffline": true,
+          "clearStaleData": true,
+          "recalculateMetrics": true,
+          "sendStatusReport": true
+        },
+        "monitoring": {
+          "trackCleanupMetrics": true,
+          "alertOnAnomalies": true,
+          "generateReport": true
+        },
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🏆 JOB 7: GAMIFICACIÓN Y RECOMPENSAS DE DISPONIBILIDAD
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-availability-gamification"
+description: "Sistema de gamificación para incentivar disponibilidad - OasisTaxi"
+schedule: "0 20 * * *" # 8:00 PM todos los días (fin de jornada)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/driver-availability-management"
+    data: |
+      {
+        "jobType": "availability_gamification",
+        "dailyRewards": {
+          "calculateOnlineHours": true,
+          "calculateResponseRate": true,
+          "calculatePeakHourBonus": true,
+          "calculateConsistencyBonus": true
+        },
+        "achievements": [
+          {
+            "id": "early_bird",
+            "name": "Madrugador",
+            "criteria": "Online antes de 6 AM por 7 días seguidos",
+            "reward": {"points": 500, "bonus": "S/ 20"}
+          },
+          {
+            "id": "night_owl",
+            "name": "Búho Nocturno",
+            "criteria": "Online después de 10 PM por 5 días",
+            "reward": {"points": 300, "bonus": "S/ 15"}
+          },
+          {
+            "id": "weekend_warrior",
+            "name": "Guerrero del Fin de Semana",
+            "criteria": "Online 8+ horas cada fin de semana",
+            "reward": {"points": 800, "bonus": "S/ 30"}
+          },
+          {
+            "id": "consistency_king",
+            "name": "Rey de la Consistencia",
+            "criteria": "Online 6+ horas diarias por 30 días",
+            "reward": {"points": 1000, "bonus": "S/ 50"}
+          }
+        ],
+        "leaderboards": {
+          "weekly": {
+            "topOnlineHours": 10,
+            "topResponseRate": 10,
+            "topEarnings": 10
+          },
+          "monthly": {
+            "topOnlineHours": 20,
+            "topResponseRate": 20,
+            "topConsistency": 20
+          }
+        },
+        "notifications": {
+          "achievement": {
+            "title": "🏆 ¡Logro desbloqueado!",
+            "body": "Has ganado {achievement_name} y {reward_amount}",
+            "actionUrl": "oasistaxi://driver/achievements"
+          },
+          "dailySummary": {
+            "title": "📊 Resumen del día",
+            "body": "{online_hours}h online, {trips} viajes, posición #{rank}",
+            "actionUrl": "oasistaxi://driver/stats"
+          }
+        },
+        "executedAt": "2024-01-01T20:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔧 COMANDOS PARA CREAR LOS JOBS EN GOOGLE CLOUD
+# ═══════════════════════════════════════════════════════════════════
+
+# 1. AUTO-OFFLINE POR INACTIVIDAD
+gcloud scheduler jobs create pubsub driver-auto-offline-inactivity \
+  --location=us-central1 \
+  --schedule="*/5 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"auto_offline_inactivity","criteria":{"inactivityThresholdMinutes":15}}' \
+  --description="Auto-offline por inactividad de conductores - OasisTaxi" \
+  --max-retry-attempts=3 \
+  --max-retry-duration=300s
+
+# 2. AUTO-OFFLINE NOCTURNO
+gcloud scheduler jobs create pubsub driver-auto-offline-night-hours \
+  --location=us-central1 \
+  --schedule="0 2 * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"auto_offline_night_hours","timeWindow":{"startHour":"02:00","endHour":"05:00"}}' \
+  --description="Auto-offline durante horario nocturno - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=180s
+
+# 3. REACTIVACIÓN MATUTINA
+gcloud scheduler jobs create pubsub driver-auto-reactivation-morning \
+  --location=us-central1 \
+  --schedule="0 6 * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"auto_reactivation_morning","reactivationHour":"06:00"}' \
+  --description="Reactivación automática matutina - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=180s
+
+# 4. OPTIMIZACIÓN POR DEMANDA
+gcloud scheduler jobs create pubsub driver-availability-optimization \
+  --location=us-central1 \
+  --schedule="*/30 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"availability_optimization","analysis":{"analyzeDemandPatterns":true}}' \
+  --description="Optimización de disponibilidad por demanda - OasisTaxi" \
+  --max-retry-attempts=3 \
+  --max-retry-duration=600s
+
+# 5. DETECCIÓN APP EN BACKGROUND
+gcloud scheduler jobs create pubsub driver-app-background-detection \
+  --location=us-central1 \
+  --schedule="*/2 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"app_background_detection","detection":{"checkAppState":true}}' \
+  --description="Detección app en background - OasisTaxi" \
+  --max-retry-attempts=5 \
+  --max-retry-duration=120s
+
+# 6. LIMPIEZA DE ESTADOS
+gcloud scheduler jobs create pubsub driver-status-cleanup \
+  --location=us-central1 \
+  --schedule="0 */4 * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"status_cleanup","cleanup":{"orphanedSessions":true}}' \
+  --description="Limpieza de estados huérfanos - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# 7. GAMIFICACIÓN
+gcloud scheduler jobs create pubsub driver-availability-gamification \
+  --location=us-central1 \
+  --schedule="0 20 * * *" \
+  --time-zone="America/Lima" \
+  --topic="driver-availability-management" \
+  --message-body='{"jobType":"availability_gamification","dailyRewards":{"calculateOnlineHours":true}}' \
+  --description="Gamificación de disponibilidad - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 VERIFICACIÓN Y MONITOREO
+# ═══════════════════════════════════════════════════════════════════
+
+# Listar todos los jobs de disponibilidad
+gcloud scheduler jobs list --location=us-central1 --filter="name:*driver*"
+
+# Ver detalles de un job específico
+gcloud scheduler jobs describe driver-auto-offline-inactivity --location=us-central1
+
+# Ejecutar manualmente para pruebas
+gcloud scheduler jobs run driver-auto-offline-inactivity --location=us-central1
+
+# Ver logs de ejecución
+gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id:driver-auto-offline-inactivity" --limit=10
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔄 TÓPICOS PUBSUB NECESARIOS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear tópico principal de gestión de disponibilidad
+gcloud pubsub topics create driver-availability-management
+
+# Crear tópicos para diferentes acciones
+gcloud pubsub topics create driver-state-changes
+gcloud pubsub topics create driver-notifications
+gcloud pubsub topics create driver-analytics-events
+
+# Verificar tópicos creados
+gcloud pubsub topics list --filter="name:*driver*"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🛡️ PERMISOS Y IAM
+# ═══════════════════════════════════════════════════════════════════
+
+# Permisos para Cloud Scheduler
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+
+# Permisos para las Cloud Functions
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:firebase-adminsdk-xyz@oasis-taxi-peru.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:firebase-adminsdk-xyz@oasis-taxi-peru.iam.gserviceaccount.com" \
+  --role="roles/firebase.messagingSender"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📊 MÉTRICAS Y ALERTAS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear métricas personalizadas
+gcloud logging metrics create auto_offline_events \
+  --description="Eventos de auto-offline de conductores" \
+  --log-filter='resource.type="cloud_function" AND textPayload:"auto_offline_executed"'
+
+gcloud logging metrics create driver_reactivation_rate \
+  --description="Tasa de reactivación de conductores" \
+  --log-filter='resource.type="cloud_function" AND textPayload:"driver_reactivated"'
+
+# Crear alertas para casos críticos
+gcloud alpha monitoring policies create --policy-from-file=driver-availability-alerts.yaml
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎯 CONFIGURACIÓN AVANZADA POR ZONAS
+# ═══════════════════════════════════════════════════════════════════
+
+zone_configurations:
+  high_demand_zones:
+    - name: "Aeropuerto Jorge Chávez"
+      auto_offline_disabled: true
+      priority_reactivation: true
+      extended_hours: "24/7"
+      
+    - name: "Centro de Lima"
+      peak_hours: ["07:00-09:00", "18:00-20:00"]
+      auto_offline_delay_minutes: 30
+      
+    - name: "Miraflores-San Isidro"
+      weekend_priority: true
+      night_service: true
+      auto_offline_threshold: 20
+
+  low_demand_zones:
+    - name: "Zonas residenciales"
+      early_auto_offline: true
+      threshold_minutes: 10
+      night_shutdown: "02:00-05:00"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🤖 MACHINE LEARNING PARA PREDICCIÓN
+# ═══════════════════════════════════════════════════════════════════
+
+ml_predictions:
+  demand_forecasting:
+    model: "oasis-taxi-demand-prediction"
+    features:
+      - hour_of_day
+      - day_of_week
+      - weather_condition
+      - historical_trips
+      - events_calendar
+    
+  optimal_driver_count:
+    algorithm: "dynamic_programming"
+    objective: "minimize_wait_time"
+    constraints:
+      - max_drivers_per_zone
+      - min_service_coverage
+      - driver_preferences
+      
+  personalized_scheduling:
+    driver_patterns: true
+    earning_optimization: true
+    work_life_balance: true
+
+# ═══════════════════════════════════════════════════════════════════
+# 📱 INTEGRACIÓN CON APP MÓVIL
+# ═══════════════════════════════════════════════════════════════════
+
+mobile_integration:
+  notification_channels:
+    - channel_id: "availability_management"
+      importance: "high"
+      sound: true
+      vibration: [1000, 500, 1000]
+      
+  deep_links:
+    - "oasistaxi://driver/availability"
+    - "oasistaxi://driver/schedule"
+    - "oasistaxi://driver/earnings-forecast"
+    - "oasistaxi://driver/zone-demand"
+    
+  local_storage:
+    - availability_preferences
+    - auto_offline_settings
+    - gamification_progress
+    - earnings_targets
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔐 PRIVACIDAD Y CUMPLIMIENTO
+# ═══════════════════════════════════════════════════════════════════
+
+privacy_compliance:
+  data_collection:
+    - location_data: "only_when_online"
+    - app_usage: "anonymized_metrics"
+    - availability_patterns: "encrypted_storage"
+    
+  driver_rights:
+    - opt_out_auto_offline: true
+    - custom_availability_hours: true
+    - data_deletion_request: true
+    - transparency_report: true
+    
+  peru_labor_compliance:
+    - independent_contractor_status: true
+    - no_forced_availability: true
+    - flexible_scheduling: true
+    - fair_compensation: true
+
+# ═══════════════════════════════════════════════════════════════════
+# 📈 KPIs Y OBJETIVOS
+# ═══════════════════════════════════════════════════════════════════
+
+success_metrics:
+  operational:
+    - driver_utilization_rate: ">75%"
+    - average_response_time: "<3 minutes"
+    - coverage_consistency: ">90%"
+    - auto_offline_accuracy: ">85%"
+    
+  driver_satisfaction:
+    - availability_control_rating: ">4.5/5"
+    - earnings_predictability: ">80%"
+    - work_life_balance: ">4.0/5"
+    - system_fairness: ">4.2/5"
+    
+  business_impact:
+    - demand_coverage: ">95%"
+    - customer_wait_reduction: ">20%"
+    - operational_efficiency: ">15%"
+    - driver_retention: ">90%"

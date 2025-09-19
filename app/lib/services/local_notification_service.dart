@@ -1,23 +1,26 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 import '../utils/navigation_helper.dart';
 
 class LocalNotificationService {
-  static final LocalNotificationService _instance = LocalNotificationService._internal();
+  static final LocalNotificationService _instance =
+      LocalNotificationService._internal();
   factory LocalNotificationService() => _instance;
   LocalNotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
 
   // Inicializar notificaciones
   Future<void> initialize() async {
     // Inicializar timezone data
     tz_data.initializeTimeZones();
     // Configuración para Android
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
     // Configuración para iOS
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -38,14 +41,16 @@ class LocalNotificationService {
     );
 
     // Solicitar permisos en Android 13+
-    await _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   }
 
   // Callback cuando se toca una notificación
   void _onNotificationTapped(NotificationResponse response) {
     AppLogger.info('Notificación tocada: ${response.payload}');
-    
+
     // Navegar a pantalla específica según el payload
     final payload = response.payload;
     if (payload != null) {
@@ -135,7 +140,8 @@ class LocalNotificationService {
   }) async {
     await showNotification(
       title: '✅ ¡Conductor encontrado!',
-      body: '$driverName está en camino - $vehicleInfo - Llegará en $estimatedTime',
+      body:
+          '$driverName está en camino - $vehicleInfo - Llegará en $estimatedTime',
       payload: 'driver_found',
     );
   }
@@ -250,6 +256,8 @@ class LocalNotificationService {
         tzScheduledDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
       AppLogger.info('Notificación programada para: $scheduledDate');

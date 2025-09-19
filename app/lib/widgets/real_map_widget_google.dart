@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -24,10 +23,10 @@ class RealMapWidget extends StatefulWidget {
   });
 
   @override
-  _RealMapWidgetState createState() => _RealMapWidgetState();
+  RealMapWidgetState createState() => RealMapWidgetState();
 }
 
-class _RealMapWidgetState extends State<RealMapWidget> {
+class RealMapWidgetState extends State<RealMapWidget> {
   final LocationService _locationService = LocationService();
   GoogleMapController? _mapController;
   Position? _currentPosition;
@@ -40,8 +39,11 @@ class _RealMapWidgetState extends State<RealMapWidget> {
   @override
   void initState() {
     super.initState();
-    _initializeLocation();
     _setupMarkers();
+    // Postergar inicialización de ubicación para evitar setState durante build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeLocation();
+    });
   }
 
   @override
@@ -59,9 +61,10 @@ class _RealMapWidgetState extends State<RealMapWidget> {
           _currentPosition = position;
         });
         _animateToPosition(position);
-        
+
         // Suscribirse a actualizaciones de ubicación
-        _locationSubscription = _locationService.locationStream.listen((position) {
+        _locationSubscription =
+            _locationService.locationStream.listen((position) {
           if (mounted) {
             setState(() {
               _currentPosition = position;
@@ -69,7 +72,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
             });
           }
         });
-        
+
         _locationService.startLocationTracking();
       }
     }
@@ -83,7 +86,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
       markers.add(
         Marker(
           markerId: MarkerId('current_location'),
-          position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          position:
+              LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           infoWindow: InfoWindow(title: 'Mi ubicación'),
         ),
@@ -96,7 +100,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
         Marker(
           markerId: MarkerId('pickup'),
           position: widget.pickupLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
           infoWindow: InfoWindow(title: 'Punto de recogida'),
         ),
       );
@@ -123,7 +128,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
     if (_currentPosition != null && widget.showCurrentLocation) {
       final marker = Marker(
         markerId: MarkerId('current_location'),
-        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        position:
+            LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
         infoWindow: InfoWindow(title: 'Mi ubicación'),
       );
@@ -159,7 +165,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
         widget.pickupLocation!,
         widget.dropoffLocation!,
       );
-      
+
       _mapController?.animateCamera(
         CameraUpdate.newLatLngBounds(bounds, 100),
       );
@@ -169,7 +175,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
   void _onTap(LatLng location) {
     if (widget.enableInteraction && widget.onLocationSelected != null) {
       widget.onLocationSelected!(location);
-      
+
       // Agregar marcador temporal
       setState(() {
         _markers.add(
@@ -194,7 +200,8 @@ class _RealMapWidgetState extends State<RealMapWidget> {
           onMapCreated: _onMapCreated,
           initialCameraPosition: CameraPosition(
             target: _currentPosition != null
-                ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+                ? LatLng(
+                    _currentPosition!.latitude, _currentPosition!.longitude)
                 : _defaultLocation,
             zoom: 15.0,
           ),
@@ -219,7 +226,7 @@ class _RealMapWidgetState extends State<RealMapWidget> {
           ]
           ''',
         ),
-        
+
         // Botón de centrar en ubicación actual
         if (widget.showCurrentLocation)
           Positioned(
@@ -239,12 +246,12 @@ class _RealMapWidgetState extends State<RealMapWidget> {
               ),
             ),
           ),
-          
+
         // Indicador de carga
         if (_currentPosition == null && widget.showCurrentLocation)
           Center(
             child: Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -259,9 +266,10 @@ class _RealMapWidgetState extends State<RealMapWidget> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     'Obteniendo ubicación...',
                     style: TextStyle(

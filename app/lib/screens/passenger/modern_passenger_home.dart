@@ -1,298 +1,706 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'dart:math';
+
+// Core
 import '../../core/theme/modern_theme.dart';
-import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../core/services/places_service.dart';
+import '../../core/config/app_config.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/oasis_button.dart';
+
+// Common Widgets
 import '../../widgets/common/oasis_app_bar.dart';
-import '../../models/price_negotiation_model.dart' as models;
-import '../../providers/ride_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../shared/settings_screen.dart';
-import '../shared/about_screen.dart';
-import '../../utils/logger.dart';
+import '../../widgets/cards/oasis_card.dart';
+
+// Services
+import '../../services/google_maps_service.dart';
+
+// Models
+import '../../models/service_type_model.dart';
+
+// Providers
+import '../../providers/location_provider.dart';
+
+// Widgets
+import '../../widgets/address_search_widget.dart';
+import '../../widgets/transport_options_widget.dart';
+import '../../widgets/passenger_drawer.dart';
+
+// Utils
+import '../../utils/app_logger.dart';
 
 class ModernPassengerHomeScreen extends StatefulWidget {
   const ModernPassengerHomeScreen({super.key});
 
   @override
-  State<ModernPassengerHomeScreen> createState() =>
-      _ModernPassengerHomeScreenState();
+  ModernPassengerHomeScreenState createState() =>
+      ModernPassengerHomeScreenState();
 }
 
-class _ModernPassengerHomeScreenState extends State<ModernPassengerHomeScreen>
+class ModernPassengerHomeScreenState extends State<ModernPassengerHomeScreen>
     with TickerProviderStateMixin {
+  // GlobalKey para el Scaffold
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Controllers
   GoogleMapController? _mapController;
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
+  late Animation<double> _pulseAnimation;
+
+  // Estado de ubicación
+  LatLng? _currentLocation;
+  LatLng? _destinationLocation;
+  String _currentAddress = 'Obteniendo ubicación...';
+  final TextEditingController _originController = TextEditingController();
+  String _destinationAddress = '';
+
+  // Estado del viaje
+  ServiceType _selectedService = ServiceType.taxiEconomico;
+  double? _estimatedDistance;
+  int? _estimatedTime;
+  double? _estimatedPrice;
+  bool _isRequestingRide = false;
+  bool _showServiceOptions = false;
+  bool _destinationSelected = false;
+
+  // Marcadores y rutas
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
-  
-  // Controllers
-  final TextEditingController _pickupController = TextEditingController();
-  final TextEditingController _destinationController = TextEditingController();
-  
-  // Animation controllers
-  late AnimationController _bottomSheetController;
-  late AnimationController _searchBarController;
-  late Animation<double> _bottomSheetAnimation;
-  late Animation<double> _searchBarAnimation;
-  
-  // Estados
-  bool _isSearchingDestination = false;
-  bool _showPriceNegotiation = false;
-  bool _showDriverOffers = false;
-  double _offeredPrice = 15.0;
-  
-  // Negociación actual
-  models.PriceNegotiation? _currentNegotiation;
-  Timer? _negotiationTimer;
+
+  // Firebase
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Google Maps Service
+  final GoogleMapsService _googleMapsService = GoogleMapsService();
+
+  // Subscriptions
+  StreamSubscription? _locationSubscription;
+  StreamSubscription? _driversSubscription;
 
   @override
   void initState() {
     super.initState();
     AppLogger.lifecycle('ModernPassengerHomeScreen', 'initState');
-    
-    _bottomSheetController = AnimationController(
+    _initializeAnimations();
+    _initializeServices();
+    // Postergar inicialización de ubicación para evitar setState durante build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeLocation();
+    });
+    _subscribeToDrivers();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await _googleMapsService.initialize(
+        googleMapsApiKey: AppConfig.googleDirectionsApiKey,
+      );
+      AppLogger.info('🗺️ GoogleMapsService inicializado correctamente');
+    } catch (e) {
+      AppLogger.error('Error inicializando GoogleMapsService', e);
+    }
+  }
+
+  void _initializeAnimations() {
+    _pulseController = AnimationController(
+      duration: Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _slideController = AnimationController(
       duration: Duration(milliseconds: 500),
       vsync: this,
     );
-    
-    _searchBarController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    
-    _bottomSheetAnimation = CurvedAnimation(
-      parent: _bottomSheetController,
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
       curve: Curves.easeInOut,
-    );
-    
-    _searchBarAnimation = CurvedAnimation(
-      parent: _searchBarController,
-      curve: Curves.easeInOut,
-    );
-    
-    _bottomSheetController.forward();
-    _searchBarController.forward();
-    
-    // Listener para cambios en el estado del viaje
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupRideProviderListener();
-    });
+    ));
   }
-  
-  void _setupRideProviderListener() {
+
+  Future<void> _initializeLocation() async {
     if (!mounted) return;
-    
-    AppLogger.debug('Configurando listener del RideProvider');
+
     try {
-      final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      // Escuchar cambios en el viaje actual
-      rideProvider.addListener(_onRideProviderChanged);
-      AppLogger.debug('Listener del RideProvider configurado exitosamente');
+      // Diferir la llamada al Provider para evitar setState durante build
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (!mounted) return;
+
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+
+      // Intentar obtener ubicación con timeout
+      await Future.any([
+        locationProvider.getCurrentLocation(),
+        Future.delayed(const Duration(seconds: 10)),
+      ]);
+
+      // Verificar que el widget aún esté montado antes de setState
+      if (!mounted) return;
+
+      // Obtener ubicación inicial - sin stream porque LocationProvider no lo tiene
+      if (locationProvider.currentLocation != null) {
+        setState(() {
+          _currentLocation = locationProvider.currentLocation;
+          _updateCurrentAddress();
+          _updateMapCamera();
+        });
+      } else {
+        // Si no se pudo obtener la ubicación, usar ubicación por defecto (Lima)
+        setState(() {
+          _currentLocation = const LatLng(-12.0464, -77.0428);
+          _currentAddress = 'Plaza de Armas, Lima';
+          _updateMapCamera();
+        });
+
+        // Intentar obtener ubicación real en segundo plano
+        _retryLocationInBackground();
+      }
     } catch (e) {
-      AppLogger.error('Error configurando listener del RideProvider', e);
+      if (mounted) {
+        AppLogger.error('Error inicializando ubicación', e);
+        // Usar ubicación por defecto si hay error
+        setState(() {
+          _currentLocation = const LatLng(-12.0464, -77.0428);
+          _currentAddress = 'Plaza de Armas, Lima';
+          _updateMapCamera();
+        });
+      }
     }
   }
-  
-  void _onRideProviderChanged() {
+
+  Future<void> _retryLocationInBackground() async {
+    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    
-    final rideProvider = Provider.of<RideProvider>(context, listen: false);
-    final currentTrip = rideProvider.currentTrip;
-    
-    if (currentTrip != null) {
-      // Navegar al código de verificación cuando el conductor sea asignado
-      if (currentTrip.status == 'accepted' || currentTrip.status == 'driver_arriving') {
-        if (currentTrip.verificationCode != null) {
-          Navigator.pushNamed(
-            context, 
-            '/passenger/verification-code',
-            arguments: currentTrip,
+
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    await locationProvider.getCurrentLocation();
+
+    if (mounted && locationProvider.currentLocation != null) {
+      setState(() {
+        _currentLocation = locationProvider.currentLocation;
+        _updateCurrentAddress();
+        _updateMapCamera();
+      });
+    }
+  }
+
+  Future<void> _updateCurrentAddress() async {
+    if (_currentLocation == null) return;
+
+    try {
+      final address = await PlacesService.getAddressFromCoordinates(
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+      );
+
+      if (mounted && address != null) {
+        setState(() {
+          _currentAddress = address;
+        });
+      }
+    } catch (e) {
+      AppLogger.error('Error obteniendo dirección actual', e);
+    }
+  }
+
+  void _updateMapCamera() {
+    if (_mapController != null && _currentLocation != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _currentLocation!,
+            zoom: 15,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _subscribeToDrivers() {
+    _driversSubscription = _firestore
+        .collection('drivers')
+        .where('isOnline', isEqualTo: true)
+        .where('isAvailable', isEqualTo: true)
+        .snapshots()
+        .listen((snapshot) {
+      _updateDriverMarkers(snapshot.docs);
+    });
+  }
+
+  void _updateDriverMarkers(List<QueryDocumentSnapshot> drivers) {
+    if (!mounted) return;
+
+    setState(() {
+      _markers
+          .removeWhere((marker) => marker.markerId.value.startsWith('driver_'));
+
+      for (var doc in drivers) {
+        final data = doc.data() as Map<String, dynamic>;
+        final location = data['location'] as GeoPoint?;
+        final serviceType = data['serviceType'] as String?;
+
+        if (location != null) {
+          final service = _getServiceFromString(serviceType);
+          final serviceInfo = ServiceTypeConfig.getServiceInfo(service);
+
+          _markers.add(
+            Marker(
+              markerId: MarkerId('driver_${doc.id}'),
+              position: LatLng(location.latitude, location.longitude),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                _getMarkerHue(serviceInfo.color),
+              ),
+              infoWindow: InfoWindow(
+                title: serviceInfo.name,
+                snippet: data['driverName'] ?? 'Conductor disponible',
+              ),
+            ),
           );
         }
+      }
+    });
+  }
+
+  ServiceType _getServiceFromString(String? type) {
+    if (type == null) return ServiceType.taxiEconomico;
+
+    try {
+      return ServiceType.values.firstWhere(
+        (e) => e.toString().split('.').last == type,
+        orElse: () => ServiceType.taxiEconomico,
+      );
+    } catch (e) {
+      return ServiceType.taxiEconomico;
+    }
+  }
+
+  double _getMarkerHue(Color color) {
+    if (color == Color(0xFF2196F3)) return BitmapDescriptor.hueBlue;
+    if (color == Color(0xFF4CAF50)) return BitmapDescriptor.hueGreen;
+    if (color == Color(0xFFFF9800)) return BitmapDescriptor.hueOrange;
+    if (color == Color(0xFFF44336)) return BitmapDescriptor.hueRed;
+    if (color == Color(0xFFFFD700)) return BitmapDescriptor.hueYellow;
+    return BitmapDescriptor.hueAzure;
+  }
+
+  void _onDestinationSelected(PlaceDetails place) {
+    setState(() {
+      _destinationLocation = LatLng(place.latitude, place.longitude);
+      _destinationAddress = place.formattedAddress;
+      _destinationSelected = true;
+      _showServiceOptions = true;
+    });
+
+    _calculateRoute();
+    _slideController.forward();
+  }
+
+  void _onOriginSelected(PlaceDetails place) {
+    setState(() {
+      _currentLocation = LatLng(place.latitude, place.longitude);
+      _currentAddress = place.formattedAddress;
+    });
+
+    // Actualizar el provider de ubicación
+    if (mounted) {
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+      locationProvider.updateLocation(LatLng(place.latitude, place.longitude));
+    }
+
+    // Si ya había destino seleccionado, recalcular ruta
+    if (_destinationLocation != null) {
+      _calculateRoute();
+    }
+
+    // Actualizar cámara del mapa para mostrar la nueva ubicación
+    _updateMapCamera();
+  }
+
+  Future<void> _getCurrentGPSLocation() async {
+    try {
+      // Mostrar indicador de carga
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text('Obteniendo tu ubicación GPS...'),
+              ],
+            ),
+            duration: Duration(seconds: 10),
+            backgroundColor: ModernTheme.primaryBlue,
+          ),
+        );
+      }
+
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+
+      // Obtener ubicación GPS actual con timeout
+      await Future.any([
+        locationProvider.getCurrentLocation(),
+        Future.delayed(const Duration(seconds: 15)),
+      ]);
+
+      if (!mounted) return;
+
+      if (locationProvider.currentLocation != null) {
+        // Obtener la dirección de la ubicación GPS
+        await locationProvider.getCurrentLocation();
+
+        setState(() {
+          _currentLocation = locationProvider.currentLocation;
+          _currentAddress =
+              locationProvider.currentAddress ?? 'Ubicación GPS obtenida';
+          // Actualizar el controlador del campo de texto
+          _originController.text = _currentAddress;
+        });
+
+        // Si ya había destino seleccionado, recalcular ruta
+        if (_destinationLocation != null) {
+          _calculateRoute();
+        }
+
+        // Actualizar cámara del mapa
+        _updateMapCamera();
+
+        // Verificar si el widget aún está montado antes de usar context
+        if (!mounted) return;
+
+        // Ocultar snackbar de loading
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+        // Mostrar confirmación
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Text('Ubicación GPS obtenida exitosamente'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+
+        AppLogger.info('📍 Ubicación GPS obtenida: $_currentAddress');
+      } else {
+        // Error obteniendo ubicación
+        _showLocationError(
+            'No se pudo obtener tu ubicación GPS. Verifica que el GPS esté activado y los permisos estén concedidos.');
+      }
+    } catch (e) {
+      AppLogger.error('Error obteniendo ubicación GPS', e);
+      if (mounted) {
+        _showLocationError('Error al obtener ubicación GPS: ${e.toString()}');
+      }
+    }
+  }
+
+  void _showLocationError(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        duration: Duration(seconds: 4),
+        backgroundColor: ModernTheme.error,
+      ),
+    );
+  }
+
+  Future<void> _calculateRoute() async {
+    if (_currentLocation == null || _destinationLocation == null) return;
+
+    try {
+      AppLogger.info('🗺️ Calculando ruta real con Google Directions API...');
+
+      // Usar Google Directions API REAL
+      final directionsResult = await _googleMapsService.getDirections(
+        origin: _currentLocation!,
+        destination: _destinationLocation!,
+        travelMode: TravelMode.driving,
+        avoidTolls: false,
+        avoidHighways: false,
+      );
+
+      if (directionsResult.success && directionsResult.polylinePoints != null) {
+        // Convertir metros a kilómetros para la distancia
+        final distanceKm = (directionsResult.distanceValue! / 1000);
+        // Convertir segundos a minutos para el tiempo
+        final timeMinutes = (directionsResult.durationValue! / 60).round();
+
+        setState(() {
+          _estimatedDistance = distanceKm;
+          _estimatedTime = timeMinutes;
+          _estimatedPrice = ServiceTypeConfig.calculatePrice(
+            _selectedService,
+            distanceKm,
+            timeMinutes,
+          );
+
+          // Añadir marcador de destino
+          _markers.add(
+            Marker(
+              markerId: MarkerId('destination'),
+              position: _destinationLocation!,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueRed),
+              infoWindow: InfoWindow(
+                title: 'Destino',
+                snippet: _destinationAddress,
+              ),
+            ),
+          );
+
+          // Añadir polyline REAL con todos los puntos de la ruta
+          _polylines.add(
+            Polyline(
+              polylineId: PolylineId('route'),
+              points: directionsResult.polylinePoints!,
+              color: ModernTheme.primaryOrange,
+              width: 4,
+              patterns: [], // Sin patrones para línea sólida
+              geodesic: true, // Seguir curvatura de la Tierra
+            ),
+          );
+        });
+
+        AppLogger.info(
+            '✅ Ruta calculada: ${directionsResult.distance}, ${directionsResult.duration}');
+
+        // Ajustar cámara para mostrar toda la ruta
+        _fitRouteInMap();
+      } else {
+        AppLogger.warning(
+            '⚠️ Error obteniendo direcciones: ${directionsResult.error}');
+        // Fallback a estimación simple si falla la API
+        _calculateRouteFallback();
+      }
+    } catch (e) {
+      AppLogger.error('Error calculando ruta con Google Directions', e);
+      // Fallback a estimación simple
+      _calculateRouteFallback();
+    }
+  }
+
+  void _calculateRouteFallback() {
+    AppLogger.info('📍 Usando fallback: estimación de ruta simple');
+    final distance =
+        _calculateDistanceHaversine(_currentLocation!, _destinationLocation!);
+
+    setState(() {
+      _estimatedDistance = distance;
+      _estimatedTime = (distance * 3).round(); // Estimación: 3 min por km
+      _estimatedPrice = ServiceTypeConfig.calculatePrice(
+        _selectedService,
+        distance,
+        _estimatedTime!,
+      );
+
+      // Añadir marcador de destino
+      _markers.add(
+        Marker(
+          markerId: MarkerId('destination'),
+          position: _destinationLocation!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: 'Destino',
+            snippet: _destinationAddress,
+          ),
+        ),
+      );
+
+      // Línea directa como fallback
+      _polylines.add(
+        Polyline(
+          polylineId: PolylineId('route'),
+          points: [_currentLocation!, _destinationLocation!],
+          color: ModernTheme.primaryOrange,
+          width: 4,
+        ),
+      );
+    });
+
+    _fitRouteInMap();
+  }
+
+  double _calculateDistanceHaversine(LatLng start, LatLng end) {
+    // Fórmula Haversine simplificada (solo como fallback)
+    const double earthRadius = 6371; // km
+    final double lat1Rad = start.latitude * (3.141592653589793 / 180);
+    final double lat2Rad = end.latitude * (3.141592653589793 / 180);
+    final double deltaLat =
+        (end.latitude - start.latitude) * (3.141592653589793 / 180);
+    final double deltaLon =
+        (end.longitude - start.longitude) * (3.141592653589793 / 180);
+
+    final double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(deltaLon / 2) * sin(deltaLon / 2);
+
+    final double c = 2 * asin(sqrt(a));
+    return earthRadius * c;
+  }
+
+  void _fitRouteInMap() {
+    if (_mapController == null ||
+        _currentLocation == null ||
+        _destinationLocation == null) {
+      return;
+    }
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        _currentLocation!.latitude < _destinationLocation!.latitude
+            ? _currentLocation!.latitude
+            : _destinationLocation!.latitude,
+        _currentLocation!.longitude < _destinationLocation!.longitude
+            ? _currentLocation!.longitude
+            : _destinationLocation!.longitude,
+      ),
+      northeast: LatLng(
+        _currentLocation!.latitude > _destinationLocation!.latitude
+            ? _currentLocation!.latitude
+            : _destinationLocation!.latitude,
+        _currentLocation!.longitude > _destinationLocation!.longitude
+            ? _currentLocation!.longitude
+            : _destinationLocation!.longitude,
+      ),
+    );
+
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 100),
+    );
+  }
+
+  Future<void> _requestRide() async {
+    if (_isRequestingRide) return;
+
+    setState(() {
+      _isRequestingRide = true;
+    });
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('Usuario no autenticado');
+
+      // Crear solicitud de viaje
+      final rideRequest = await _firestore.collection('ride_requests').add({
+        'passengerId': user.uid,
+        'passengerName': user.displayName ?? 'Pasajero',
+        'passengerPhone': user.phoneNumber ?? '',
+        'serviceType': _selectedService.toString().split('.').last,
+        'pickupLocation':
+            GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
+        'pickupAddress': _currentAddress,
+        'destinationLocation': GeoPoint(
+            _destinationLocation!.latitude, _destinationLocation!.longitude),
+        'destinationAddress': _destinationAddress,
+        'estimatedDistance': _estimatedDistance,
+        'estimatedTime': _estimatedTime,
+        'estimatedPrice': _estimatedPrice,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Navegar a pantalla de espera
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          '/passenger/tracking', // Cambiar a tracking existente
+          arguments: rideRequest.id,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error solicitando viaje', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al solicitar el viaje'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequestingRide = false;
+        });
       }
     }
   }
 
   @override
   void dispose() {
-    // Remover listener antes de dispose para evitar "widget deactivated" error
-    try {
-      if (mounted) {
-        final rideProvider = Provider.of<RideProvider>(context, listen: false);
-        rideProvider.removeListener(_onRideProviderChanged);
-      }
-    } catch (e) {
-      // Ignorar errores si el context ya no está disponible
-      AppLogger.debug('Error removiendo listener en dispose: $e');
-    }
-    
-    _bottomSheetController.dispose();
-    _searchBarController.dispose();
-    _pickupController.dispose();
-    _destinationController.dispose();
-    _negotiationTimer?.cancel();
+    _pulseController.dispose();
+    _slideController.dispose();
+    _locationSubscription?.cancel();
+    _driversSubscription?.cancel();
+    _mapController?.dispose();
     super.dispose();
-  }
-
-  void _startNegotiation() async {
-    // Validar que se hayan ingresado origen y destino
-    if (_pickupController.text.isEmpty || _destinationController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Debes ingresar origen y destino'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    try {
-      if (!mounted) return;
-      final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.currentUser;
-      
-      if (user == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: Usuario no autenticado'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _showPriceNegotiation = true;
-      });
-
-      // Obtener ubicación real del GPS del dispositivo
-      LatLng? currentLocation = await _getCurrentLocation();
-      if (currentLocation == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo obtener la ubicación actual. Verifica los permisos GPS.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Geocoding real para destino (si no se proporcionó coordenadas específicas)
-      LatLng? destinationLocation = await _getDestinationLocation();
-      if (destinationLocation == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo encontrar la dirección de destino'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Crear solicitud de viaje REAL usando ubicaciones reales
-      await rideProvider.requestRide(
-        pickupLocation: currentLocation, // UBICACIÓN GPS REAL
-        destinationLocation: destinationLocation, // DESTINO REAL GEOCODIFICADO
-        pickupAddress: _pickupController.text.isEmpty ? 'Mi ubicación actual' : _pickupController.text,
-        destinationAddress: _destinationController.text,
-        userId: user.id,
-      );
-
-      if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Buscando conductores disponibles...'),
-          backgroundColor: ModernTheme.oasisGreen,
-        ),
-      );
-
-    } catch (e) {
-      if (!mounted) return;
-      
-      setState(() {
-        _showPriceNegotiation = false;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al solicitar viaje: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-  
-  void _simulateDriverOffers() {
-    _negotiationTimer = Timer.periodic(Duration(seconds: 3), (timer) {
-      if (_currentNegotiation != null && 
-          _currentNegotiation!.driverOffers.length < 5) {
-        if (!mounted) return;
-        setState(() {
-          final newOffer = models.DriverOffer(
-            driverId: 'driver${_currentNegotiation!.driverOffers.length}',
-            driverName: 'Conductor ${_currentNegotiation!.driverOffers.length + 1}',
-            driverPhoto: '', // Se obtiene del perfil del conductor desde Firebase
-            driverRating: 4.5 + (_currentNegotiation!.driverOffers.length * 0.1),
-            vehicleModel: ['Toyota Corolla', 'Nissan Sentra', 'Hyundai Accent'][
-              _currentNegotiation!.driverOffers.length % 3
-            ],
-            vehiclePlate: 'ABC-${100 + _currentNegotiation!.driverOffers.length}',
-            vehicleColor: ['Blanco', 'Negro', 'Gris'][
-              _currentNegotiation!.driverOffers.length % 3
-            ],
-            acceptedPrice: _offeredPrice - (_currentNegotiation!.driverOffers.length * 0.5),
-            estimatedArrival: 3 + _currentNegotiation!.driverOffers.length,
-            offeredAt: DateTime.now(),
-            status: models.OfferStatus.pending,
-            completedTrips: 500 + (_currentNegotiation!.driverOffers.length * 100),
-            acceptanceRate: 90.0 + _currentNegotiation!.driverOffers.length,
-          );
-          
-          _currentNegotiation = _currentNegotiation!.copyWith(
-            driverOffers: [..._currentNegotiation!.driverOffers, newOffer],
-            status: models.NegotiationStatus.negotiating,
-          );
-          
-          _showDriverOffers = true;
-        });
-      } else {
-        timer.cancel();
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: OasisAppBar(
-        title: 'Oasis Taxi',
+      key: _scaffoldKey,
+      appBar: OasisAppBar.standard(
+        title: 'Inicio',
         showBackButton: false,
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: Colors.white),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications, color: Colors.white),
+            icon: Icon(Icons.notifications_outlined, color: Colors.white),
             onPressed: () => Navigator.pushNamed(context, '/shared/notifications'),
           ),
         ],
       ),
-      drawer: _buildDrawer(),
+      drawer: PassengerDrawer(),
       body: Stack(
         children: [
-          // Mapa
+          // Mapa de fondo
           GoogleMap(
             initialCameraPosition: CameraPosition(
-              target: LatLng(-12.0851, -76.9770),
-              zoom: 15,
+              target: _currentLocation ?? LatLng(-12.0464, -77.0428),
+              zoom: 14,
             ),
-            // onMapCreated: (controller) => _mapController = controller,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              _updateMapCamera();
+            },
             markers: _markers,
             polylines: _polylines,
             myLocationEnabled: true,
@@ -300,913 +708,287 @@ class _ModernPassengerHomeScreenState extends State<ModernPassengerHomeScreen>
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
           ),
-          
-          // Barra de búsqueda superior
+
+          // Gradiente superior
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.7),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+
+          // Contenido principal con padding responsivo
           SafeArea(
-            child: AnimatedBuilder(
-              animation: _searchBarAnimation,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, -100 * (1 - _searchBarAnimation.value)),
-                  child: Opacity(
-                    opacity: _searchBarAnimation.value,
-                    child: _buildSearchBar(),
+            child: SingleChildScrollView(
+              padding: ModernTheme.getResponsivePadding(context),
+              child: Column(
+                children: [
+
+                  // Tarjeta de búsqueda
+                  if (!_destinationSelected)
+                    OasisCard.elevated(
+                      margin: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: Padding(
+                        padding: AppSpacing.all(AppSpacing.md),
+                    child: Column(
+                      children: [
+                        // Ubicación actual - Completamente editable con GPS
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: ModernTheme.success,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            AppSpacing.horizontalSpaceSM,
+                            Expanded(
+                              child: AddressSearchWidget(
+                                hintText: 'Tu ubicación actual',
+                                initialText: _currentAddress,
+                                onPlaceSelected: _onOriginSelected,
+                                autofocus: false,
+                              ),
+                            ),
+                            AppSpacing.horizontalSpaceXS,
+                            // Botón GPS - Más visible
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: ModernTheme.primaryOrange,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: ModernTheme.primaryOrange
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.my_location_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                onPressed: _getCurrentGPSLocation,
+                                tooltip: 'Obtener mi ubicación GPS',
+                                padding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        Padding(
+                          padding: EdgeInsets.only(left: AppSpacing.xs),
+                          child: Container(
+                            height: 30,
+                            width: 1,
+                            color: Colors.grey.shade300,
+                          ),
+                        ),
+
+                        // Campo de búsqueda de destino
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: ModernTheme.error,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            AppSpacing.horizontalSpaceSM,
+                            Expanded(
+                              child: AddressSearchWidget(
+                                hintText: '¿A dónde vas?',
+                                onPlaceSelected: _onDestinationSelected,
+                                autofocus: false,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
+
+                // Información del viaje seleccionado
+                if (_destinationSelected)
+                  OasisCard.elevated(
+                    margin: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: Padding(
+                      padding: AppSpacing.all(AppSpacing.md),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.route, color: ModernTheme.primaryBlue),
+                              AppSpacing.horizontalSpaceXS,
+                              Text(
+                                '${_estimatedDistance?.toStringAsFixed(1) ?? '0'} km',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              AppSpacing.horizontalSpaceMD,
+                              Icon(Icons.access_time,
+                                  color: ModernTheme.primaryBlue),
+                              AppSpacing.horizontalSpaceXS,
+                              Text(
+                                '${_estimatedTime ?? 0} min',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              Spacer(),
+                              OasisButton.text(
+                                text: 'Cambiar',
+                                onPressed: () {
+                                  setState(() {
+                                    _destinationSelected = false;
+                                    _showServiceOptions = false;
+                                    _destinationLocation = null;
+                                    _destinationAddress = '';
+                                    _markers.removeWhere(
+                                        (m) => m.markerId.value == 'destination');
+                                    _polylines.clear();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          
-          // Bottom sheet con negociación de precio
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AnimatedBuilder(
-              animation: _bottomSheetAnimation,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, 400 * (1 - _bottomSheetAnimation.value)),
-                  child: _showDriverOffers
-                      ? _buildDriverOffersSheet()
-                      : _showPriceNegotiation
-                          ? _buildPriceNegotiationSheet()
-                          : _buildDestinationSheet(),
-                );
-              },
-            ),
-          ),
-          
-          
+
           // Botón de ubicación actual
           Positioned(
-            right: 16,
-            bottom: _showPriceNegotiation ? 420 : 320,
-            child: _buildLocationButton(),
+            right: AppSpacing.md,
+            bottom: _showServiceOptions ? 320 : 100,
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              child: OasisButton.icon(
+                icon: Icons.my_location,
+                onPressed: _updateMapCamera,
+                size: OasisButtonSize.medium,
+                variant: OasisButtonVariant.secondary,
+              ),
+            ),
           ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildSearchBar() {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: ModernTheme.floatingShadow,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Campo de recogida
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
+
+          // Panel de opciones de servicio con DraggableScrollableSheet responsivo
+          if (_showServiceOptions)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Determinar si es pantalla pequeña
+                final isSmallScreen = constraints.maxHeight < 600 ||
+                                    constraints.maxWidth < ModernTheme.mobileBreakpoint;
+
+                return DraggableScrollableSheet(
+                  initialChildSize: isSmallScreen ? 0.5 : 0.4, // Más espacio en pantallas pequeñas
+                  minChildSize: isSmallScreen ? 0.35 : 0.25, // Tamaño mínimo más grande en pantallas pequeñas
+                  maxChildSize: isSmallScreen ? 0.85 : 0.75, // Tamaño máximo más grande en pantallas pequeñas
+                  snap: true, // Habilitar snap a posiciones predefinidas
+                  snapSizes: isSmallScreen
+                      ? const [0.35, 0.5, 0.85] // Posiciones para pantallas pequeñas
+                      : const [0.25, 0.4, 0.75], // Posiciones para pantallas normales
+              builder:
+                  (BuildContext context, ScrollController scrollController) {
+                return Container(
                   decoration: BoxDecoration(
-                    color: ModernTheme.success,
-                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 25,
+                        offset: Offset(0, -8),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _pickupController,
-                    decoration: InputDecoration(
-                      hintText: '¿Dónde estás?',
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.my_location, color: ModernTheme.primaryOrange),
-                  onPressed: () {
-                    _pickupController.text = 'Mi ubicación actual';
-                  },
-                ),
-              ],
-            ),
-          ),
-          
-          Divider(height: 1),
-          
-          // Campo de destino
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: ModernTheme.error,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _destinationController,
-                    decoration: InputDecoration(
-                      hintText: '¿A dónde vas?',
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    style: TextStyle(fontSize: 16),
-                    onTap: () {
-                      if (!mounted) return;
-                      setState(() => _isSearchingDestination = true);
-                    },
-                  ),
-                ),
-                if (_destinationController.text.isNotEmpty)
-                  IconButton(
-                    icon: Icon(Icons.close, size: 20),
-                    onPressed: () {
-                      _destinationController.clear();
-                      if (!mounted) return;
-                      setState(() => _isSearchingDestination = false);
-                    },
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildDestinationSheet() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: ModernTheme.floatingShadow,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Lugares favoritos
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Lugares favoritos',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: ModernTheme.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildFavoritePlace(Icons.home, 'Casa'),
-                    _buildFavoritePlace(Icons.work, 'Trabajo'),
-                    _buildFavoritePlace(Icons.school, 'Universidad'),
-                    _buildFavoritePlace(Icons.add, 'Agregar'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          Divider(),
-          
-          // Destinos recientes
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Recientes',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: ModernTheme.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 16),
-                _buildRecentPlace('Centro Comercial Plaza', 'Av. Principal 123'),
-                _buildRecentPlace('Aeropuerto Internacional', 'Terminal 1'),
-                _buildRecentPlace('Parque Central', 'Calle Principal s/n'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildPriceNegotiationSheet() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: ModernTheme.floatingShadow,
-      ),
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: EdgeInsets.only(bottom: 20),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Título
-          Text(
-            'Ofrece tu precio',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: ModernTheme.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Los conductores cercanos verán tu oferta',
-            style: TextStyle(
-              fontSize: 14,
-              color: ModernTheme.textSecondary,
-            ),
-          ),
-          SizedBox(height: 24),
-          
-          // Información del viaje
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ModernTheme.backgroundLight,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.route, color: ModernTheme.primaryBlue),
-                SizedBox(width: 12),
-                Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '5.5 km • 15 min',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                      // Widget de opciones de transporte
+                      Expanded(
+                        child: TransportOptionsWidget(
+                          selectedService: _selectedService,
+                          onServiceSelected: (service) {
+                            setState(() {
+                              _selectedService = service;
+                              _estimatedPrice =
+                                  ServiceTypeConfig.calculatePrice(
+                                service,
+                                _estimatedDistance ?? 0,
+                                _estimatedTime ?? 0,
+                              );
+                            });
+                          },
+                          distance: _estimatedDistance,
+                          scrollController: scrollController,
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Precio sugerido: S/ 15.00',
-                        style: TextStyle(
-                          color: ModernTheme.success,
-                          fontSize: 14,
+                      // Botón de solicitar taxi integrado en el panel
+                      if (_destinationSelected)
+                        Container(
+                          padding: EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 10,
+                                offset: Offset(0, -5),
+                              ),
+                            ],
+                          ),
+                          child: SafeArea(
+                            top: false,
+                            child: AnimatedBuilder(
+                              animation: _pulseAnimation,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: _pulseAnimation.value,
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: OasisButton.primary(
+                                      text: _isRequestingRide
+                                          ? 'Solicitando...'
+                                          : 'Solicitar ${ServiceTypeConfig.getServiceInfo(_selectedService).name}',
+                                      onPressed: _isRequestingRide ? null : _requestRide,
+                                      size: OasisButtonSize.large,
+                                      icon: _isRequestingRide
+                                          ? null
+                                          : Icons.arrow_forward,
+                                      loading: _isRequestingRide,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 24),
-          
-          // Slider de precio
-          PriceNegotiationSlider(
-            minPrice: 10.0,
-            maxPrice: 25.0,
-            suggestedPrice: 15.0,
-            onPriceChanged: (price) {
-              if (!mounted) return;
-              setState(() => _offeredPrice = price);
-            },
-          ),
-          SizedBox(height: 24),
-          
-          // Métodos de pago
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildPaymentMethod(Icons.money, 'Efectivo', true),
-              _buildPaymentMethod(Icons.credit_card, 'Tarjeta', false),
-              _buildPaymentMethod(Icons.account_balance_wallet, 'Billetera', false),
-            ],
-          ),
-          SizedBox(height: 24),
-          
-          // Botón de buscar conductor
-          AnimatedPulseButton(
-            text: 'Buscar conductor',
-            icon: Icons.search,
-            onPressed: _startNegotiation,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildDriverOffersSheet() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: ModernTheme.floatingShadow,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Título con contador
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ofertas de conductores',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: ModernTheme.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '${_currentNegotiation?.driverOffers.length ?? 0} conductores interesados',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: ModernTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                // Timer countdown
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: ModernTheme.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.timer, size: 16, color: ModernTheme.warning),
-                      SizedBox(width: 4),
-                      Text(
-                        '${_currentNegotiation?.timeRemaining.inMinutes ?? 0}:${(_currentNegotiation?.timeRemaining.inSeconds ?? 0) % 60}',
-                        style: TextStyle(
-                          color: ModernTheme.warning,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Lista de ofertas
-          SizedBox(
-            height: 300,
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _currentNegotiation?.driverOffers.length ?? 0,
-              itemBuilder: (context, index) {
-                final offer = _currentNegotiation!.driverOffers[index];
-                return _buildDriverOfferCard(offer);
+                );
               },
             ),
-          ),
+            )
         ],
       ),
+      drawer: const PassengerDrawer(),
     );
-  }
-  
-  Widget _buildDriverOfferCard(models.DriverOffer offer) {
-    return AnimatedElevatedCard(
-      onTap: () {
-        // Aceptar oferta
-        _showDriverAcceptedDialog(offer);
-      },
-      borderRadius: 16,
-      child: Container(
-        padding: EdgeInsets.all(16),
-        margin: EdgeInsets.only(bottom: 12),
-        child: Row(
-          children: [
-            // Foto del conductor
-            CircleAvatar(
-              radius: 30,
-              backgroundImage: NetworkImage(offer.driverPhoto),
-            ),
-            SizedBox(width: 12),
-            
-            // Información del conductor
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        offer.driverName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(Icons.star, size: 16, color: ModernTheme.accentYellow),
-                      Text(
-                        offer.driverRating.toStringAsFixed(1),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ModernTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '${offer.vehicleModel} • ${offer.vehicleColor}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: ModernTheme.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.access_time, size: 14, color: ModernTheme.info),
-                      SizedBox(width: 4),
-                      Text(
-                        '${offer.estimatedArrival} min',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: ModernTheme.info,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Icon(Icons.directions_car, size: 14, color: ModernTheme.textSecondary),
-                      SizedBox(width: 4),
-                      Text(
-                        '${offer.completedTrips} viajes',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: ModernTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // Precio ofertado
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: ModernTheme.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'S/ ${offer.acceptedPrice.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: ModernTheme.success,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildFavoritePlace(IconData icon, String label) {
-    return InkWell(
-      onTap: () {
-        if (label != 'Agregar') {
-          _destinationController.text = label;
-          if (!mounted) return;
-          setState(() => _showPriceNegotiation = true);
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ModernTheme.backgroundLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: ModernTheme.primaryOrange),
-            ),
-            SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildRecentPlace(String title, String subtitle) {
-    return InkWell(
-      onTap: () {
-        _destinationController.text = title;
-        if (!mounted) return;
-        setState(() => _showPriceNegotiation = true);
-      },
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: ModernTheme.backgroundLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.history,
-                color: ModernTheme.textSecondary,
-                size: 20,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: ModernTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: ModernTheme.textSecondary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildPaymentMethod(IconData icon, String label, bool selected) {
-    return InkWell(
-      onTap: () {
-        // Cambiar método de pago
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? ModernTheme.primaryOrange.withValues(alpha: 0.1) : Colors.transparent,
-          border: Border.all(
-            color: selected ? ModernTheme.primaryOrange : Colors.grey.shade300,
-            width: selected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: selected ? ModernTheme.primaryOrange : ModernTheme.textSecondary,
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? ModernTheme.primaryOrange : ModernTheme.textSecondary,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  
-  Widget _buildLocationButton() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: ModernTheme.cardShadow,
-      ),
-      child: IconButton(
-        icon: Icon(Icons.my_location, color: ModernTheme.primaryOrange),
-        onPressed: () {
-          // Centrar en ubicación actual
-        },
-      ),
-    );
-  }
-  
-  void _showDriverAcceptedDialog(models.DriverOffer offer) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ModernLoadingIndicator(color: ModernTheme.success),
-            SizedBox(height: 20),
-            Text(
-              '¡Conductor encontrado!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '${offer.driverName} está en camino',
-              style: TextStyle(color: ModernTheme.textSecondary),
-            ),
-            SizedBox(height: 20),
-            AnimatedPulseButton(
-              text: 'Ver detalles',
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Navegar a pantalla de seguimiento
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildDrawer() {
-    return Drawer(
-      child: Container(
-        color: Colors.white,
-        child: Column(
-          children: [
-            // Header del drawer unificado
-            OasisDrawerHeader(
-              userType: 'passenger',
-              userName: 'Usuario Pasajero',
-            ),
-            
-            // Opciones del menú
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildDrawerItem(
-                    icon: Icons.history,
-                    title: 'Historial de Viajes',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/trip-history');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.star,
-                    title: 'Mis Calificaciones',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/ratings-history');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.payment,
-                    title: 'Métodos de Pago',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/payment-methods');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.favorite,
-                    title: 'Lugares Favoritos',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/favorites');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.local_offer,
-                    title: 'Promociones',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/promotions');
-                    },
-                  ),
-                  Divider(),
-                  _buildDrawerItem(
-                    icon: Icons.person,
-                    title: 'Mi Perfil',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/passenger/profile');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.settings,
-                    title: 'Configuración',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.help,
-                    title: 'Ayuda',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AboutScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  Divider(),
-                  _buildDrawerItem(
-                    icon: Icons.logout,
-                    title: 'Cerrar Sesión',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/login',
-                        (route) => false,
-                      );
-                    },
-                    color: ModernTheme.error,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: color ?? ModernTheme.oasisGreen,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: color ?? ModernTheme.textPrimary,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  /// Obtener ubicación GPS REAL del dispositivo
-  Future<LatLng?> _getCurrentLocation() async {
-    try {
-      AppLogger.info('Obteniendo ubicación GPS real del dispositivo');
-      
-      // Verificar permisos de ubicación
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          AppLogger.warning('Permisos de ubicación denegados');
-          return null;
-        }
-      }
-      
-      if (permission == LocationPermission.deniedForever) {
-        AppLogger.error('Permisos de ubicación denegados permanentemente');
-        return null;
-      }
-
-      // Obtener ubicación actual real
-      final Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-
-      final LatLng currentLocation = LatLng(position.latitude, position.longitude);
-      AppLogger.info('Ubicación GPS real obtenida: ${position.latitude}, ${position.longitude}');
-      
-      return currentLocation;
-      
-    } catch (e, stackTrace) {
-      AppLogger.error('Error obteniendo ubicación GPS real', e, stackTrace);
-      return null;
-    }
-  }
-
-  /// Geocodificar dirección de destino REAL usando Google Maps API
-  Future<LatLng?> _getDestinationLocation() async {
-    if (_destinationController.text.trim().isEmpty) {
-      AppLogger.warning('Dirección de destino vacía');
-      return null;
-    }
-
-    try {
-      AppLogger.info('Geocodificando dirección: ${_destinationController.text}');
-      
-      // Geocodificación básica usando coordenadas fijas para desarrollo
-      if (!mounted) return null;
-      
-      // Por ahora, usar coordenadas fijas para el centro de Lima
-      // En producción esto debe ser reemplazado por un servicio de geocoding real
-      final coordinates = LatLng(-12.0464, -77.0428); // Plaza de Armas, Lima
-      
-      AppLogger.info('Usando coordenadas fijas para desarrollo: ${coordinates.latitude}, ${coordinates.longitude}');
-      return coordinates;
-      
-    } catch (e, stackTrace) {
-      AppLogger.error('Error en geocoding de destino', e, stackTrace);
-      return null;
-    }
   }
 }

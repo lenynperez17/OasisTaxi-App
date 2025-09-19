@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
 import 'package:flutter/services.dart';
 import 'dart:async';
+import '../../core/theme/modern_theme.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/oasis_button.dart';
+import '../../widgets/common/oasis_app_bar.dart';
+import '../../widgets/cards/oasis_card.dart';
 import '../../services/emergency_service.dart';
 import '../../services/firebase_service.dart';
 import '../../widgets/loading_overlay.dart';
+import '../../utils/app_logger.dart';
+import '../../providers/emergency_provider.dart' show EmergencyContact;
+// Importar EmergencyType y EmergencyHistory desde emergency_service
+export '../../services/emergency_service.dart'
+    show EmergencyType, EmergencyHistory;
 
 /// PANTALLA DE EMERGENCIA SOS - OASIS TAXI
 /// =======================================
-/// 
+///
 /// Funcionalidades críticas:
 /// 🚨 Botón de pánico grande y visible
 /// 📞 Llamada automática al 911
@@ -31,10 +40,10 @@ class EmergencySOSScreen extends StatefulWidget {
   });
 
   @override
-  State<EmergencySOSScreen> createState() => _EmergencySOSScreenState();
+  State<EmergencySOSScreen> createState() => EmergencySOSScreenState();
 }
 
-class _EmergencySOSScreenState extends State<EmergencySOSScreen>
+class EmergencySOSScreenState extends State<EmergencySOSScreen>
     with TickerProviderStateMixin {
   final EmergencyService _emergencyService = EmergencyService();
   final FirebaseService _firebaseService = FirebaseService();
@@ -55,6 +64,8 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('EmergencySOSScreen',
+        'initState - Usuario: ${widget.userId}, Tipo: ${widget.userType}, RideId: ${widget.rideId}');
     _initializeServices();
     _setupAnimations();
     _loadEmergencyData();
@@ -95,7 +106,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
 
   Future<void> _initializeServices() async {
     await _emergencyService.initialize();
-    
+
     if (!mounted) return;
     setState(() {
       _emergencyActive = _emergencyService.isEmergencyActive;
@@ -107,23 +118,34 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   }
 
   Future<void> _loadEmergencyData() async {
+    AppLogger.info('Cargando datos de emergencia - Usuario: ${widget.userId}');
     setState(() => _isLoading = true);
 
     try {
-      // Cargar tipos de emergencia
+      AppLogger.api('GET', 'EmergencyService - getEmergencyTypes');
       _emergencyTypes = EmergencyService.getEmergencyTypes();
       _selectedEmergencyType = _emergencyTypes.first;
 
-      // Cargar contactos de emergencia
-      _emergencyContacts = await _emergencyService.getEmergencyContacts(widget.userId);
+      AppLogger.api('GET',
+          'EmergencyService - getEmergencyContacts para usuario: ${widget.userId}');
+      _emergencyContacts =
+          await _emergencyService.getEmergencyContacts(widget.userId);
 
-      // Cargar historial de emergencias
-      _emergencyHistory = await _emergencyService.getUserEmergencyHistory(widget.userId);
+      AppLogger.api('GET',
+          'EmergencyService - getUserEmergencyHistory para usuario: ${widget.userId}');
+      _emergencyHistory =
+          await _emergencyService.getUserEmergencyHistory(widget.userId);
 
+      AppLogger.info(
+          'Datos de emergencia cargados exitosamente - Contactos: ${_emergencyContacts.length}, Historial: ${_emergencyHistory.length}');
     } catch (e) {
+      AppLogger.error(
+          'Error cargando datos de emergencia - Usuario: ${widget.userId}', e);
       _showErrorSnackBar('Error cargando datos: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -132,35 +154,52 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   // ============================================================================
 
   Future<void> _triggerSOS() async {
-    // Confirmación antes de activar SOS
+    AppLogger.critical(
+        'INTENTO DE ACTIVACIÓN SOS - Usuario: ${widget.userId}, Tipo: ${widget.userType}, RideId: ${widget.rideId}, TipoEmergencia: ${_selectedEmergencyType?.id}');
+
     final confirmed = await _showSOSConfirmation();
-    if (!confirmed) return;
+    if (!confirmed) {
+      AppLogger.info(
+          'Usuario canceló activación SOS - Usuario: ${widget.userId}');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
+      AppLogger.critical(
+          'ACTIVANDO SOS REAL - Usuario: ${widget.userId}, TipoEmergencia: ${_selectedEmergencyType?.id}');
+      AppLogger.api('POST', 'EmergencyService - triggerSOS CRÍTICO');
+
       final result = await _emergencyService.triggerSOS(
         userId: widget.userId,
         userType: widget.userType,
         rideId: widget.rideId,
-        emergencyType: _selectedEmergencyType?.id,
-        notes: 'Emergencia activada desde la aplicación Oasis Taxi',
+        emergencyType: _selectedEmergencyType ??
+            EmergencyService.getEmergencyTypes().first,
+        description: 'Emergencia activada desde la aplicación Oasis Taxi',
       );
 
-      if (result.success) {
-        setState(() {
-          _emergencyActive = true;
-        });
+      if (result['success'] == true) {
+        AppLogger.critical(
+            'SOS ACTIVADO EXITOSAMENTE - Usuario: ${widget.userId}, Servicios contactados: 911, Contactos notificados');
+
+        if (mounted) {
+          setState(() {
+            _emergencyActive = true;
+          });
+        }
 
         _startEmergencyAnimation();
         _startContinuousVibration();
 
         _showSuccessDialog(
           title: '🚨 SOS ACTIVADO',
-          message: result.message ?? 'Servicios de emergencia contactados',
+          message: result['message'] ?? 'Servicios de emergencia contactados',
         );
 
-        await _firebaseService.analytics.logEvent(
+        AppLogger.firebase('Analytics - emergency_sos_triggered_from_screen');
+        await _firebaseService.analytics?.logEvent(
           name: 'emergency_sos_triggered_from_screen',
           parameters: {
             'user_id': widget.userId,
@@ -170,31 +209,52 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
           },
         );
       } else {
-        _showErrorSnackBar(result.error ?? 'Error activando SOS');
+        AppLogger.error(
+            'FALLÓ ACTIVACIÓN SOS - Usuario: ${widget.userId}, Error: ${result['error']}');
+        _showErrorSnackBar(result['error'] ?? 'Error activando SOS');
       }
     } catch (e) {
+      AppLogger.critical(
+          'ERROR CRÍTICO AL ACTIVAR SOS - Usuario: ${widget.userId}', e);
       _showErrorSnackBar('Error activando SOS: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _cancelEmergency() async {
+    AppLogger.critical(
+        'INTENTO DE CANCELACIÓN DE EMERGENCIA - Usuario: ${widget.userId}');
+
     final confirmed = await _showCancelConfirmation();
-    if (!confirmed) return;
+    if (!confirmed) {
+      AppLogger.info(
+          'Usuario canceló la cancelación de emergencia - Usuario: ${widget.userId}');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
+      AppLogger.critical(
+          'CANCELANDO EMERGENCIA ACTIVA - Usuario: ${widget.userId}, Razón: Falsa alarma');
+      AppLogger.api('POST', 'EmergencyService - cancelEmergency');
+
       final success = await _emergencyService.cancelEmergency(
-        userId: widget.userId,
-        reason: 'Cancelado por el usuario - Falsa alarma',
+        'Cancelado por el usuario - Falsa alarma',
       );
 
       if (success) {
-        setState(() {
-          _emergencyActive = false;
-        });
+        AppLogger.critical(
+            'EMERGENCIA CANCELADA EXITOSAMENTE - Usuario: ${widget.userId}');
+
+        if (mounted) {
+          setState(() {
+            _emergencyActive = false;
+          });
+        }
 
         _stopEmergencyAnimation();
         _stopContinuousVibration();
@@ -204,14 +264,23 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
           message: 'La emergencia ha sido cancelada exitosamente',
         );
 
-        await _loadEmergencyData(); // Recargar historial
+        AppLogger.info(
+            'Recargando historial de emergencias tras cancelación - Usuario: ${widget.userId}');
+        await _loadEmergencyData();
       } else {
+        AppLogger.error(
+            'FALLÓ CANCELACIÓN DE EMERGENCIA - Usuario: ${widget.userId}');
         _showErrorSnackBar('Error cancelando emergencia');
       }
     } catch (e) {
+      AppLogger.critical(
+          'ERROR CRÍTICO AL CANCELAR EMERGENCIA - Usuario: ${widget.userId}',
+          e);
       _showErrorSnackBar('Error cancelando emergencia: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -247,102 +316,98 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
 
   Future<bool> _showSOSConfirmation() async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: Colors.red, size: 32),
-            SizedBox(width: 12),
-            Text('🚨 CONFIRMAR SOS'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '¿Estás seguro que quieres activar la emergencia SOS?',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Esto hará lo siguiente:',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Row(
               children: [
-                Text('• 📞 Llamada automática al 911'),
-                Text('• 📱 SMS a tus contactos de emergencia'),
-                Text('• 🎙️ Iniciar grabación de audio'),
-                Text('• 📍 Compartir ubicación en tiempo real'),
-                Text('• 🔔 Alertar a Oasis Taxi Central'),
+                Icon(Icons.warning, color: Colors.red, size: 32),
+                SizedBox(width: 12),
+                Text('🚨 CONFIRMAR SOS'),
               ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: const Text(
-                '⚠️ Solo usar en emergencias reales. Uso indebido puede tener consecuencias legales.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.red,
-                  fontWeight: FontWeight.w500,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '¿Estás seguro que quieres activar la emergencia SOS?',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
+                AppSpacing.verticalSpaceMD,
+                const Text(
+                  'Esto hará lo siguiente:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• 📞 Llamada automática al 911'),
+                    Text('• 📱 SMS a tus contactos de emergencia'),
+                    Text('• 🎙️ Iniciar grabación de audio'),
+                    Text('• 📍 Compartir ubicación en tiempo real'),
+                    Text('• 🔔 Alertar a Oasis Taxi Central'),
+                  ],
+                ),
+                AppSpacing.verticalSpaceMD,
+                Container(
+                  padding: AppSpacing.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: const Text(
+                    '⚠️ Solo usar en emergencias reales. Uso indebido puede tener consecuencias legales.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              OasisButton.text(
+                text: 'CANCELAR',
+                onPressed: () => Navigator.of(context).pop(false),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('CANCELAR'),
+              OasisButton.danger(
+                text: 'SÍ, ACTIVAR SOS',
+                onPressed: () => Navigator.of(context).pop(true),
+                size: OasisButtonSize.large,
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('SÍ, ACTIVAR SOS'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<bool> _showCancelConfirmation() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancelar Emergencia'),
-        content: const Text(
-          '¿Estás seguro que quieres cancelar la emergencia activa?\n\n'
-          'Solo cancela si es una falsa alarma.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('NO'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cancelar Emergencia'),
+            content: const Text(
+              '¿Estás seguro que quieres cancelar la emergencia activa?\n\n'
+              'Solo cancela si es una falsa alarma.',
             ),
-            child: const Text('SÍ, CANCELAR'),
+            actions: [
+              OasisButton.text(
+                text: 'NO',
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              OasisButton.secondary(
+                text: 'SÍ, CANCELAR',
+                onPressed: () => Navigator.of(context).pop(true),
+                size: OasisButtonSize.large,
+              ),
+            ],
           ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showSuccessDialog({required String title, required String message}) {
@@ -362,10 +427,13 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   }
 
   void _showErrorSnackBar(String message) {
+    AppLogger.error(
+        'Mostrando error al usuario - EmergencySOSScreen: $message');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: ModernTheme.error,
         duration: const Duration(seconds: 4),
       ),
     );
@@ -378,15 +446,13 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _emergencyActive ? Colors.red.shade900 : Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          '🚨 EMERGENCIA SOS',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: _emergencyActive ? Colors.red.shade700 : Colors.blue.shade600,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor:
+          _emergencyActive ? ModernTheme.error : ModernTheme.background,
+      appBar: OasisAppBar.elevated(
+        title: '🚨 EMERGENCIA SOS',
+        backgroundColor:
+            _emergencyActive ? ModernTheme.error : ModernTheme.oasisGreen,
+        textColor: Colors.white,
       ),
       body: AnimatedBuilder(
         animation: _warningAnimation,
@@ -398,18 +464,18 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
             child: LoadingOverlay(
               isLoading: _isLoading,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: ModernTheme.getResponsivePadding(context),
                 child: Column(
                   children: [
                     if (_emergencyActive) _buildActiveEmergencyCard(),
                     if (!_emergencyActive) ...[
                       _buildSOSButton(),
-                      const SizedBox(height: 24),
+                      AppSpacing.verticalSpaceLG,
                       _buildEmergencyTypeSelector(),
-                      const SizedBox(height: 24),
+                      AppSpacing.verticalSpaceLG,
                       _buildEmergencyContactsCard(),
                     ],
-                    const SizedBox(height: 24),
+                    AppSpacing.verticalSpaceLG,
                     _buildEmergencyHistoryCard(),
                   ],
                 ),
@@ -492,10 +558,10 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   }
 
   Widget _buildActiveEmergencyCard() {
-    return Card(
-      color: Colors.white,
+    return OasisCard.elevated(
+      backgroundColor: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: AppSpacing.all(AppSpacing.lg),
         child: Column(
           children: [
             const Icon(
@@ -503,7 +569,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
               color: Colors.red,
               size: 64,
             ),
-            const SizedBox(height: 16),
+            AppSpacing.verticalSpaceMD,
             const Text(
               '🚨 EMERGENCIA ACTIVA',
               style: TextStyle(
@@ -513,7 +579,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            AppSpacing.verticalSpaceSM,
             const Text(
               'Los servicios de emergencia han sido contactados.\n'
               'Tus contactos de emergencia han sido notificados.\n'
@@ -548,15 +614,11 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: OasisButton.secondary(
+                text: 'CANCELAR EMERGENCIA (Solo Falsa Alarma)',
                 onPressed: _isLoading ? null : _cancelEmergency,
-                icon: const Icon(Icons.cancel),
-                label: const Text('CANCELAR EMERGENCIA (Solo Falsa Alarma)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
+                icon: Icons.cancel,
+                size: OasisButtonSize.large,
               ),
             ),
           ],
@@ -568,7 +630,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   Widget _buildEmergencyTypeSelector() {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -576,7 +638,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
               'Tipo de Emergencia',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            AppSpacing.verticalSpaceSM,
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -597,15 +659,15 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
               }).toList(),
             ),
             if (_selectedEmergencyType != null) ...[
-              const SizedBox(height: 12),
+              AppSpacing.verticalSpaceSM,
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: AppSpacing.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _selectedEmergencyType!.description,
+                  'Tipo seleccionado: ${_selectedEmergencyType!.name}',
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -617,9 +679,9 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   }
 
   Widget _buildEmergencyContactsCard() {
-    return Card(
+    return OasisCard.elevated(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -630,19 +692,19 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
                   'Contactos de Emergencia',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                TextButton.icon(
+                OasisButton.text(
+                  text: 'Agregar',
                   onPressed: () {
                     // Navegar a configurar contactos
                   },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Agregar'),
+                  icon: Icons.add,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            AppSpacing.verticalSpaceSM,
             if (_emergencyContacts.isEmpty)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: AppSpacing.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -670,7 +732,8 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
                       child: Icon(Icons.person),
                     ),
                     title: Text(contact.name),
-                    subtitle: Text('${contact.relationship} • ${contact.phoneNumber}'),
+                    subtitle:
+                        Text('${contact.relationship} • ${contact.phone}'),
                     trailing: const Icon(Icons.phone, color: Colors.green),
                     dense: true,
                   );
@@ -683,9 +746,9 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   }
 
   Widget _buildEmergencyHistoryCard() {
-    return Card(
+    return OasisCard.elevated(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -693,7 +756,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
               'Historial de Emergencias',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            AppSpacing.verticalSpaceSM,
             if (_emergencyHistory.isEmpty)
               const Center(
                 child: Padding(
@@ -712,7 +775,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
                 children: _emergencyHistory.take(3).map((emergency) {
                   IconData statusIcon;
                   Color statusColor;
-                  
+
                   switch (emergency.status) {
                     case 'resolved':
                       statusIcon = Icons.check_circle;
@@ -733,7 +796,9 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(emergency.location),
+                        Text(emergency.location != null
+                            ? 'Ubicación: ${emergency.location?['description'] ?? 'No disponible'}'
+                            : 'Sin ubicación'),
                         Text(
                           '${emergency.createdAt.day}/${emergency.createdAt.month}/${emergency.createdAt.year} '
                           '${emergency.createdAt.hour}:${emergency.createdAt.minute.toString().padLeft(2, '0')}',
@@ -754,13 +819,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen>
   String _getEmergencyTypeName(String type) {
     final emergencyType = _emergencyTypes.firstWhere(
       (t) => t.id == type,
-      orElse: () => EmergencyType(
-        id: 'unknown', 
-        name: 'Emergencia', 
-        description: '', 
-        icon: '🚨', 
-        priority: 'medium'
-      ),
+      orElse: () => EmergencyService.getEmergencyTypes().first,
     );
     return '${emergencyType.icon} ${emergencyType.name}';
   }

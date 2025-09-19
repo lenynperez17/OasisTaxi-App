@@ -1,0 +1,250 @@
+# 🗂️ CONFIGURACIÓN DE CLOUD SCHEDULER PARA AUTO-DELETE
+# OasisTaxi Perú - Sistema de Eliminación Automática de Archivos de Chat
+# 
+# Este archivo define los trabajos de Cloud Scheduler para:
+# - Eliminación automática de archivos expirados cada hora
+# - Limpieza de estadísticas antiguas diariamente
+# - Reporte semanal de uso de almacenamiento
+
+# ═══════════════════════════════════════════════════════════════════
+# 🕐 JOB 1: ELIMINACIÓN AUTOMÁTICA CADA HORA
+# ═══════════════════════════════════════════════════════════════════
+name: "auto-delete-chat-files-hourly"
+description: "Eliminación automática de archivos de chat expirados - OasisTaxi"
+schedule: "0 * * * *" # Cada hora en punto
+time_zone: "America/Lima" # Zona horaria de Perú
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/auto-delete-chat-files"
+    data: |
+      {
+        "source": "scheduler",
+        "job": "auto-delete-chat-files-hourly",
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 3
+  max_retry_duration: "600s"
+  min_backoff_duration: "5s"
+  max_backoff_duration: "3600s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🧹 JOB 2: LIMPIEZA DE ESTADÍSTICAS ANTIGUAS DIARIA
+# ═══════════════════════════════════════════════════════════════════
+name: "cleanup-auto-delete-stats-daily"
+description: "Limpieza diaria de estadísticas de auto-delete antiguas - OasisTaxi"
+schedule: "0 2 * * *" # Todos los días a las 2:00 AM
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/cleanup-old-stats"
+    data: |
+      {
+        "source": "scheduler",
+        "job": "cleanup-auto-delete-stats-daily",
+        "action": "cleanup_old_stats",
+        "retentionDays": 30,
+        "executedAt": "2024-01-01T02:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 📊 JOB 3: REPORTE SEMANAL DE ALMACENAMIENTO
+# ═══════════════════════════════════════════════════════════════════
+name: "weekly-storage-report"
+description: "Reporte semanal de uso de almacenamiento por usuario - OasisTaxi"
+schedule: "0 8 * * 1" # Lunes a las 8:00 AM
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/generate-storage-report"
+    data: |
+      {
+        "source": "scheduler",
+        "job": "weekly-storage-report",
+        "reportType": "storage_usage",
+        "includeSummary": true,
+        "includeTopUsers": true,
+        "executedAt": "2024-01-01T08:00:00Z"
+      }
+retry_config:
+  retry_count: 1
+  max_retry_duration: "120s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🚨 JOB 4: ELIMINACIÓN DE ARCHIVOS CRÍTICOS (URGENTE)
+# ═══════════════════════════════════════════════════════════════════
+name: "critical-auto-delete-every-15min"
+description: "Eliminación crítica cada 15 minutos para archivos marcados como urgentes - OasisTaxi"
+schedule: "*/15 * * * *" # Cada 15 minutos
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/auto-delete-chat-files"
+    data: |
+      {
+        "source": "scheduler",
+        "job": "critical-auto-delete-every-15min",
+        "priority": "critical",
+        "onlyUrgent": true,
+        "maxFiles": 50,
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 5
+  max_retry_duration: "900s"
+  min_backoff_duration: "10s"
+  max_backoff_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔧 COMANDOS PARA CREAR LOS JOBS EN GOOGLE CLOUD
+# ═══════════════════════════════════════════════════════════════════
+
+# 1. ELIMINACIÓN AUTOMÁTICA CADA HORA
+gcloud scheduler jobs create pubsub auto-delete-chat-files-hourly \
+  --location=us-central1 \
+  --schedule="0 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="auto-delete-chat-files" \
+  --message-body='{"source":"scheduler","job":"auto-delete-chat-files-hourly"}' \
+  --description="Eliminación automática de archivos de chat expirados - OasisTaxi" \
+  --max-retry-attempts=3 \
+  --max-retry-duration=600s \
+  --min-backoff-duration=5s \
+  --max-backoff-duration=3600s
+
+# 2. LIMPIEZA DE ESTADÍSTICAS DIARIA
+gcloud scheduler jobs create pubsub cleanup-auto-delete-stats-daily \
+  --location=us-central1 \
+  --schedule="0 2 * * *" \
+  --time-zone="America/Lima" \
+  --topic="cleanup-old-stats" \
+  --message-body='{"source":"scheduler","job":"cleanup-auto-delete-stats-daily","action":"cleanup_old_stats","retentionDays":30}' \
+  --description="Limpieza diaria de estadísticas de auto-delete antiguas - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# 3. REPORTE SEMANAL DE ALMACENAMIENTO
+gcloud scheduler jobs create pubsub weekly-storage-report \
+  --location=us-central1 \
+  --schedule="0 8 * * 1" \
+  --time-zone="America/Lima" \
+  --topic="generate-storage-report" \
+  --message-body='{"source":"scheduler","job":"weekly-storage-report","reportType":"storage_usage","includeSummary":true,"includeTopUsers":true}' \
+  --description="Reporte semanal de uso de almacenamiento por usuario - OasisTaxi" \
+  --max-retry-attempts=1 \
+  --max-retry-duration=120s
+
+# 4. ELIMINACIÓN CRÍTICA CADA 15 MINUTOS
+gcloud scheduler jobs create pubsub critical-auto-delete-every-15min \
+  --location=us-central1 \
+  --schedule="*/15 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="auto-delete-chat-files" \
+  --message-body='{"source":"scheduler","job":"critical-auto-delete-every-15min","priority":"critical","onlyUrgent":true,"maxFiles":50}' \
+  --description="Eliminación crítica cada 15 minutos para archivos marcados como urgentes - OasisTaxi" \
+  --max-retry-attempts=5 \
+  --max-retry-duration=900s \
+  --min-backoff-duration=10s \
+  --max-backoff-duration=300s
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 VERIFICACIÓN DE JOBS CREADOS
+# ═══════════════════════════════════════════════════════════════════
+
+# Listar todos los jobs de Cloud Scheduler
+gcloud scheduler jobs list --location=us-central1
+
+# Ver detalles de un job específico
+gcloud scheduler jobs describe auto-delete-chat-files-hourly --location=us-central1
+
+# Ejecutar un job manualmente (para pruebas)
+gcloud scheduler jobs run auto-delete-chat-files-hourly --location=us-central1
+
+# Ver logs de ejecución
+gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id=auto-delete-chat-files-hourly" --limit=10 --format=json
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔄 TÓPICOS PUBSUB NECESARIOS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear tópicos Pub/Sub si no existen
+gcloud pubsub topics create auto-delete-chat-files
+gcloud pubsub topics create cleanup-old-stats
+gcloud pubsub topics create generate-storage-report
+
+# Verificar tópicos creados
+gcloud pubsub topics list
+
+# ═══════════════════════════════════════════════════════════════════
+# 🛡️ PERMISOS NECESARIOS PARA CLOUD SCHEDULER
+# ═══════════════════════════════════════════════════════════════════
+
+# El servicio de Cloud Scheduler necesita permisos para:
+# 1. Publicar en tópicos Pub/Sub
+# 2. Invocar Cloud Functions
+# 3. Acceder a Cloud Storage
+# 4. Escribir logs
+
+# Configurar permisos automáticamente:
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
+  --role="roles/cloudfunctions.invoker"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📊 MONITOREO Y ALERTAS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear alertas para fallos en jobs críticos
+# 1. Alert si auto-delete falla 3 veces seguidas
+# 2. Alert si el almacenamiento excede límites
+# 3. Alert si hay demasiados archivos pendientes de eliminación
+
+# Script para crear alertas (requiere configuración adicional):
+# gcloud alpha monitoring policies create --policy-from-file=alerts/auto-delete-alerts.yaml
+
+# ═══════════════════════════════════════════════════════════════════
+# 📝 NOTAS IMPORTANTES
+# ═══════════════════════════════════════════════════════════════════
+
+# 1. TIEMPO DE RETENCIÓN:
+#    - Archivos de chat: 90 días por defecto
+#    - Estadísticas: 30 días
+#    - Logs de auditoría: 365 días
+#    - Archivos críticos: 7 días máximo
+
+# 2. LÍMITES DE CUOTA:
+#    - 1 GB por usuario máximo
+#    - 100 archivos por chat máximo
+#    - 50 MB por archivo máximo
+
+# 3. HORARIOS OPTIMIZADOS:
+#    - Eliminación principal: cada hora
+#    - Limpieza de stats: 2:00 AM (poco tráfico)
+#    - Reportes: lunes 8:00 AM (inicio de semana)
+#    - Críticos: cada 15 min (respuesta rápida)
+
+# 4. ZONAS HORARIAS:
+#    - Configurado para America/Lima (Perú)
+#    - UTC-5 en horario estándar
+#    - UTC-5 durante todo el año (no hay cambio de horario)
+
+# 5. RECUPERACIÓN ANTE FALLOS:
+#    - Reintentos automáticos configurados
+#    - Backoff exponencial para evitar spam
+#    - Alertas automáticas en fallos críticos
+#    - Logs detallados para debugging

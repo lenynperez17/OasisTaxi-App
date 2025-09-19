@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +7,7 @@ import '../../core/theme/modern_theme.dart';
 import '../../providers/ride_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/trip_model.dart';
-import '../../utils/logger.dart';
+import '../../utils/app_logger.dart';
 
 /// TripDetailsScreen - Detalles completos del viaje
 /// ✅ IMPLEMENTACIÓN COMPLETA con funcionalidad real
@@ -23,10 +22,10 @@ class TripDetailsScreen extends StatefulWidget {
   });
 
   @override
-  State<TripDetailsScreen> createState() => _TripDetailsScreenState();
+  State<TripDetailsScreen> createState() => TripDetailsScreenState();
 }
 
-class _TripDetailsScreenState extends State<TripDetailsScreen>
+class TripDetailsScreenState extends State<TripDetailsScreen>
     with TickerProviderStateMixin {
   late AnimationController _mapAnimationController;
   late AnimationController _detailsAnimationController;
@@ -38,17 +37,18 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
-  
+
   // Estados de UI
   bool _isMapExpanded = false;
-  final bool _showFullRoute = true;
 
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle(
+        'TripDetailsScreen', 'initState - TripId: ${widget.tripId}');
+
     _mapAnimationController = AnimationController(
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _detailsAnimationController = AnimationController(
@@ -93,7 +93,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       // Si no, cargar desde el provider
       if (!mounted) return;
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
-      
+
       // Buscar en el historial o viaje actual
       TripModel? foundTrip;
       if (rideProvider.currentTrip?.id == widget.tripId) {
@@ -114,13 +114,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       } else {
         throw Exception('Viaje no encontrado');
       }
-
     } catch (e) {
       AppLogger.error('Error cargando datos del viaje', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al cargar los detalles del viaje'),
+            content: const Text('Error al cargar los detalles del viaje'),
             backgroundColor: ModernTheme.error,
           ),
         );
@@ -128,7 +127,6 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       }
     }
   }
-
 
   void _setupMapData() {
     if (_trip == null) return;
@@ -175,13 +173,13 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
     setState(() {
       _isMapExpanded = !_isMapExpanded;
     });
-    
+
     if (_isMapExpanded) {
       _mapAnimationController.forward();
     } else {
       _mapAnimationController.reverse();
     }
-    
+
     HapticFeedback.lightImpact();
   }
 
@@ -193,7 +191,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se puede realizar la llamada'),
+          content: const Text('No se puede realizar la llamada'),
           backgroundColor: ModernTheme.error,
         ),
       );
@@ -202,20 +200,21 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Future<void> _openInMaps() async {
     if (_trip == null) return;
-    
+
     final pickup = _trip!.pickupLocation;
     final destination = _trip!.destinationLocation;
-    
-    final googleMapsUrl = 'https://www.google.com/maps/dir/${pickup.latitude},${pickup.longitude}/${destination.latitude},${destination.longitude}';
+
+    final googleMapsUrl =
+        'https://www.google.com/maps/dir/${pickup.latitude},${pickup.longitude}/${destination.latitude},${destination.longitude}';
     final uri = Uri.parse(googleMapsUrl);
-    
+
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se puede abrir Google Maps'),
+          content: const Text('No se puede abrir Google Maps'),
           backgroundColor: ModernTheme.error,
         ),
       );
@@ -224,18 +223,18 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   void _openChat() {
     if (_trip == null) return;
-    
+
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUser = authProvider.currentUser;
-    
+
     if (currentUser == null) return;
-    
+
     // Determinar con quién chatear
     String otherUserName;
     String otherUserRole;
     String? otherUserId;
-    
+
     if (currentUser.userType == 'passenger') {
       otherUserName = _trip!.vehicleInfo?['driverName'] ?? 'Conductor';
       otherUserRole = 'driver';
@@ -245,7 +244,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       otherUserRole = 'passenger';
       otherUserId = _trip!.userId;
     }
-    
+
     Navigator.pushNamed(
       context,
       '/shared/chat',
@@ -267,27 +266,29 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Detalles del Viaje', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const Text('Detalles del Viaje',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             if (_trip != null)
-              Text(_trip!.id.substring(0, 8), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+              Text(_trip!.id.substring(0, 8),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
           ],
         ),
         actions: [
           if (_trip != null) ...[
             IconButton(
-              icon: Icon(Icons.chat, color: Colors.white),
+              icon: const Icon(Icons.chat, color: Colors.white),
               onPressed: _openChat,
             ),
             IconButton(
-              icon: Icon(Icons.more_vert, color: Colors.white),
+              icon: const Icon(Icons.more_vert, color: Colors.white),
               onPressed: _showTripOptions,
             ),
           ],
         ],
       ),
-      body: _isLoading 
+      body: _isLoading
           ? _buildLoadingState()
-          : _trip == null 
+          : _trip == null
               ? _buildErrorState()
               : _buildTripDetails(),
     );
@@ -301,7 +302,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Cargando detalles del viaje...',
             style: TextStyle(
@@ -324,7 +325,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
             size: 64,
             color: ModernTheme.error,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Viaje no encontrado',
             style: TextStyle(
@@ -333,7 +334,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'No se pudieron cargar los detalles de este viaje',
             textAlign: TextAlign.center,
@@ -342,13 +343,13 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
               color: ModernTheme.textSecondary,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: ModernTheme.oasisGreen,
             ),
-            child: Text('Volver', style: TextStyle(color: Colors.white)),
+            child: const Text('Volver', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -361,7 +362,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
         children: [
           // Mapa del viaje
           _buildTripMap(),
-          
+
           // Detalles del viaje
           SlideTransition(
             position: _detailsAnimation,
@@ -378,7 +379,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       builder: (context, child) {
         return Container(
           height: _mapAnimation.value,
-          margin: EdgeInsets.all(16),
+          margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: ModernTheme.cardShadow,
@@ -402,7 +403,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                 ),
-                
+
                 // Controles del mapa
                 Positioned(
                   top: 16,
@@ -413,12 +414,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
                         icon: _isMapExpanded ? Icons.compress : Icons.expand,
                         onPressed: _toggleMapSize,
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       _buildMapControl(
                         icon: Icons.my_location,
                         onPressed: _fitMapToRoute,
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       _buildMapControl(
                         icon: Icons.open_in_new,
                         onPressed: _openInMaps,
@@ -426,7 +427,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
                     ],
                   ),
                 ),
-                
+
                 // Información del estado en el mapa
                 Positioned(
                   bottom: 16,
@@ -468,7 +469,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildMapStatusInfo() {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(12),
@@ -498,7 +499,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
           _buildMapStat(
             icon: Icons.attach_money,
             label: 'Tarifa',
-            value: 'S/${(_trip!.finalFare ?? _trip!.estimatedFare).toStringAsFixed(2)}',
+            value:
+                'S/${(_trip!.finalFare ?? _trip!.estimatedFare).toStringAsFixed(2)}',
           ),
         ],
       ),
@@ -514,7 +516,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: ModernTheme.oasisGreen),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -536,23 +538,23 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildDetailsSection() {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           _buildStatusCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildParticipantsCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildRouteCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildPaymentCard(),
           if (_trip!.status == 'completed') ...[
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildRatingCard(),
           ],
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildTimestampsCard(),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildActionButtons(),
         ],
       ),
@@ -564,7 +566,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
     Color statusColor;
     IconData statusIcon;
     String statusText;
-    
+
     switch (status) {
       case 'completed':
         statusColor = ModernTheme.success;
@@ -586,9 +588,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
         statusIcon = Icons.schedule;
         statusText = 'Pendiente';
     }
-    
+
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -597,14 +599,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: statusColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(statusIcon, color: statusColor, size: 24),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,7 +630,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
             ),
           ),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: statusColor,
               borderRadius: BorderRadius.circular(20),
@@ -650,9 +652,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
   Widget _buildParticipantsCard() {
     final authProvider = Provider.of<AuthProvider>(context);
     final isPassenger = authProvider.currentUser?.userType == 'passenger';
-    
+
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -669,21 +671,22 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
+
           // Conductor
           _buildParticipantRow(
             title: 'Conductor',
             name: _trip!.vehicleInfo?['driverName'] ?? 'Conductor',
             phone: _trip!.vehicleInfo?['driverPhone'] ?? '',
-            subtitle: '${_trip!.vehicleInfo?['model'] ?? ''} - ${_trip!.vehicleInfo?['plate'] ?? ''}',
+            subtitle:
+                '${_trip!.vehicleInfo?['model'] ?? ''} - ${_trip!.vehicleInfo?['plate'] ?? ''}',
             color: ModernTheme.oasisGreen,
             icon: Icons.directions_car,
             canContact: isPassenger,
           ),
-          
+
           Divider(height: 24),
-          
+
           // Pasajero
           _buildParticipantRow(
             title: 'Pasajero',
@@ -715,7 +718,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
           backgroundColor: color.withValues(alpha: 0.1),
           child: Icon(icon, color: color, size: 20),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -749,11 +752,11 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
         if (canContact) ...[
           IconButton(
             onPressed: () => _makePhoneCall(phone),
-            icon: Icon(Icons.phone, color: ModernTheme.oasisGreen),
+            icon: const Icon(Icons.phone, color: ModernTheme.oasisGreen),
           ),
           IconButton(
             onPressed: _openChat,
-            icon: Icon(Icons.chat, color: ModernTheme.oasisGreen),
+            icon: const Icon(Icons.chat, color: ModernTheme.oasisGreen),
           ),
         ],
       ],
@@ -762,7 +765,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildRouteCard() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -779,8 +782,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
+
           // Origen
           _buildLocationRow(
             icon: Icons.my_location,
@@ -789,10 +792,10 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
             address: _trip!.pickupAddress,
             isFirst: true,
           ),
-          
+
           // Línea conectora
           _buildConnectorLine(),
-          
+
           // Destino
           _buildLocationRow(
             icon: Icons.location_on,
@@ -818,14 +821,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: iconColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: iconColor, size: 16),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,7 +841,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 address,
                 style: TextStyle(
@@ -856,7 +859,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildConnectorLine() {
     return Padding(
-      padding: EdgeInsets.only(left: 16, top: 8, bottom: 8),
+      padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
       child: Container(
         width: 2,
         height: 20,
@@ -878,7 +881,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
     // Inicializar con valores por defecto
     IconData paymentIcon = Icons.money;
     String paymentLabel = 'Efectivo';
-    
+
     // Usar valores por defecto ya que TripModel no tiene paymentMethod
     /* switch (_trip!.paymentMethod) {
       case 'cash':
@@ -897,9 +900,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
         paymentIcon = Icons.payment;
         paymentLabel = 'Otro';
     } */
-    
+
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -908,14 +911,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(paymentIcon, color: ModernTheme.oasisGreen, size: 20),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -954,9 +957,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildRatingCard() {
     if (_trip!.passengerRating == null) return SizedBox.shrink();
-    
+
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -965,14 +968,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.amber.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.star, color: Colors.amber, size: 20),
+            child: const Icon(Icons.star, color: Colors.amber, size: 20),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,8 +993,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
                     return Icon(
                       Icons.star,
                       size: 16,
-                      color: index < _trip!.passengerRating! 
-                          ? Colors.amber 
+                      color: index < _trip!.passengerRating!
+                          ? Colors.amber
                           : Colors.grey.shade300,
                     );
                   }),
@@ -1014,7 +1017,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
   Widget _buildTimestampsCard() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1031,25 +1034,22 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
           _buildTimestampRow(
             'Solicitud creada',
             _trip!.requestedAt,
             Icons.add_circle_outline,
           ),
-          
           if (_trip!.startedAt != null) ...[
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             _buildTimestampRow(
               'Viaje iniciado',
               _trip!.startedAt!,
               Icons.play_arrow,
             ),
           ],
-          
           if (_trip!.completedAt != null) ...[
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             _buildTimestampRow(
               'Viaje completado',
               _trip!.completedAt!,
@@ -1065,7 +1065,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
     return Row(
       children: [
         Icon(icon, size: 16, color: ModernTheme.oasisGreen),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
@@ -1094,25 +1094,27 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _openInMaps,
-                icon: Icon(Icons.map, color: Colors.white),
-                label: Text('Ver en Maps', style: TextStyle(color: Colors.white)),
+                icon: const Icon(Icons.map, color: Colors.white),
+                label: const Text('Ver en Maps',
+                    style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ModernTheme.oasisGreen,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: _openChat,
-                icon: Icon(Icons.chat, color: ModernTheme.oasisGreen),
-                label: Text('Chat', style: TextStyle(color: ModernTheme.oasisGreen)),
+                icon: const Icon(Icons.chat, color: ModernTheme.oasisGreen),
+                label: const Text('Chat',
+                    style: TextStyle(color: ModernTheme.oasisGreen)),
                 style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   side: BorderSide(color: ModernTheme.oasisGreen),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1123,18 +1125,21 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
           ],
         ),
         if (_trip!.status == 'completed') ...[
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () {
                 // Implementar repetir viaje
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Funcionalidad de repetir viaje próximamente')),
+                  const SnackBar(
+                      content:
+                          Text('Funcionalidad de repetir viaje próximamente')),
                 );
               },
               icon: Icon(Icons.repeat, color: ModernTheme.primaryBlue),
-              label: Text('Repetir Viaje', style: TextStyle(color: ModernTheme.primaryBlue)),
+              label: Text('Repetir Viaje',
+                  style: TextStyle(color: ModernTheme.primaryBlue)),
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
                 side: BorderSide(color: ModernTheme.primaryBlue),
@@ -1154,12 +1159,16 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
 
     final bounds = LatLngBounds(
       southwest: LatLng(
-        [_trip!.pickupLocation.latitude, _trip!.destinationLocation.latitude].reduce((a, b) => a < b ? a : b),
-        [_trip!.pickupLocation.longitude, _trip!.destinationLocation.longitude].reduce((a, b) => a < b ? a : b),
+        [_trip!.pickupLocation.latitude, _trip!.destinationLocation.latitude]
+            .reduce((a, b) => a < b ? a : b),
+        [_trip!.pickupLocation.longitude, _trip!.destinationLocation.longitude]
+            .reduce((a, b) => a < b ? a : b),
       ),
       northeast: LatLng(
-        [_trip!.pickupLocation.latitude, _trip!.destinationLocation.latitude].reduce((a, b) => a > b ? a : b),
-        [_trip!.pickupLocation.longitude, _trip!.destinationLocation.longitude].reduce((a, b) => a > b ? a : b),
+        [_trip!.pickupLocation.latitude, _trip!.destinationLocation.latitude]
+            .reduce((a, b) => a > b ? a : b),
+        [_trip!.pickupLocation.longitude, _trip!.destinationLocation.longitude]
+            .reduce((a, b) => a > b ? a : b),
       ),
     );
 
@@ -1173,7 +1182,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen>
       context: context,
       builder: (context) {
         return Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

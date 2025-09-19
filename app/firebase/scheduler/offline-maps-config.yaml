@@ -1,0 +1,572 @@
+# ====================================================================
+# 🗺️ CONFIGURACIÓN OFFLINE MAPS - CLOUD SCHEDULER OASISTAXI
+# ====================================================================
+# Jobs programados para gestión automática de caché de mapas offline
+# Optimizado para zonas de Lima con descarga inteligente y limpieza
+# ====================================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: offline-maps-lima-download
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: offline-cache
+    region: peru-lima
+spec:
+  schedule: "0 2 * * 0" # Domingos a las 2 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: maps-downloader
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: google-maps-api-key
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: REDIS_URL
+              value: "redis://redis-oasistaxi-service:6379"
+            - name: JOB_TYPE
+              value: "lima-download"
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1000m"
+            volumeMounts:
+            - name: maps-config
+              mountPath: /config
+          volumes:
+          - name: maps-config
+            configMap:
+              name: offline-maps-config
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🧹 LIMPIEZA AUTOMÁTICA DE CACHÉ EXPIRADO
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: offline-maps-cleanup
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: cache-cleanup
+spec:
+  schedule: "30 3 * * *" # Diario a las 3:30 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cache-cleaner
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "cache-cleanup"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: MAX_CACHE_SIZE_MB
+              value: "500"
+            - name: TILE_EXPIRY_DAYS
+              value: "30"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📊 OPTIMIZACIÓN DE ZONAS POPULARES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: popular-zones-optimization
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: zone-optimization
+spec:
+  schedule: "0 1 * * 1" # Lunes a la 1 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: zone-optimizer
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "zone-optimization"
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: google-maps-api-key
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: ANALYTICS_DAYS_BACK
+              value: "7"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+            volumeMounts:
+            - name: analytics-config
+              mountPath: /analytics
+          volumes:
+          - name: analytics-config
+            configMap:
+              name: analytics-config
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🚨 MONITOREO DE ESPACIO DE ALMACENAMIENTO
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-monitoring
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: storage-monitor
+spec:
+  schedule: "*/30 * * * *" # Cada 30 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Allow
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: storage-monitor
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "storage-monitoring"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: ALERT_THRESHOLD_PERCENT
+              value: "80"
+            - name: CRITICAL_THRESHOLD_PERCENT
+              value: "90"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "50m"
+              limits:
+                memory: "256Mi"
+                cpu: "100m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🔄 ACTUALIZACIÓN DE MAPAS DE TRÁFICO
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: traffic-maps-update
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: traffic-update
+spec:
+  schedule: "0 */4 * * *" # Cada 4 horas
+  timeZone: "America/Lima"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: traffic-updater
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "traffic-update"
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: google-maps-api-key
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: TRAFFIC_ZONES_PRIORITY
+              value: "centro,miraflores,sanisidro,aeropuerto"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📱 SINCRONIZACIÓN CON APPS MÓVILES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mobile-sync-notification
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+    component: mobile-sync
+spec:
+  schedule: "15 2 * * 0" # Domingos a las 2:15 AM (después del download)
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: mobile-notifier
+            image: gcr.io/oasis-taxi-peru/maps-cache-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "mobile-sync"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: fcm-server-key
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🗃️ CONFIGMAP CON ZONAS DE LIMA
+# ====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: offline-maps-config
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+data:
+  lima-zones.json: |
+    {
+      "zones": [
+        {
+          "name": "Lima Centro",
+          "priority": "critical",
+          "bounds": {
+            "southwest": {"lat": -12.0800, "lng": -77.0800},
+            "northeast": {"lat": -12.0200, "lng": -77.0200}
+          },
+          "maxZoomLevel": 18,
+          "updateFrequency": "daily"
+        },
+        {
+          "name": "Miraflores - San Isidro",
+          "priority": "high",
+          "bounds": {
+            "southwest": {"lat": -12.1400, "lng": -77.0600},
+            "northeast": {"lat": -12.0800, "lng": -77.0000}
+          },
+          "maxZoomLevel": 17,
+          "updateFrequency": "weekly"
+        },
+        {
+          "name": "Aeropuerto Jorge Chávez",
+          "priority": "high",
+          "bounds": {
+            "southwest": {"lat": -12.0300, "lng": -77.1300},
+            "northeast": {"lat": -11.9900, "lng": -77.0900}
+          },
+          "maxZoomLevel": 17,
+          "updateFrequency": "daily"
+        },
+        {
+          "name": "Surco - La Molina",
+          "priority": "medium",
+          "bounds": {
+            "southwest": {"lat": -12.1800, "lng": -76.9800},
+            "northeast": {"lat": -12.0800, "lng": -76.9000}
+          },
+          "maxZoomLevel": 16,
+          "updateFrequency": "weekly"
+        },
+        {
+          "name": "San Juan de Lurigancho",
+          "priority": "medium",
+          "bounds": {
+            "southwest": {"lat": -11.9500, "lng": -77.0000},
+            "northeast": {"lat": -11.8500, "lng": -76.9000}
+          },
+          "maxZoomLevel": 15,
+          "updateFrequency": "weekly"
+        },
+        {
+          "name": "Callao Puerto",
+          "priority": "medium",
+          "bounds": {
+            "southwest": {"lat": -12.0800, "lng": -77.1500},
+            "northeast": {"lat": -12.0200, "lng": -77.1000}
+          },
+          "maxZoomLevel": 16,
+          "updateFrequency": "weekly"
+        }
+      ]
+    }
+  
+  cache-config.yaml: |
+    cache:
+      maxSizeMB: 500
+      tileExpiryDays: 30
+      concurrentDownloads: 10
+      retryAttempts: 3
+      requestTimeoutSeconds: 10
+      
+    mapTypes:
+      - roadmap
+      - satellite  
+      - traffic
+      
+    zoomLevels:
+      min: 10
+      max: 18
+      default: 15
+      
+    downloadStrategy:
+      batchSize: 100
+      pauseBetweenBatches: 1000 # milliseconds
+      priorityFirst: true
+      
+    cleanup:
+      autoCleanup: true
+      maxCacheAge: 30 # days
+      lowStorageThreshold: 100 # MB
+      
+    monitoring:
+      enableMetrics: true
+      reportInterval: 300 # seconds
+      alertThresholds:
+        storage: 80 # percent
+        errors: 10 # percent
+        
+  peru-specific.json: |
+    {
+      "country": "PE",
+      "timezone": "America/Lima",
+      "language": "es-PE",
+      "currency": "PEN",
+      "mapProviders": {
+        "primary": "google",
+        "fallback": "openstreetmap"
+      },
+      "trafficPatterns": {
+        "rushHours": [
+          {"start": "07:00", "end": "09:30"},
+          {"start": "18:00", "end": "20:30"}
+        ],
+        "weekends": {
+          "enabled": true,
+          "reducedFrequency": true
+        }
+      },
+      "popularDestinations": [
+        {"name": "Centro Histórico", "lat": -12.0464, "lng": -77.0428},
+        {"name": "Miraflores", "lat": -12.1210, "lng": -77.0282},
+        {"name": "San Isidro", "lat": -12.0976, "lng": -77.0365},
+        {"name": "Aeropuerto", "lat": -12.0219, "lng": -77.1143},
+        {"name": "La Molina", "lat": -12.0792, "lng": -76.9447},
+        {"name": "Surco", "lat": -12.1359, "lng": -77.0142}
+      ]
+    }
+
+---
+# ====================================================================
+# 🔐 SERVICE ACCOUNT PARA JOBS
+# ====================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: maps-cache-sa
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+
+---
+# ====================================================================
+# 🛡️ RBAC PARA ACCESO A RECURSOS
+# ====================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: maps-cache-role
+  namespace: oasistaxi-prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: maps-cache-rolebinding
+  namespace: oasistaxi-prod
+subjects:
+- kind: ServiceAccount
+  name: maps-cache-sa
+  namespace: oasistaxi-prod
+roleRef:
+  kind: Role
+  name: maps-cache-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ====================================================================
+# 📊 SERVICE MONITOR PARA PROMETHEUS
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: offline-maps-monitor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+spec:
+  selector:
+    matchLabels:
+      app: maps-cache-metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ====================================================================
+# 🚨 ALERTING RULES
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: offline-maps-alerts
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-maps
+spec:
+  groups:
+  - name: maps-cache.rules
+    rules:
+    - alert: MapsCacheStorageFull
+      expr: maps_cache_storage_used_percent > 90
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Maps cache storage is nearly full"
+        description: "Maps cache storage usage is at {{ $value }}%"
+    
+    - alert: MapsCacheDownloadFailed
+      expr: maps_cache_download_failures_total > 10
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High number of maps download failures"
+        description: "{{ $value }} download failures in the last 10 minutes"
+    
+    - alert: MapsCacheExpiredTiles
+      expr: maps_cache_expired_tiles_percent > 50
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High percentage of expired map tiles"
+        description: "{{ $value }}% of cached tiles have expired"
+
+# ====================================================================
+# 🚀 COMANDOS DE DEPLOYMENT
+# ====================================================================
+# 
+# 1. Aplicar toda la configuración:
+# kubectl apply -f offline-maps-config.yaml
+#
+# 2. Verificar CronJobs:
+# kubectl get cronjobs -n oasistaxi-prod
+#
+# 3. Ver logs de un job específico:
+# kubectl logs -n oasistaxi-prod job/offline-maps-lima-download-xxxxx
+#
+# 4. Ejecutar job manualmente para testing:
+# kubectl create job --from=cronjob/offline-maps-lima-download manual-download -n oasistaxi-prod
+#
+# 5. Ver configuración de mapas:
+# kubectl get configmap offline-maps-config -n oasistaxi-prod -o yaml
+#
+# 6. Monitorear almacenamiento:
+# kubectl top pods -n oasistaxi-prod --containers
+#
+# 7. Ver métricas de Prometheus:
+# curl http://prometheus:9090/api/v1/query?query=maps_cache_storage_used_percent
+#
+# 8. Escalar recursos si es necesario:
+# kubectl patch cronjob offline-maps-lima-download -n oasistaxi-prod -p '{"spec":{"jobTemplate":{"spec":{"template":{"spec":{"containers":[{"name":"maps-downloader","resources":{"limits":{"memory":"4Gi","cpu":"2000m"}}}]}}}}}}'
+#
+# ====================================================================

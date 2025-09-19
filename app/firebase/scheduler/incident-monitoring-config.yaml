@@ -1,0 +1,695 @@
+# ====================================================================
+# 🚨 CONFIGURACIÓN MONITOREO DE INCIDENTES - CLOUD SCHEDULER OASISTAXI
+# ====================================================================
+# Jobs programados para monitoreo automático de incidentes críticos
+# Escalamiento automático, seguimiento de SLA y notificaciones de emergencia
+# Integración con autoridades peruanas (PNP, SAMU, Bomberos, CEM, Serenazgo)
+# ====================================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: critical-incidents-monitor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: critical-monitor
+    region: peru-lima
+spec:
+  schedule: "*/2 * * * *" # Cada 2 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: critical-incidents-monitor
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "critical-monitoring"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: twilio-account-sid
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: twilio-auth-token
+            - name: PNP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-authorities
+                  key: pnp-api-key
+            - name: SAMU_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-authorities
+                  key: samu-api-key
+            - name: ESCALATION_THRESHOLD_MINUTES
+              value: "5"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# ⚠️ ESCALAMIENTO AUTOMÁTICO DE INCIDENTES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incident-auto-escalation
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: auto-escalation
+spec:
+  schedule: "*/10 * * * *" # Cada 10 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: auto-escalation
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "auto-escalation"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: fcm-server-key
+            - name: ESCALATION_RULES
+              value: |
+                {
+                  "noResponseTime": 30,
+                  "criticalEscalationTime": 15,
+                  "maxEscalationLevel": 5,
+                  "autoAuthoritiesContact": true,
+                  "emergencyTypes": ["medical_emergency", "kidnapping", "fire_emergency", "natural_disaster"]
+                }
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "300m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📊 ANÁLISIS DE PATRONES DE INCIDENTES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incident-pattern-analysis
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: pattern-analysis
+spec:
+  schedule: "0 */4 * * *" # Cada 4 horas
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: pattern-analyzer
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "pattern-analysis"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: ANALYSIS_WINDOW_HOURS
+              value: "24"
+            - name: MIN_INCIDENTS_FOR_PATTERN
+              value: "3"
+            - name: ALERT_THRESHOLD_PERCENTAGE
+              value: "150" # 150% incremento para alerta
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+            volumeMounts:
+            - name: ml-models
+              mountPath: /ml-models
+          volumes:
+          - name: ml-models
+            configMap:
+              name: incident-ml-models
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🕐 VERIFICACIÓN DE SLA Y TIEMPOS DE RESPUESTA
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incident-sla-monitor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: sla-monitoring
+spec:
+  schedule: "*/15 * * * *" # Cada 15 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Allow
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: sla-monitor
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "sla-monitoring"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: SLA_TARGETS
+              value: |
+                {
+                  "critical": {"acknowledgment": 5, "resolution": 30},
+                  "high": {"acknowledgment": 15, "resolution": 120},
+                  "medium": {"acknowledgment": 60, "resolution": 480},
+                  "low": {"acknowledgment": 240, "resolution": 1440}
+                }
+            - name: ALERT_BEFORE_BREACH_MINUTES
+              value: "10"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📍 MONITOREO DE ZONAS DE ALTO RIESGO
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: risk-zone-monitor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: risk-zone-monitor
+spec:
+  schedule: "0 */6 * * *" # Cada 6 horas
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: risk-zone-analyzer
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "risk-zone-analysis"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: google-maps-api-key
+            - name: RISK_ANALYSIS_DAYS
+              value: "7"
+            - name: HIGH_RISK_THRESHOLD
+              value: "5" # 5+ incidentes por zona en ventana de análisis
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "400m"
+            volumeMounts:
+            - name: lima-districts
+              mountPath: /districts-data
+          volumes:
+          - name: lima-districts
+            configMap:
+              name: lima-districts-config
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📱 NOTIFICACIONES AUTOMÁTICAS PUSH
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incident-push-notifications
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: push-notifications
+spec:
+  schedule: "*/5 * * * *" # Cada 5 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: push-notifier
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "push-notifications"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: fcm-server-key
+            - name: NOTIFICATION_RULES
+              value: |
+                {
+                  "immediate": ["medical_emergency", "kidnapping", "fire_emergency"],
+                  "high_priority": ["robbery", "traffic_accident", "driver_intoxicated"],
+                  "standard": ["harassment", "vehicle_unsafe", "overcharging"],
+                  "batchIntervalMinutes": 15,
+                  "maxNotificationsPerUser": 10
+                }
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "250m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🔄 SINCRONIZACIÓN CON SISTEMAS EXTERNOS
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: external-systems-sync
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: external-sync
+spec:
+  schedule: "*/30 * * * *" # Cada 30 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: external-sync
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "external-sync"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: EXTERNAL_APIS
+              value: |
+                {
+                  "pnp": "https://api.pnp.gob.pe/incidents",
+                  "samu": "https://api.minsa.gob.pe/samu/incidents",
+                  "serenazgo_lima": "https://api.munlima.gob.pe/serenazgo/incidents",
+                  "syncIntervalMinutes": 30,
+                  "maxRetries": 3,
+                  "timeoutSeconds": 30
+                }
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "150m"
+              limits:
+                memory: "512Mi"
+                cpu: "300m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📊 GENERACIÓN DE REPORTES AUTOMÁTICOS
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incident-reports-generator
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+    component: reports-generator
+spec:
+  schedule: "0 8 * * *" # Diario a las 8 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: reports-generator
+            image: gcr.io/oasis-taxi-peru/incident-processor:latest
+            env:
+            - name: JOB_TYPE
+              value: "daily-reports"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: REPORT_RECIPIENTS
+              value: |
+                [
+                  "admin@oasistaxiperu.com",
+                  "seguridad@oasistaxiperu.com",
+                  "operaciones@oasistaxiperu.com"
+                ]
+            - name: REPORT_TYPES
+              value: |
+                [
+                  "daily_summary",
+                  "critical_incidents",
+                  "sla_compliance",
+                  "risk_zones",
+                  "authority_notifications",
+                  "user_feedback"
+                ]
+            - name: EMAIL_SERVICE_API
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: sendgrid-api-key
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+            volumeMounts:
+            - name: report-templates
+              mountPath: /report-templates
+          volumes:
+          - name: report-templates
+            configMap:
+              name: incident-report-templates
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🗃️ CONFIGMAPS CON DATOS DE REFERENCIA
+# ====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lima-districts-config
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+data:
+  districts.json: |
+    {
+      "districts": [
+        {
+          "name": "Lima Centro",
+          "code": "LIMA_CENTRO",
+          "coordinates": {"lat": -12.0464, "lng": -77.0428},
+          "riskLevel": "MEDIUM",
+          "authorities": {
+            "pnp": {"station": "Comisaría Centro Lima", "phone": "01-424-0000"},
+            "serenazgo": {"phone": "01-315-1212", "email": "serenazgo@munlima.gob.pe"},
+            "samu": {"zone": "Lima Centro", "phone": "116"}
+          },
+          "emergencyServices": {
+            "hospital": "Hospital Nacional Dos de Mayo",
+            "fireStation": "Estación Central Bomberos",
+            "policeStation": "Comisaría Centro Lima"
+          }
+        },
+        {
+          "name": "Miraflores",
+          "code": "MIRAFLORES",
+          "coordinates": {"lat": -12.1210, "lng": -77.0282},
+          "riskLevel": "LOW",
+          "authorities": {
+            "pnp": {"station": "Comisaría Miraflores", "phone": "01-445-0000"},
+            "serenazgo": {"phone": "01-617-7313", "email": "serenazgo@miraflores.gob.pe"},
+            "samu": {"zone": "Lima Sur", "phone": "116"}
+          }
+        },
+        {
+          "name": "San Isidro",
+          "code": "SAN_ISIDRO",
+          "coordinates": {"lat": -12.0976, "lng": -77.0365},
+          "riskLevel": "LOW",
+          "authorities": {
+            "pnp": {"station": "Comisaría San Isidro", "phone": "01-440-0000"},
+            "serenazgo": {"phone": "01-513-9000", "email": "serenazgo@msi.gob.pe"}
+          }
+        },
+        {
+          "name": "Callao",
+          "code": "CALLAO",
+          "coordinates": {"lat": -12.0546, "lng": -77.1127},
+          "riskLevel": "HIGH",
+          "authorities": {
+            "pnp": {"station": "Comisaría Callao", "phone": "01-453-0000"},
+            "serenazgo": {"phone": "01-420-4000", "email": "serenazgo@municallao.gob.pe"}
+          }
+        },
+        {
+          "name": "San Juan de Lurigancho",
+          "code": "SJL",
+          "coordinates": {"lat": -11.9, "lng": -77.0},
+          "riskLevel": "HIGH",
+          "authorities": {
+            "pnp": {"station": "Comisaría SJL", "phone": "01-388-0000"},
+            "serenazgo": {"phone": "01-388-5555"}
+          }
+        }
+      ],
+      "emergencyProtocols": {
+        "critical": {
+          "responseTimeMinutes": 5,
+          "autoEscalate": true,
+          "contactAuthorities": true,
+          "requiredActions": ["immediate_notification", "location_tracking", "supervisor_alert"]
+        },
+        "high": {
+          "responseTimeMinutes": 15,
+          "autoEscalate": false,
+          "contactAuthorities": "conditional",
+          "requiredActions": ["priority_notification", "status_tracking"]
+        }
+      }
+    }
+
+  incident-types-mapping.json: |
+    {
+      "typeMapping": {
+        "medical_emergency": {
+          "authorities": ["SAMU", "PNP"],
+          "priority": 10,
+          "autoEscalate": true,
+          "responseTimeTarget": 5
+        },
+        "kidnapping": {
+          "authorities": ["PNP", "SERENAZGO"],
+          "priority": 10,
+          "autoEscalate": true,
+          "responseTimeTarget": 3
+        },
+        "robbery": {
+          "authorities": ["PNP", "SERENAZGO"],
+          "priority": 8,
+          "autoEscalate": true,
+          "responseTimeTarget": 10
+        },
+        "traffic_accident": {
+          "authorities": ["PNP", "SAMU", "BOMBEROS"],
+          "priority": 7,
+          "autoEscalate": "conditional",
+          "responseTimeTarget": 15
+        },
+        "harassment": {
+          "authorities": ["CEM", "PNP"],
+          "priority": 6,
+          "autoEscalate": false,
+          "responseTimeTarget": 30
+        },
+        "fire_emergency": {
+          "authorities": ["BOMBEROS", "PNP"],
+          "priority": 9,
+          "autoEscalate": true,
+          "responseTimeTarget": 5
+        }
+      }
+    }
+
+---
+# ====================================================================
+# 📊 SERVICE MONITOR PARA PROMETHEUS
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: incident-monitoring
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+spec:
+  selector:
+    matchLabels:
+      app: incident-metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ====================================================================
+# 🚨 ALERTING RULES PARA INCIDENTES
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: incident-alerts
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-incidents
+spec:
+  groups:
+  - name: incident.rules
+    rules:
+    - alert: CriticalIncidentUnacknowledged
+      expr: incidents_critical_unacknowledged > 0
+      for: 3m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Incidente crítico sin reconocer"
+        description: "{{ $value }} incidentes críticos llevan más de 3 minutos sin reconocer"
+    
+    - alert: HighIncidentVolume
+      expr: rate(incidents_total[5m]) > 0.5
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Alto volumen de incidentes"
+        description: "Tasa de incidentes: {{ $value }} por segundo en los últimos 5 minutos"
+    
+    - alert: SLABreach
+      expr: incidents_sla_breached_total > 0
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Incumplimiento de SLA detectado"
+        description: "{{ $value }} incidentes han excedido el SLA de respuesta"
+    
+    - alert: AuthorityNotificationFailed
+      expr: authority_notifications_failed_total > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Falla en notificaciones a autoridades"
+        description: "{{ $value }} notificaciones a autoridades han fallado"
+
+    - alert: RiskZoneIncidentSpike
+      expr: incidents_by_zone_rate > 2 * incidents_by_zone_rate offset 1h
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pico de incidentes en zona de riesgo"
+        description: "Incremento del {{ $value }}% en incidentes en zona específica"
+
+# ====================================================================
+# 🚀 COMANDOS DE DEPLOYMENT Y MONITOREO
+# ====================================================================
+# 
+# 1. Aplicar configuración completa:
+# kubectl apply -f incident-monitoring-config.yaml
+#
+# 2. Verificar CronJobs activos:
+# kubectl get cronjobs -n oasistaxi-prod -l app=oasistaxi-incidents
+#
+# 3. Ver logs del monitor crítico:
+# kubectl logs -n oasistaxi-prod -l app=oasistaxi-incidents,component=critical-monitor
+#
+# 4. Ejecutar escalamiento manual:
+# kubectl create job --from=cronjob/incident-auto-escalation manual-escalation -n oasistaxi-prod
+#
+# 5. Ver métricas en tiempo real:
+# kubectl port-forward -n oasistaxi-prod svc/incident-metrics 9090:9090
+#
+# 6. Verificar alertas activas:
+# kubectl get prometheusrules incident-alerts -n oasistaxi-prod -o yaml
+#
+# 7. Ver estado de notificaciones a autoridades:
+# kubectl logs -f -n oasistaxi-prod deployment/external-sync
+#
+# 8. Ejecutar análisis de patrones:
+# kubectl create job --from=cronjob/incident-pattern-analysis pattern-analysis-$(date +%s) -n oasistaxi-prod
+#
+# ====================================================================

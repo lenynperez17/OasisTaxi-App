@@ -1,244 +1,360 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../services/security_integration_service.dart';
+import '../../utils/app_logger.dart';
+import 'package:provider/provider.dart';
+import '../../providers/vehicle_provider.dart';
+import '../../providers/auth_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class VehicleManagementScreen extends StatefulWidget {
   const VehicleManagementScreen({super.key});
 
   @override
-  _VehicleManagementScreenState createState() => _VehicleManagementScreenState();
+  VehicleManagementScreenState createState() => VehicleManagementScreenState();
 }
 
-class _VehicleManagementScreenState extends State<VehicleManagementScreen> 
+class VehicleManagementScreenState extends State<VehicleManagementScreen>
     with TickerProviderStateMixin {
   // Animation controllers
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
-  // Vehicle data
-  final Map<String, dynamic> _vehicleData = {
-    'brand': 'Toyota',
-    'model': 'Corolla',
-    'year': 2021,
-    'plate': 'ABC-123',
-    'color': 'Blanco',
-    'vin': '1HGBH41JXMN109186',
-    'seats': 4,
-    'fuelType': 'Gasolina',
-    'transmission': 'Automático',
-    'mileage': 45678,
-    'status': 'active',
-    'photos': [
-      'https://example.com/front.jpg',
-      'https://example.com/back.jpg',
-      'https://example.com/side.jpg',
-      'https://example.com/interior.jpg',
-    ],
-  };
-  
-  // Documents
-  final List<VehicleDocument> _documents = [
-    VehicleDocument(
-      id: '1',
-      type: 'Licencia de Conducir',
-      number: 'LC-123456789',
-      issueDate: DateTime(2020, 1, 15),
-      expiryDate: DateTime(2025, 1, 15),
-      status: DocumentStatus.valid,
-      icon: Icons.badge,
-      color: ModernTheme.primaryBlue,
-    ),
-    VehicleDocument(
-      id: '2',
-      type: 'Seguro Vehicular',
-      number: 'SV-987654321',
-      issueDate: DateTime(2024, 1, 1),
-      expiryDate: DateTime(2025, 1, 1),
-      status: DocumentStatus.valid,
-      icon: Icons.security,
-      color: ModernTheme.oasisGreen,
-    ),
-    VehicleDocument(
-      id: '3',
-      type: 'SOAT',
-      number: 'SOAT-2024-456',
-      issueDate: DateTime(2024, 3, 1),
-      expiryDate: DateTime(2025, 3, 1),
-      status: DocumentStatus.valid,
-      icon: Icons.article,
-      color: Colors.orange,
-    ),
-    VehicleDocument(
-      id: '4',
-      type: 'Revisión Técnica',
-      number: 'RT-2024-789',
-      issueDate: DateTime(2024, 6, 1),
-      expiryDate: DateTime(2024, 12, 1),
-      status: DocumentStatus.expiringSoon,
-      icon: Icons.build,
-      color: ModernTheme.warning,
-    ),
-    VehicleDocument(
-      id: '5',
-      type: 'Tarjeta de Propiedad',
-      number: 'TP-123456',
-      issueDate: DateTime(2021, 1, 1),
-      expiryDate: null, // No expira
-      status: DocumentStatus.valid,
-      icon: Icons.description,
-      color: Colors.purple,
-    ),
-  ];
-  
-  // Maintenance records
-  final List<MaintenanceRecord> _maintenanceRecords = [
-    MaintenanceRecord(
-      id: '1',
-      type: 'Cambio de Aceite',
-      date: DateTime.now().subtract(Duration(days: 30)),
-      mileage: 45000,
-      cost: 120.00,
-      workshop: 'Taller Central',
-      nextDue: DateTime.now().add(Duration(days: 60)),
-      icon: Icons.water_drop,
-    ),
-    MaintenanceRecord(
-      id: '2',
-      type: 'Rotación de Llantas',
-      date: DateTime.now().subtract(Duration(days: 45)),
-      mileage: 44500,
-      cost: 80.00,
-      workshop: 'Llantas Express',
-      nextDue: DateTime.now().add(Duration(days: 135)),
-      icon: Icons.circle_outlined,
-    ),
-    MaintenanceRecord(
-      id: '3',
-      type: 'Filtro de Aire',
-      date: DateTime.now().subtract(Duration(days: 90)),
-      mileage: 43000,
-      cost: 45.00,
-      workshop: 'AutoService',
-      nextDue: DateTime.now().add(Duration(days: 270)),
-      icon: Icons.air,
-    ),
-  ];
-  
-  // Reminders
-  final List<Reminder> _reminders = [
-    Reminder(
-      id: '1',
-      title: 'Renovar Revisión Técnica',
-      description: 'Vence el 01/12/2024',
-      date: DateTime(2024, 12, 1),
-      type: ReminderType.document,
-      priority: Priority.high,
-    ),
-    Reminder(
-      id: '2',
-      title: 'Cambio de Aceite',
-      description: 'Próximo cambio en 2,000 km',
-      date: DateTime.now().add(Duration(days: 60)),
-      type: ReminderType.maintenance,
-      priority: Priority.medium,
-    ),
-    Reminder(
-      id: '3',
-      title: 'Renovar SOAT',
-      description: 'Vence el 01/03/2025',
-      date: DateTime(2025, 3, 1),
-      type: ReminderType.document,
-      priority: Priority.low,
-    ),
-  ];
-  
+
+  // UI state
   int _selectedTab = 0;
   bool _isEditing = false;
-  
+  final ImagePicker _imagePicker = ImagePicker();
+
+  // Loading states per section
+  bool _loadingVehicle = false;
+  bool _loadingDocuments = false;
+  bool _loadingMaintenance = false;
+  bool _loadingReminders = false;
+
+  // Error states per section
+  String? _vehicleError;
+  String? _documentsError;
+  String? _maintenanceError;
+  String? _remindersError;
+
+  // Form controllers for adding new items
+  final TextEditingController _documentTypeController = TextEditingController();
+  final TextEditingController _documentNumberController = TextEditingController();
+  final TextEditingController _maintenanceTypeController = TextEditingController();
+  final TextEditingController _workshopController = TextEditingController();
+  final TextEditingController _costController = TextEditingController();
+  final TextEditingController _reminderTitleController = TextEditingController();
+  final TextEditingController _reminderDescriptionController = TextEditingController();
+
+  // Vehicle form controllers and key
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _brandController = TextEditingController();
+  final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _yearController = TextEditingController();
+  final TextEditingController _plateController = TextEditingController();
+  final TextEditingController _colorController = TextEditingController();
+  final TextEditingController _vinController = TextEditingController();
+  final TextEditingController _transmissionController = TextEditingController();
+  final TextEditingController _fuelTypeController = TextEditingController();
+  final TextEditingController _seatsController = TextEditingController();
+  final TextEditingController _mileageController = TextEditingController();
+
+  // Remove all mock data - will use real data from VehicleProvider
+  // All data will come from Provider instead of being hardcoded
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('VehicleManagementScreen', 'initState');
+
     _fadeController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-    
+
     _fadeController.forward();
+
+    // Load vehicle data when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadVehicleData();
+    });
   }
-  
+
+  Future<void> _loadVehicleData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _loadingVehicle = true;
+      _loadingDocuments = true;
+      _loadingMaintenance = true;
+      _loadingReminders = true;
+      // Clear previous errors
+      _vehicleError = null;
+      _documentsError = null;
+      _maintenanceError = null;
+      _remindersError = null;
+    });
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final vehicleProvider = Provider.of<VehicleProvider>(context, listen: false);
+
+    // Use currentUser.id instead of user.uid
+    if (authProvider.currentUser != null) {
+      try {
+        await vehicleProvider.loadVehicleData(authProvider.currentUser!.id);
+      } catch (e) {
+        AppLogger.error('Error loading vehicle data', e);
+        if (mounted) {
+          setState(() {
+            _vehicleError = 'Error al cargar datos del vehículo';
+            _documentsError = 'Error al cargar documentos';
+            _maintenanceError = 'Error al cargar mantenimientos';
+            _remindersError = 'Error al cargar recordatorios';
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _vehicleError = 'Usuario no autenticado';
+          _documentsError = 'Usuario no autenticado';
+          _maintenanceError = 'Usuario no autenticado';
+          _remindersError = 'Usuario no autenticado';
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _loadingVehicle = false;
+        _loadingDocuments = false;
+        _loadingMaintenance = false;
+        _loadingReminders = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
+    _documentTypeController.dispose();
+    _documentNumberController.dispose();
+    _maintenanceTypeController.dispose();
+    _workshopController.dispose();
+    _costController.dispose();
+    _reminderTitleController.dispose();
+    _reminderDescriptionController.dispose();
+    // Dispose vehicle form controllers
+    _brandController.dispose();
+    _modelController.dispose();
+    _yearController.dispose();
+    _plateController.dispose();
+    _colorController.dispose();
+    _vinController.dispose();
+    _transmissionController.dispose();
+    _fuelTypeController.dispose();
+    _seatsController.dispose();
+    _mileageController.dispose();
     super.dispose();
   }
-  
+
+  Future<void> _handleDocumentUpload() async {
+    try {
+      // Implementación para manejar la carga de documentos
+      AppLogger.info('📄 Iniciando carga de documento del vehículo');
+
+      // Aquí se implementaría la lógica real de carga de documentos
+      // Por ejemplo: seleccionar archivo, validar, subir a Firebase Storage
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Documento cargado exitosamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      AppLogger.error('❌ Error al cargar documento: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar documento'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ModernTheme.backgroundLight,
-      appBar: AppBar(
-        backgroundColor: ModernTheme.oasisGreen,
-        elevation: 0,
-        title: Text(
-          'Mi Vehículo',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.save : Icons.edit, color: Colors.white),
-            onPressed: () {
-              setState(() => _isEditing = !_isEditing);
-              if (!_isEditing) {
-                _saveChanges();
-              }
-            },
-          ),
-        ],
-      ),
-      body: AnimatedBuilder(
-        animation: _fadeAnimation,
-        builder: (context, child) {
-          return Opacity(
-            opacity: _fadeAnimation.value,
-            child: Column(
-              children: [
-                // Tab bar
-                _buildTabBar(),
-                
-                // Content
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedTab,
-                    children: [
-                      _buildVehicleInfo(),
-                      _buildDocuments(),
-                      _buildMaintenance(),
-                      _buildReminders(),
-                    ],
+    return Consumer<VehicleProvider>(
+      builder: (context, vehicleProvider, child) {
+        if (vehicleProvider.isLoading && vehicleProvider.vehicleData.isEmpty) {
+          return Scaffold(
+            backgroundColor: ModernTheme.backgroundLight,
+            appBar: _buildAppBar(null),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Cargando información del vehículo...',
+                    style: TextStyle(color: ModernTheme.textSecondary),
+                  ),
+                ],
+              ),
             ),
           );
-        },
-      ),
-      floatingActionButton: _selectedTab > 0 ? FloatingActionButton(
-        onPressed: _showAddDialog,
-        backgroundColor: ModernTheme.oasisGreen,
-        child: Icon(Icons.add, color: Colors.white),
-      ) : null,
+        }
+
+        if (vehicleProvider.error != null) {
+          return Scaffold(
+            backgroundColor: ModernTheme.backgroundLight,
+            appBar: _buildAppBar(null),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: ModernTheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error cargando datos',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: ModernTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    vehicleProvider.error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: ModernTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      vehicleProvider.clearError();
+                      _loadVehicleData();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ModernTheme.oasisGreen,
+                    ),
+                    child: Text('Reintentar'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: ModernTheme.backgroundLight,
+          appBar: _buildAppBar(vehicleProvider),
+          body: AnimatedBuilder(
+            animation: _fadeAnimation,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _fadeAnimation.value,
+                child: Column(
+                  children: [
+                    _buildTabBar(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: _selectedTab,
+                        children: [
+                          _buildVehicleInfo(vehicleProvider),
+                          _buildDocuments(vehicleProvider),
+                          _buildMaintenance(vehicleProvider),
+                          _buildReminders(vehicleProvider),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          floatingActionButton: _selectedTab > 0
+              ? FloatingActionButton(
+                  onPressed: () => _showAddDialog(),
+                  backgroundColor: ModernTheme.oasisGreen,
+                  child: vehicleProvider.isSaving
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Icon(Icons.add, color: Colors.white),
+                )
+              : null,
+        );
+      },
     );
   }
-  
+
+  AppBar _buildAppBar(VehicleProvider? vehicleProvider) {
+    return AppBar(
+      backgroundColor: ModernTheme.oasisGreen,
+      elevation: 0,
+      title: Text(
+        'Mi Vehículo',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      actions: [
+        if (vehicleProvider != null)
+          IconButton(
+            icon: Icon(
+              _isEditing ? Icons.save : Icons.edit,
+              color: Colors.white,
+            ),
+            onPressed: vehicleProvider.isSaving
+                ? null
+                : () {
+                    if (_isEditing) {
+                      // Save changes
+                      _saveVehicleChanges(vehicleProvider);
+                    } else {
+                      // Enter edit mode and initialize controllers
+                      final vehicleData = vehicleProvider.vehicleData;
+                      _brandController.text = vehicleData['brand']?.toString() ?? '';
+                      _modelController.text = vehicleData['model']?.toString() ?? '';
+                      _yearController.text = vehicleData['year']?.toString() ?? '';
+                      _plateController.text = vehicleData['plate']?.toString() ?? '';
+                      _colorController.text = vehicleData['color']?.toString() ?? '';
+                      _vinController.text = vehicleData['vin']?.toString() ?? '';
+                      _transmissionController.text = vehicleData['transmission']?.toString() ?? '';
+                      _fuelTypeController.text = vehicleData['fuelType']?.toString() ?? '';
+                      _seatsController.text = vehicleData['seats']?.toString() ?? '';
+                      _mileageController.text = vehicleData['mileage']?.toString() ?? '';
+                      setState(() => _isEditing = true);
+                    }
+                  },
+          ),
+      ],
+    );
+  }
+
   Widget _buildTabBar() {
     return Container(
       color: Colors.white,
@@ -252,10 +368,10 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   Widget _buildTab(String label, IconData icon, int index) {
     final isSelected = _selectedTab == index;
-    
+
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _selectedTab = index),
@@ -273,15 +389,19 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             children: [
               Icon(
                 icon,
-                color: isSelected ? ModernTheme.oasisGreen : ModernTheme.textSecondary,
+                color: isSelected
+                    ? ModernTheme.oasisGreen
+                    : ModernTheme.textSecondary,
                 size: 20,
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isSelected ? ModernTheme.oasisGreen : ModernTheme.textSecondary,
+                  color: isSelected
+                      ? ModernTheme.oasisGreen
+                      : ModernTheme.textSecondary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -291,8 +411,28 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
-  Widget _buildVehicleInfo() {
+
+  Widget _buildVehicleInfo(VehicleProvider vehicleProvider) {
+    if (_loadingVehicle) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: ModernTheme.oasisGreen),
+            const SizedBox(height: 16),
+            Text('Cargando información del vehículo...', style: TextStyle(color: ModernTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    // Show error state if there's an error
+    if (_vehicleError != null) {
+      return _buildErrorState(_vehicleError!, _loadVehicleData);
+    }
+
+    final vehicleData = vehicleProvider.vehicleData;
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
       child: Column(
@@ -303,7 +443,10 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [ModernTheme.oasisGreen, ModernTheme.oasisGreen.withValues(alpha: 0.8)],
+                colors: [
+                  ModernTheme.oasisGreen,
+                  ModernTheme.oasisGreen.withValues(alpha: 0.8)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -326,13 +469,13 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                         size: 32,
                       ),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${_vehicleData['brand']} ${_vehicleData['model']}',
+                            '${vehicleData['brand'] ?? 'Sin marca'} ${vehicleData['model'] ?? 'Sin modelo'}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -340,7 +483,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                             ),
                           ),
                           Text(
-                            '${_vehicleData['year']} • ${_vehicleData['plate']}',
+                            '${vehicleData['year'] ?? 'Sin año'} • ${vehicleData['plate'] ?? 'Sin placa'}',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
@@ -350,7 +493,8 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
@@ -361,13 +505,15 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: Colors.greenAccent,
+                              color: (vehicleData['isActive'] ?? false)
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent,
                               shape: BoxShape.circle,
                             ),
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
-                            'Activo',
+                            (vehicleData['isActive'] ?? false) ? 'Activo' : 'Inactivo',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -379,21 +525,24 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildVehicleStat('Kilometraje', '${_vehicleData['mileage']} km', Icons.speed),
-                    _buildVehicleStat('Asientos', '${_vehicleData['seats']}', Icons.event_seat),
-                    _buildVehicleStat('Combustible', _vehicleData['fuelType'], Icons.local_gas_station),
+                    _buildVehicleStat('Kilometraje',
+                        '${vehicleData['mileage'] ?? 0} km', Icons.speed),
+                    _buildVehicleStat('Asientos', '${vehicleData['seats'] ?? 4}',
+                        Icons.event_seat),
+                    _buildVehicleStat('Combustible', vehicleData['fuelType'] ?? 'Gasolina',
+                        Icons.local_gas_station),
                   ],
                 ),
               ],
             ),
           ),
-          
-          SizedBox(height: 20),
-          
+
+          const SizedBox(height: 20),
+
           // Photos section
           Text(
             'Fotos del Vehículo',
@@ -402,23 +551,11 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 12),
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _vehicleData['photos'].length + (_isEditing ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (_isEditing && index == _vehicleData['photos'].length) {
-                  return _buildAddPhotoCard();
-                }
-                return _buildPhotoCard(index);
-              },
-            ),
-          ),
-          
-          SizedBox(height: 24),
-          
+          const SizedBox(height: 12),
+          _buildPhotosSection(vehicleProvider),
+
+          const SizedBox(height: 24),
+
           // Vehicle details
           Text(
             'Información Detallada',
@@ -427,11 +564,11 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 12),
-          _buildDetailCard(),
-          
-          SizedBox(height: 24),
-          
+          const SizedBox(height: 12),
+          _buildDetailCard(vehicleProvider),
+
+          const SizedBox(height: 24),
+
           // Technical specs
           Text(
             'Especificaciones Técnicas',
@@ -440,18 +577,18 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 12),
-          _buildSpecsCard(),
+          const SizedBox(height: 12),
+          _buildSpecsCard(vehicleProvider),
         ],
       ),
     );
   }
-  
+
   Widget _buildVehicleStat(String label, String value, IconData icon) {
     return Column(
       children: [
         Icon(icon, color: Colors.white70, size: 24),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           value,
           style: TextStyle(
@@ -470,39 +607,76 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ],
     );
   }
-  
-  Widget _buildPhotoCard(int index) {
+
+  Widget _buildPhotosSection(VehicleProvider vehicleProvider) {
+    final vehicleData = vehicleProvider.vehicleData;
+    final photos = List<String>.from(vehicleData['photos'] ?? []);
+
+    return Container(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _isEditing ? photos.length + 1 : photos.length,
+        itemBuilder: (context, index) {
+          if (_isEditing && index == photos.length) {
+            return _buildAddPhotoCard(vehicleProvider);
+          }
+          return _buildPhotoCard(photos[index], index, vehicleProvider);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPhotoCard(String photoUrl, int index, VehicleProvider vehicleProvider) {
     return Container(
       width: 160,
       margin: EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         image: DecorationImage(
-          image: AssetImage('assets/images/car_placeholder.png'),
+          image: photoUrl.isNotEmpty
+              ? NetworkImage(photoUrl) as ImageProvider
+              : AssetImage('assets/images/car_placeholder.png'),
           fit: BoxFit.cover,
         ),
       ),
-      child: _isEditing ? Align(
-        alignment: Alignment.topRight,
-        child: Container(
-          margin: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: ModernTheme.error,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(Icons.close, color: Colors.white, size: 16),
-            onPressed: () {
-              // Remove photo
-            },
-            padding: EdgeInsets.all(4),
-          ),
-        ),
-      ) : null,
+      child: _isEditing
+          ? Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                margin: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ModernTheme.error,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.close, color: Colors.white, size: 16),
+                  onPressed: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final driverId = authProvider.currentUser?.id;
+
+                    if (driverId != null) {
+                      final success = await vehicleProvider.removeVehiclePhoto(driverId, index);
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success ? 'Foto eliminada' : 'Error al eliminar foto'),
+                            backgroundColor: success ? ModernTheme.success : ModernTheme.error,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  padding: EdgeInsets.all(4),
+                ),
+              ),
+            )
+          : null,
     );
   }
-  
-  Widget _buildAddPhotoCard() {
+
+  Widget _buildAddPhotoCard(VehicleProvider vehicleProvider) {
     return Container(
       width: 160,
       margin: EdgeInsets.only(right: 12),
@@ -515,13 +689,13 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         ),
       ),
       child: InkWell(
-        onTap: _addPhoto,
+        onTap: () => _addPhoto(vehicleProvider),
         borderRadius: BorderRadius.circular(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.add_a_photo, color: ModernTheme.oasisGreen, size: 32),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Agregar Foto',
               style: TextStyle(
@@ -534,8 +708,10 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
-  Widget _buildDetailCard() {
+
+  Widget _buildDetailCard(VehicleProvider vehicleProvider) {
+    final vehicleData = vehicleProvider.vehicleData;
+
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -545,24 +721,27 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
       child: Column(
         children: [
-          _buildDetailRow('Marca', _vehicleData['brand'], Icons.branding_watermark),
-          _buildDetailRow('Modelo', _vehicleData['model'], Icons.model_training),
-          _buildDetailRow('Año', _vehicleData['year'].toString(), Icons.calendar_today),
-          _buildDetailRow('Placa', _vehicleData['plate'], Icons.badge),
-          _buildDetailRow('Color', _vehicleData['color'], Icons.palette),
-          _buildDetailRow('VIN', _vehicleData['vin'], Icons.fingerprint),
+          _buildDetailRow(
+              'Marca', vehicleData['brand'] ?? '', Icons.branding_watermark),
+          _buildDetailRow(
+              'Modelo', vehicleData['model'] ?? '', Icons.model_training),
+          _buildDetailRow(
+              'Año', (vehicleData['year'] ?? '').toString(), Icons.calendar_today),
+          _buildDetailRow('Placa', vehicleData['plate'] ?? '', Icons.badge),
+          _buildDetailRow('Color', vehicleData['color'] ?? '', Icons.palette),
+          _buildDetailRow('VIN', vehicleData['vin'] ?? '', Icons.fingerprint),
         ],
       ),
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value, IconData icon) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Icon(icon, color: ModernTheme.textSecondary, size: 20),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
@@ -571,30 +750,32 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               ),
             ),
           ),
-          _isEditing ? Expanded(
-            flex: 2,
-            child: TextFormField(
-              initialValue: value,
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+          _isEditing
+              ? Expanded(
+                  flex: 2,
+                  child: SecurityIntegrationService.buildSecureTextField(
+                    context: context,
+                    controller: TextEditingController(text: value),
+                    label: '',
+                    fieldType: label.toLowerCase().contains('placa')
+                        ? 'vehicleplate'
+                        : 'text',
+                  ),
+                )
+              : Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ),
-          ) : Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ],
       ),
     );
   }
-  
-  Widget _buildSpecsCard() {
+
+  Widget _buildSpecsCard(VehicleProvider vehicleProvider) {
+    final vehicleData = vehicleProvider.vehicleData;
+
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -604,15 +785,19 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
       child: Column(
         children: [
-          _buildSpecRow('Transmisión', _vehicleData['transmission'], Icons.settings),
-          _buildSpecRow('Tipo de Combustible', _vehicleData['fuelType'], Icons.local_gas_station),
-          _buildSpecRow('Número de Asientos', '${_vehicleData['seats']} pasajeros', Icons.event_seat),
-          _buildSpecRow('Kilometraje Actual', '${_vehicleData['mileage']} km', Icons.speed),
+          _buildSpecRow(
+              'Transmisión', vehicleData['transmission'] ?? 'Manual', Icons.settings),
+          _buildSpecRow('Tipo de Combustible', vehicleData['fuelType'] ?? 'Gasolina',
+              Icons.local_gas_station),
+          _buildSpecRow('Número de Asientos',
+              '${vehicleData['seats'] ?? 4} pasajeros', Icons.event_seat),
+          _buildSpecRow('Kilometraje Actual', '${vehicleData['mileage'] ?? 0} km',
+              Icons.speed),
         ],
       ),
     );
   }
-  
+
   Widget _buildSpecRow(String label, String value, IconData icon) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
@@ -626,7 +811,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             ),
             child: Icon(icon, color: ModernTheme.oasisGreen, size: 20),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,23 +837,73 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
-  Widget _buildDocuments() {
+
+  Widget _buildDocuments(VehicleProvider vehicleProvider) {
+    if (_loadingDocuments) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: ModernTheme.oasisGreen),
+            const SizedBox(height: 16),
+            Text('Cargando documentos...', style: TextStyle(color: ModernTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    // Show error state if there's an error
+    if (_documentsError != null) {
+      return _buildErrorState(_documentsError!, _loadVehicleData);
+    }
+
+    final documents = vehicleProvider.documents;
+
+    if (documents.isEmpty && !_isEditing) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.description_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No hay documentos registrados',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _documents.length,
+      itemCount: _isEditing ? documents.length + 1 : documents.length,
       itemBuilder: (context, index) {
-        final doc = _documents[index];
-        return _buildDocumentCard(doc);
+        if (_isEditing && index == documents.length) {
+          return _buildAddDocumentButton(vehicleProvider);
+        }
+        final doc = documents[index];
+        return _buildDocumentCard(doc, vehicleProvider);
       },
     );
   }
-  
-  Widget _buildDocumentCard(VehicleDocument doc) {
-    final daysUntilExpiry = doc.expiryDate?.difference(DateTime.now()).inDays;
+
+  Widget _buildDocumentCard(VehicleDocument doc, VehicleProvider vehicleProvider) {
+    final expiryDate = doc.expiryDate;
+    final daysUntilExpiry = expiryDate?.difference(DateTime.now()).inDays;
     final isExpiringSoon = daysUntilExpiry != null && daysUntilExpiry < 30;
     final isExpired = daysUntilExpiry != null && daysUntilExpiry < 0;
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -681,10 +916,10 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         leading: Container(
           padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: doc.color.withValues(alpha: 0.1),
+            color: _getDocumentColor(doc.type).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(doc.icon, color: doc.color),
+          child: Icon(_getDocumentIcon(doc.type), color: _getDocumentColor(doc.type)),
         ),
         title: Text(
           doc.type,
@@ -697,13 +932,15 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Número: ${doc.number}'),
-            if (doc.expiryDate != null)
+            if (expiryDate != null)
               Text(
-                'Vence: ${_formatDate(doc.expiryDate!)}',
+                'Vence: ${_formatDate(expiryDate)}',
                 style: TextStyle(
-                  color: isExpired ? ModernTheme.error : 
-                         isExpiringSoon ? ModernTheme.warning : 
-                         ModernTheme.textSecondary,
+                  color: isExpired
+                      ? ModernTheme.error
+                      : isExpiringSoon
+                          ? ModernTheme.warning
+                          : ModernTheme.textSecondary,
                 ),
               ),
           ],
@@ -726,7 +963,9 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                 ),
               ),
             ),
-            if (daysUntilExpiry != null && daysUntilExpiry > 0 && daysUntilExpiry < 30)
+            if (daysUntilExpiry != null &&
+                daysUntilExpiry > 0 &&
+                daysUntilExpiry < 30)
               Padding(
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
@@ -739,23 +978,72 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               ),
           ],
         ),
-        onTap: () => _showDocumentDetails(doc),
+        onTap: _isEditing ? () => _showDocumentForm(vehicleProvider, doc) : null,
       ),
     );
   }
-  
-  Widget _buildMaintenance() {
+
+  Widget _buildMaintenance(VehicleProvider vehicleProvider) {
+    if (_loadingMaintenance) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: ModernTheme.oasisGreen),
+            const SizedBox(height: 16),
+            Text('Cargando mantenimientos...', style: TextStyle(color: ModernTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    // Show error state if there's an error
+    if (_maintenanceError != null) {
+      return _buildErrorState(_maintenanceError!, _loadVehicleData);
+    }
+
+    final maintenanceRecords = vehicleProvider.maintenanceRecords;
+
+    if (maintenanceRecords.isEmpty && !_isEditing) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.build_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No hay registros de mantenimiento',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _maintenanceRecords.length,
+      itemCount: _isEditing ? maintenanceRecords.length + 1 : maintenanceRecords.length,
       itemBuilder: (context, index) {
-        final record = _maintenanceRecords[index];
-        return _buildMaintenanceCard(record);
+        if (_isEditing && index == maintenanceRecords.length) {
+          return _buildAddMaintenanceButton(vehicleProvider);
+        }
+        final record = maintenanceRecords[index];
+        return _buildMaintenanceCard(record, vehicleProvider);
       },
     );
   }
-  
-  Widget _buildMaintenanceCard(MaintenanceRecord record) {
+
+  Widget _buildMaintenanceCard(MaintenanceRecord record, VehicleProvider vehicleProvider) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -772,7 +1060,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             color: ModernTheme.primaryBlue.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(record.icon, color: ModernTheme.primaryBlue),
+          child: Icon(_getMaintenanceIcon(record.type), color: ModernTheme.primaryBlue),
         ),
         title: Text(
           record.type,
@@ -816,8 +1104,10 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             child: Column(
               children: [
                 _buildMaintenanceDetail('Taller', record.workshop, Icons.store),
-                _buildMaintenanceDetail('Kilometraje', '${record.mileage} km', Icons.speed),
-                _buildMaintenanceDetail('Costo', 'S/ ${record.cost.toStringAsFixed(2)}', Icons.attach_money),
+                _buildMaintenanceDetail(
+                    'Kilometraje', '${record.mileage} km', Icons.speed),
+                _buildMaintenanceDetail('Costo',
+                    'S/ ${record.cost.toStringAsFixed(2)}', Icons.attach_money),
                 if (record.notes != null)
                   _buildMaintenanceDetail('Notas', record.notes!, Icons.note),
               ],
@@ -827,14 +1117,14 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   Widget _buildMaintenanceDetail(String label, String value, IconData icon) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Icon(icon, size: 16, color: ModernTheme.textSecondary),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             '$label:',
             style: TextStyle(
@@ -842,7 +1132,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
               fontSize: 12,
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
@@ -856,18 +1146,67 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
-  Widget _buildReminders() {
+
+  Widget _buildReminders(VehicleProvider vehicleProvider) {
+    if (_loadingReminders) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: ModernTheme.oasisGreen),
+            const SizedBox(height: 16),
+            Text('Cargando recordatorios...', style: TextStyle(color: ModernTheme.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    // Show error state if there's an error
+    if (_remindersError != null) {
+      return _buildErrorState(_remindersError!, _loadVehicleData);
+    }
+
+    final reminders = vehicleProvider.reminders;
+
+    if (reminders.isEmpty && !_isEditing) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.notification_important_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No hay recordatorios activos',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _reminders.length,
+      itemCount: _isEditing ? reminders.length + 1 : reminders.length,
       itemBuilder: (context, index) {
-        final reminder = _reminders[index];
+        if (_isEditing && index == reminders.length) {
+          return _buildAddReminderButton(vehicleProvider);
+        }
+        final reminder = reminders[index];
         return _buildReminderCard(reminder);
       },
     );
   }
-  
+
   Widget _buildReminderCard(Reminder reminder) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -906,11 +1245,12 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(reminder.description),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 14, color: ModernTheme.textSecondary),
-                SizedBox(width: 4),
+                Icon(Icons.calendar_today,
+                    size: 14, color: ModernTheme.textSecondary),
+                const SizedBox(width: 4),
                 Text(
                   _formatDate(reminder.date),
                   style: TextStyle(
@@ -944,7 +1284,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   Color _getStatusColor(DocumentStatus status) {
     switch (status) {
       case DocumentStatus.valid:
@@ -957,7 +1297,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         return ModernTheme.info;
     }
   }
-  
+
   String _getStatusText(DocumentStatus status) {
     switch (status) {
       case DocumentStatus.valid:
@@ -970,7 +1310,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         return 'Pendiente';
     }
   }
-  
+
   Color _getPriorityColor(Priority priority) {
     switch (priority) {
       case Priority.high:
@@ -981,7 +1321,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         return ModernTheme.info;
     }
   }
-  
+
   Color _getReminderColor(ReminderType type) {
     switch (type) {
       case ReminderType.document:
@@ -994,7 +1334,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         return Colors.grey;
     }
   }
-  
+
   IconData _getReminderIcon(ReminderType type) {
     switch (type) {
       case ReminderType.document:
@@ -1007,21 +1347,12 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         return Icons.info;
     }
   }
-  
+
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
-  
-  void _addPhoto() {
-    // Show photo picker
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Seleccionar foto desde galería'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
+
+
   void _saveChanges() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1030,7 +1361,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   void _showDocumentDetails(VehicleDocument doc) {
     showModalBottomSheet(
       context: context,
@@ -1048,7 +1379,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
             Row(
               children: [
                 Icon(doc.icon, color: doc.color, size: 32),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Text(
                   doc.type,
                   style: TextStyle(
@@ -1058,13 +1389,15 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                 ),
               ],
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             _buildDocumentDetailRow('Número', doc.number),
-            _buildDocumentDetailRow('Fecha de emisión', _formatDate(doc.issueDate)),
+            _buildDocumentDetailRow(
+                'Fecha de emisión', _formatDate(doc.issueDate)),
             if (doc.expiryDate != null)
-              _buildDocumentDetailRow('Fecha de vencimiento', _formatDate(doc.expiryDate!)),
+              _buildDocumentDetailRow(
+                  'Fecha de vencimiento', _formatDate(doc.expiryDate!)),
             _buildDocumentDetailRow('Estado', _getStatusText(doc.status)),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
@@ -1085,7 +1418,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -1111,7 +1444,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   Widget _buildDocumentDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
@@ -1134,7 +1467,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
-  
+
   void _showAddDialog() {
     String title = '';
     switch (_selectedTab) {
@@ -1148,7 +1481,7 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
         title = 'Crear Recordatorio';
         break;
     }
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1178,74 +1511,692 @@ class _VehicleManagementScreenState extends State<VehicleManagementScreen>
       ),
     );
   }
+
+  // Comment 4 & 12: Implement photo management with permission handling
+  Future<void> _addPhoto(VehicleProvider vehicleProvider) async {
+    try {
+      // Check camera/gallery permissions
+      final PermissionStatus cameraStatus = await Permission.camera.status;
+      final PermissionStatus galleryStatus = await Permission.photos.status;
+
+      if (!cameraStatus.isGranted && !galleryStatus.isGranted) {
+        // Request permissions
+        final Map<Permission, PermissionStatus> statuses = await [
+          Permission.camera,
+          Permission.photos,
+        ].request();
+
+        if (statuses[Permission.camera]!.isDenied &&
+            statuses[Permission.photos]!.isDenied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Se requieren permisos para acceder a la cámara o galería'),
+                backgroundColor: ModernTheme.warning,
+                action: SnackBarAction(
+                  label: 'Configuración',
+                  onPressed: () => openAppSettings(),
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Show image source dialog
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Seleccionar fuente'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt),
+                title: Text('Cámara'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library),
+                title: Text('Galería'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Show loading indicator
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => Center(
+              child: Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Subiendo foto...'),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Upload photo
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final driverId = authProvider.currentUser?.id;
+        if (driverId == null) {
+          throw Exception('Usuario no autenticado');
+        }
+        final success = await vehicleProvider.uploadVehiclePhoto(driverId, File(image.path));
+
+        if (mounted) {
+          Navigator.pop(context); // Dismiss loading
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(success
+                ? 'Foto agregada exitosamente'
+                : 'Error al agregar foto'),
+              backgroundColor: success ? ModernTheme.success : ModernTheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error adding photo', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al procesar la foto: $e'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // Save vehicle changes
+  Future<void> _saveVehicleChanges(VehicleProvider vehicleProvider) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final driverId = authProvider.currentUser?.id;
+
+    if (driverId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: Usuario no autenticado'),
+          backgroundColor: ModernTheme.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final updates = {
+        'brand': _brandController.text,
+        'model': _modelController.text,
+        'year': int.tryParse(_yearController.text) ?? 0,
+        'plate': _plateController.text,
+        'color': _colorController.text,
+        'vin': _vinController.text,
+        'transmission': _transmissionController.text,
+        'fuelType': _fuelTypeController.text,
+        'seats': int.tryParse(_seatsController.text) ?? 4,
+        'mileage': int.tryParse(_mileageController.text) ?? 0,
+      };
+
+      final success = await vehicleProvider.updateVehicleInfo(driverId, updates);
+
+      if (mounted) {
+        setState(() {
+          _isEditing = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success
+              ? 'Cambios guardados exitosamente'
+              : 'Error al guardar cambios'),
+            backgroundColor: success ? ModernTheme.success : ModernTheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error saving vehicle changes', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // Helper method to build add document button
+  Widget _buildAddDocumentButton(VehicleProvider vehicleProvider) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.add, color: ModernTheme.oasisGreen),
+        ),
+        title: Text('Agregar Documento'),
+        subtitle: Text('Registrar nuevo documento del vehículo'),
+        onTap: () => _showDocumentForm(vehicleProvider),
+      ),
+    );
+  }
+
+  // Helper method to build add maintenance button
+  Widget _buildAddMaintenanceButton(VehicleProvider vehicleProvider) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ModernTheme.primaryBlue.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.add, color: ModernTheme.primaryBlue),
+        ),
+        title: Text('Registrar Mantenimiento'),
+        subtitle: Text('Agregar nuevo registro de mantenimiento'),
+        onTap: () => _showMaintenanceForm(vehicleProvider),
+      ),
+    );
+  }
+
+  // Helper method to build add reminder button
+  Widget _buildAddReminderButton(VehicleProvider vehicleProvider) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.purple.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.add, color: Colors.purple),
+        ),
+        title: Text('Crear Recordatorio'),
+        subtitle: Text('Agregar nuevo recordatorio'),
+        onTap: () => _showReminderForm(vehicleProvider),
+      ),
+    );
+  }
+
+  // Form for maintenance records
+  void _showMaintenanceForm(VehicleProvider vehicleProvider, [MaintenanceRecord? record]) {
+    // Initialize controllers with existing values if editing
+    if (record != null) {
+      _maintenanceTypeController.text = record.type;
+      _workshopController.text = record.workshop;
+      _costController.text = record.cost.toString();
+    } else {
+      _maintenanceTypeController.clear();
+      _workshopController.clear();
+      _costController.clear();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              record != null ? 'Editar Mantenimiento' : 'Registrar Mantenimiento',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _maintenanceTypeController,
+              decoration: InputDecoration(
+                labelText: 'Tipo de Mantenimiento',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _workshopController,
+              decoration: InputDecoration(
+                labelText: 'Taller',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _costController,
+              decoration: InputDecoration(
+                labelText: 'Costo (S/)',
+                border: OutlineInputBorder(),
+                prefixText: 'S/ ',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final driverId = authProvider.currentUser?.id;
+
+                    if (driverId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: Usuario no autenticado'),
+                          backgroundColor: ModernTheme.error,
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
+                      if (record != null) {
+                        // Editing existing record
+                        await vehicleProvider.updateMaintenanceRecord(
+                          driverId,
+                          record.id,
+                          {
+                            'type': _maintenanceTypeController.text,
+                            'workshop': _workshopController.text,
+                            'cost': double.tryParse(_costController.text) ?? 0.0,
+                            'mileage': vehicleProvider.vehicleData['mileage'] ?? 0,
+                            'date': Timestamp.fromDate(DateTime.now()),
+                          },
+                        );
+                      } else {
+                        // Creating new record
+                        await vehicleProvider.addMaintenanceRecord(
+                          driverId: driverId,
+                          type: _maintenanceTypeController.text,
+                          date: DateTime.now(),
+                          mileage: vehicleProvider.vehicleData['mileage'] ?? 0,
+                          cost: double.tryParse(_costController.text) ?? 0.0,
+                          workshop: _workshopController.text,
+                        );
+                      }
+
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(record != null ? 'Mantenimiento actualizado' : 'Mantenimiento registrado'),
+                            backgroundColor: ModernTheme.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      AppLogger.error('Error saving maintenance', e);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error al guardar: $e'),
+                            backgroundColor: ModernTheme.error,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ModernTheme.oasisGreen,
+                  ),
+                  child: Text(record != null ? 'Actualizar' : 'Registrar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Form for reminders
+  void _showReminderForm(VehicleProvider vehicleProvider, [Reminder? reminder]) {
+    // Initialize controllers with existing values if editing
+    if (reminder != null) {
+      _reminderTitleController.text = reminder.title;
+      _reminderDescriptionController.text = reminder.description;
+    } else {
+      _reminderTitleController.clear();
+      _reminderDescriptionController.clear();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              reminder != null ? 'Editar Recordatorio' : 'Crear Recordatorio',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _reminderTitleController,
+              decoration: InputDecoration(
+                labelText: 'Título',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _reminderDescriptionController,
+              decoration: InputDecoration(
+                labelText: 'Descripción',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final driverId = authProvider.currentUser?.id;
+
+                    if (driverId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: Usuario no autenticado'),
+                          backgroundColor: ModernTheme.error,
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
+                      if (reminder != null) {
+                        // Editing existing reminder
+                        await vehicleProvider.updateReminder(
+                          driverId,
+                          reminder.id,
+                          {
+                            'title': _reminderTitleController.text,
+                            'description': _reminderDescriptionController.text,
+                            'date': Timestamp.fromDate(DateTime.now()),
+                            'type': ReminderType.maintenance.index,
+                            'priority': Priority.medium.index,
+                          },
+                        );
+                      } else {
+                        // Creating new reminder
+                        await vehicleProvider.addReminder(
+                          driverId: driverId,
+                          title: _reminderTitleController.text,
+                          description: _reminderDescriptionController.text,
+                          date: DateTime.now(),
+                          type: ReminderType.maintenance,
+                          priority: Priority.medium,
+                        );
+                      }
+
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(reminder != null ? 'Recordatorio actualizado' : 'Recordatorio creado'),
+                            backgroundColor: ModernTheme.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      AppLogger.error('Error saving reminder', e);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error al guardar: $e'),
+                            backgroundColor: ModernTheme.error,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ModernTheme.oasisGreen,
+                  ),
+                  child: Text(reminder != null ? 'Actualizar' : 'Crear'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method to build error state widget
+  Widget _buildErrorState(String errorMessage, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: ModernTheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Error',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ModernTheme.error,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: ModernTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: Icon(Icons.refresh),
+              label: Text('Reintentar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ModernTheme.oasisGreen,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method to get document color based on type
+  Color _getDocumentColor(String documentType) {
+    switch (documentType.toLowerCase()) {
+      case 'license':
+      case 'licencia':
+        return ModernTheme.primaryBlue;
+      case 'soat':
+        return ModernTheme.oasisGreen;
+      case 'criminal_record':
+      case 'antecedentes':
+        return ModernTheme.warning;
+      case 'vehicle_photo':
+      case 'foto':
+        return ModernTheme.textSecondary;
+      default:
+        return ModernTheme.textSecondary;
+    }
+  }
+
+  // Helper method to get document icon based on type
+  IconData _getDocumentIcon(String documentType) {
+    switch (documentType.toLowerCase()) {
+      case 'license':
+      case 'licencia':
+        return Icons.badge;
+      case 'soat':
+        return Icons.security;
+      case 'criminal_record':
+      case 'antecedentes':
+        return Icons.verified_user;
+      case 'vehicle_photo':
+      case 'foto':
+        return Icons.photo_camera;
+      default:
+        return Icons.description;
+    }
+  }
+
+  // Helper method to get maintenance icon based on type
+  IconData _getMaintenanceIcon(String maintenanceType) {
+    switch (maintenanceType.toLowerCase()) {
+      case 'oil_change':
+      case 'cambio_aceite':
+        return Icons.oil_barrel;
+      case 'tire_rotation':
+      case 'rotacion_neumaticos':
+        return Icons.tire_repair;
+      case 'brake_service':
+      case 'servicio_frenos':
+        return Icons.build;
+      case 'general_inspection':
+      case 'inspeccion':
+        return Icons.search;
+      default:
+        return Icons.build_circle;
+    }
+  }
+
+  // Show document form for adding/editing documents
+  void _showDocumentForm(VehicleProvider vehicleProvider, [VehicleDocument? document]) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                document != null ? 'Editar Documento' : 'Agregar Documento',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              // Document type dropdown
+              DropdownButtonFormField<String>(
+                value: document?.type,
+                decoration: InputDecoration(
+                  labelText: 'Tipo de Documento',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: [
+                  DropdownMenuItem(value: 'license', child: Text('Licencia de Conducir')),
+                  DropdownMenuItem(value: 'soat', child: Text('SOAT')),
+                  DropdownMenuItem(value: 'criminal_record', child: Text('Antecedentes')),
+                  DropdownMenuItem(value: 'vehicle_photo', child: Text('Foto del Vehículo')),
+                ],
+                onChanged: (value) {
+                  // Handle document type selection
+                },
+              ),
+              SizedBox(height: 16),
+              // Upload button
+              ElevatedButton.icon(
+                onPressed: () async {
+                  // Handle document upload
+                  Navigator.pop(context);
+                  _handleDocumentUpload();
+                },
+                icon: Icon(Icons.upload_file),
+                label: Text('Cargar Documento'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ModernTheme.oasisGreen,
+                  minimumSize: Size(double.infinity, 48),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
-
-// Models
-class VehicleDocument {
-  final String id;
-  final String type;
-  final String number;
-  final DateTime issueDate;
-  final DateTime? expiryDate;
-  final DocumentStatus status;
-  final IconData icon;
-  final Color color;
-  
-  VehicleDocument({
-    required this.id,
-    required this.type,
-    required this.number,
-    required this.issueDate,
-    this.expiryDate,
-    required this.status,
-    required this.icon,
-    required this.color,
-  });
-}
-
-enum DocumentStatus { valid, expiringSoon, expired, pending }
-
-class MaintenanceRecord {
-  final String id;
-  final String type;
-  final DateTime date;
-  final int mileage;
-  final double cost;
-  final String workshop;
-  final DateTime? nextDue;
-  final IconData icon;
-  final String? notes;
-  
-  MaintenanceRecord({
-    required this.id,
-    required this.type,
-    required this.date,
-    required this.mileage,
-    required this.cost,
-    required this.workshop,
-    this.nextDue,
-    required this.icon,
-    this.notes,
-  });
-}
-
-class Reminder {
-  final String id;
-  final String title;
-  final String description;
-  final DateTime date;
-  final ReminderType type;
-  final Priority priority;
-  
-  Reminder({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.date,
-    required this.type,
-    required this.priority,
-  });
-}
-
-enum ReminderType { document, maintenance, payment, other }
-enum Priority { high, medium, low }

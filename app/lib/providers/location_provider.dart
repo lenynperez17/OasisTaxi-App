@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../utils/app_logger.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/google_maps_service.dart';
 import '../core/config/app_config.dart';
@@ -6,7 +7,7 @@ import '../core/config/app_config.dart';
 /// Provider real para ubicación ✅ IMPLEMENTACIÓN REAL
 class LocationProvider with ChangeNotifier {
   final GoogleMapsService _mapsService = GoogleMapsService();
-  
+
   LatLng? _currentLocation;
   bool _isLoading = false;
   String? _errorMessage;
@@ -26,10 +27,11 @@ class LocationProvider with ChangeNotifier {
   Future<void> initialize() async {
     try {
       // API Key desde configuración centralizada
-      await _mapsService.initialize(googleMapsApiKey: AppConfig.googleMapsApiKey);
+      await _mapsService.initialize(
+          googleMapsApiKey: AppConfig.googleMapsApiKey);
       await getCurrentLocation();
     } catch (e) {
-      debugPrint('LocationProvider: Error initializing - $e');
+      AppLogger.debug('LocationProvider: Error initializing - $e');
       _setError('Error inicializando servicio de ubicación');
     }
   }
@@ -41,15 +43,15 @@ class LocationProvider with ChangeNotifier {
 
     try {
       final result = await _mapsService.getCurrentLocation();
-      
+
       if (result.success) {
         _currentLocation = LatLng(result.latitude!, result.longitude!);
         _locationServiceEnabled = true;
         _permissionGranted = true;
-        
+
         // Obtener dirección de la ubicación
         await _updateCurrentAddress();
-        
+
         _setLoading(false);
       } else {
         _setError(result.error ?? 'Error obteniendo ubicación');
@@ -69,16 +71,14 @@ class LocationProvider with ChangeNotifier {
 
     try {
       final result = await _mapsService.reverseGeocode(
-        _currentLocation!.latitude, 
-        _currentLocation!.longitude
-      );
-      
+          _currentLocation!.latitude, _currentLocation!.longitude);
+
       if (result.success) {
         _currentAddress = result.formattedAddress;
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('LocationProvider: Error getting address - $e');
+      AppLogger.debug('LocationProvider: Error getting address - $e');
     }
   }
 
@@ -86,7 +86,7 @@ class LocationProvider with ChangeNotifier {
   Future<LatLng?> searchLocation(String address) async {
     try {
       final result = await _mapsService.geocodeAddress(address);
-      
+
       if (result.success) {
         return LatLng(result.latitude!, result.longitude!);
       } else {
@@ -103,19 +103,21 @@ class LocationProvider with ChangeNotifier {
   Future<List<Map<String, dynamic>>> getPlaceAutocomplete(String input) async {
     try {
       final result = await _mapsService.getPlaceAutocomplete(input);
-      
+
       if (result.success) {
-        return result.predictions!.map((prediction) => {
-          'placeId': prediction.placeId,
-          'description': prediction.description,
-          'mainText': prediction.mainText,
-          'secondaryText': prediction.secondaryText,
-        }).toList();
+        return result.predictions!
+            .map((prediction) => {
+                  'placeId': prediction.placeId,
+                  'description': prediction.description,
+                  'mainText': prediction.mainText,
+                  'secondaryText': prediction.secondaryText,
+                })
+            .toList();
       } else {
         return [];
       }
     } catch (e) {
-      debugPrint('LocationProvider: Error getting autocomplete - $e');
+      AppLogger.debug('LocationProvider: Error getting autocomplete - $e');
       return [];
     }
   }
@@ -130,7 +132,7 @@ class LocationProvider with ChangeNotifier {
         origin: origin,
         destination: destination,
       );
-      
+
       if (result.success) {
         return {
           'polylinePoints': result.polylinePoints,
@@ -163,23 +165,25 @@ class LocationProvider with ChangeNotifier {
         radius: radius,
         type: type,
       );
-      
+
       if (result.success) {
-        return result.places!.map((place) => {
-          'placeId': place.placeId,
-          'name': place.name,
-          'vicinity': place.vicinity,
-          'latitude': place.latitude,
-          'longitude': place.longitude,
-          'rating': place.rating,
-          'types': place.types,
-          'isOpen': place.isOpen,
-        }).toList();
+        return result.places!
+            .map((place) => {
+                  'placeId': place.placeId,
+                  'name': place.name,
+                  'vicinity': place.vicinity,
+                  'latitude': place.latitude,
+                  'longitude': place.longitude,
+                  'rating': place.rating,
+                  'types': place.types,
+                  'isOpen': place.isOpen,
+                })
+            .toList();
       } else {
         return [];
       }
     } catch (e) {
-      debugPrint('LocationProvider: Error searching nearby places - $e');
+      AppLogger.debug('LocationProvider: Error searching nearby places - $e');
       return [];
     }
   }

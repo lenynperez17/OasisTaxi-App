@@ -1,140 +1,172 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/modern_theme.dart';
-import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/oasis_button.dart';
 import '../../widgets/common/oasis_app_bar.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/ride_provider.dart';
-import '../../models/trip_model.dart';
-import '../shared/rating_dialog.dart';
+import '../../widgets/cards/oasis_card.dart';
+import '../../utils/app_logger.dart';
 
 class TripHistoryScreen extends StatefulWidget {
   const TripHistoryScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _TripHistoryScreenState createState() => _TripHistoryScreenState();
+  TripHistoryScreenState createState() => TripHistoryScreenState();
 }
 
-class _TripHistoryScreenState extends State<TripHistoryScreen>
+class TripHistoryScreenState extends State<TripHistoryScreen>
     with TickerProviderStateMixin {
-  late AnimationController _listAnimationController;
-  late AnimationController _statsAnimationController;
-  
-  String _selectedFilter = 'all';
-  DateTimeRange? _dateRange;
-  List<TripModel> _trips = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  late TabController _tabController;
+  late AnimationController _animationController;
+
   bool _isLoading = true;
-  
+  List<Map<String, dynamic>> _allTrips = [];
+  List<Map<String, dynamic>> _completedTrips = [];
+  List<Map<String, dynamic>> _cancelledTrips = [];
+  List<Map<String, dynamic>> _activeTrips = [];
+
   // Estadísticas
-  Map<String, dynamic> get _stats {
-    final completedTrips = _filteredTrips.where((t) => t.status == 'completed').toList();
-    final totalSpent = completedTrips.fold<double>(0, (sum, trip) => sum + (trip.finalFare ?? trip.estimatedFare));
-    final totalDistance = completedTrips.fold<double>(0, (sum, trip) => sum + trip.estimatedDistance);
-    final avgRating = completedTrips.where((t) => t.passengerRating != null)
-        .fold<double>(0, (sum, trip) => sum + (trip.passengerRating ?? 0)) / 
-        completedTrips.where((t) => t.passengerRating != null).length;
-    
-    return {
-      'totalTrips': completedTrips.length,
-      'totalSpent': totalSpent,
-      'totalDistance': totalDistance,
-      'avgRating': avgRating.isNaN ? 0.0 : avgRating,
-    };
-  }
-  
-  List<TripModel> get _filteredTrips {
-    var filtered = _trips;
-    
-    if (_selectedFilter != 'all') {
-      filtered = filtered.where((trip) => trip.status == _selectedFilter).toList();
-    }
-    
-    if (_dateRange != null) {
-      filtered = filtered.where((trip) {
-        return trip.requestedAt.isAfter(_dateRange!.start) &&
-               trip.requestedAt.isBefore(_dateRange!.end.add(Duration(days: 1)));
-      }).toList();
-    }
-    
-    return filtered;
-  }
+  int _totalTrips = 0;
+  double _totalSpent = 0.0;
+  double _totalDistance = 0.0;
+  double _averageRating = 0.0;
+  int _favoriteDriverCount = 0;
+  String _mostVisitedPlace = '';
 
   @override
   void initState() {
     super.initState();
-    
-    _listAnimationController = AnimationController(
+    AppLogger.lifecycle('TripHistoryScreen', 'initState');
+    _tabController = TabController(length: 4, vsync: this);
+    _animationController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _statsAnimationController = AnimationController(
-      duration: Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    
-    _loadTripsHistory();
-  }
-
-  Future<void> _loadTripsHistory() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final rideProvider = Provider.of<RideProvider>(context, listen: false);
-    
-    if (authProvider.currentUser != null) {
-      try {
-        final trips = await rideProvider.getUserTripHistory(authProvider.currentUser!.id);
-        
-        if (!mounted) return;
-        setState(() {
-          _trips = trips;
-          _isLoading = false;
-        });
-        _listAnimationController.forward();
-        _statsAnimationController.forward();
-      } catch (e) {
-        setState(() {
-          _isLoading = false;
-        });
-        debugPrint('Error loading trip history: $e');
-      }
-    } else {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    _loadTripHistory();
   }
 
   @override
   void dispose() {
-    _listAnimationController.dispose();
-    _statsAnimationController.dispose();
+    _tabController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
-  
-  void _selectDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(Duration(days: 365)),
-      lastDate: DateTime.now(),
-      initialDateRange: _dateRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: ModernTheme.oasisGreen,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (picked != null) {
+
+  Future<void> _loadTripHistory() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Cargar viajes desde Firestore
+      final querySnapshot = await _firestore
+          .collection('trips')
+          .where('passengerId', isEqualTo: user.uid)
+          .orderBy('requestedAt', descending: true)
+          .limit(100)
+          .get();
+
+      _allTrips = [];
+      _completedTrips = [];
+      _cancelledTrips = [];
+      _activeTrips = [];
+
+      double totalFare = 0.0;
+      double totalDist = 0.0;
+      double totalRating = 0.0;
+      int ratedTrips = 0;
+      Map<String, int> destinations = {};
+      Set<String> drivers = {};
+
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+
+        // Asegurar que los campos necesarios existen
+        data['requestedAt'] = data['requestedAt'] ?? Timestamp.now();
+        data['status'] = data['status'] ?? 'unknown';
+
+        _allTrips.add(data);
+
+        // Clasificar por estado
+        switch (data['status']) {
+          case 'completed':
+            _completedTrips.add(data);
+            totalFare +=
+                (data['finalFare'] ?? data['estimatedFare'] ?? 0.0).toDouble();
+            totalDist += (data['estimatedDistance'] ?? 0.0).toDouble();
+
+            if (data['passengerRating'] != null) {
+              totalRating += data['passengerRating'].toDouble();
+              ratedTrips++;
+            }
+
+            // Contar destinos
+            final destination = data['dropoffAddress'] ?? '';
+            if (destination.isNotEmpty) {
+              destinations[destination] = (destinations[destination] ?? 0) + 1;
+            }
+
+            // Contar conductores únicos
+            if (data['driverId'] != null) {
+              drivers.add(data['driverId']);
+            }
+            break;
+
+          case 'cancelled':
+          case 'cancelled_by_passenger':
+          case 'cancelled_by_driver':
+            _cancelledTrips.add(data);
+            break;
+
+          case 'requested':
+          case 'accepted':
+          case 'on_the_way':
+          case 'arrived':
+          case 'in_progress':
+            _activeTrips.add(data);
+            break;
+        }
+      }
+
+      // Calcular estadísticas
+      _totalTrips = _allTrips.length;
+      _totalSpent = totalFare;
+      _totalDistance = totalDist;
+      _averageRating = ratedTrips > 0 ? totalRating / ratedTrips : 0.0;
+      _favoriteDriverCount = drivers.length;
+
+      // Encontrar el lugar más visitado
+      if (destinations.isNotEmpty) {
+        var sortedDestinations = destinations.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        _mostVisitedPlace = sortedDestinations.first.key;
+      }
+
       setState(() {
-        _dateRange = picked;
+        _isLoading = false;
       });
+
+      _animationController.forward();
+    } catch (e) {
+      AppLogger.error('Error cargando historial de viajes', e);
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar el historial'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -142,165 +174,163 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ModernTheme.backgroundLight,
-      appBar: OasisAppBar(
+      appBar: OasisAppBar.standard(
         title: 'Historial de Viajes',
         showBackButton: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.download, color: Colors.white),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Descargando historial...'),
-                  backgroundColor: ModernTheme.oasisGreen,
-                ),
-              );
-            },
-          ),
-        ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: [
+            Tab(text: 'Todos (${_allTrips.length})'),
+            Tab(text: 'Completados (${_completedTrips.length})'),
+            Tab(text: 'Activos (${_activeTrips.length})'),
+            Tab(text: 'Cancelados (${_cancelledTrips.length})'),
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          // Estadísticas
-          AnimatedBuilder(
-            animation: _statsAnimationController,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, -50 * (1 - _statsAnimationController.value)),
-                child: Opacity(
-                  opacity: _statsAnimationController.value,
-                  child: _buildStatistics(),
-                ),
-              );
-            },
-          ),
-          
-          // Filtros
-          _buildFilters(),
-          
-          // Lista de viajes
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: ModernTheme.oasisGreen))
-                : _filteredTrips.isEmpty
-                    ? _buildEmptyState()
-                    : AnimatedBuilder(
-                    animation: _listAnimationController,
-                    builder: (context, child) {
-                      return ListView.builder(
-                        padding: EdgeInsets.all(16),
-                        itemCount: _filteredTrips.length,
-                        itemBuilder: (context, index) {
-                          final trip = _filteredTrips[index];
-                          final delay = index * 0.1;
-                          final animation = Tween<double>(
-                            begin: 0,
-                            end: 1,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: _listAnimationController,
-                              curve: Interval(
-                                delay,
-                                delay + 0.5,
-                                curve: Curves.easeOutBack,
-                              ),
-                            ),
-                          );
-                          
-                          return AnimatedBuilder(
-                            animation: animation,
-                            builder: (context, child) {
-                              return Transform.translate(
-                                offset: Offset(50 * (1 - animation.value), 0),
-                                child: Opacity(
-                                  opacity: animation.value.clamp(0.0, 1.0),
-                                  child: _buildTripCard(trip),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: ModernTheme.oasisGreen,
+              ),
+            )
+          : Column(
+              children: [
+                _buildStatisticsCard(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTripsList(_allTrips),
+                      _buildTripsList(_completedTrips),
+                      _buildTripsList(_activeTrips),
+                      _buildTripsList(_cancelledTrips),
+                    ],
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildStatistics() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: ModernTheme.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: ModernTheme.oasisGreen.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Resumen del Mes',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+                ),
+              ],
             ),
-          ),
-          SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.route,
-                value: '${_stats['totalTrips']}',
-                label: 'Viajes',
-              ),
-              _buildStatItem(
-                icon: Icons.attach_money,
-                value: '\$${_stats['totalSpent'].toStringAsFixed(2)}',
-                label: 'Gastado',
-              ),
-              _buildStatItem(
-                icon: Icons.map,
-                value: '${_stats['totalDistance'].toStringAsFixed(1)} km',
-                label: 'Distancia',
-              ),
-              _buildStatItem(
-                icon: Icons.star,
-                value: _stats['avgRating'].toStringAsFixed(1),
-                label: 'Rating',
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
-  
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
+
+  Widget _buildStatisticsCard() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, -50 * (1 - _animationController.value)),
+          child: Opacity(
+            opacity: _animationController.value,
+            child: Container(
+              margin: AppSpacing.all(AppSpacing.md),
+              child: OasisCard(
+                gradient: ModernTheme.primaryGradient,
+                padding: AppSpacing.cardPaddingLargeAll,
+                  child: Column(
+                children: [
+                  Text(
+                    'Resumen de tu Actividad',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  AppSpacing.verticalSpaceLG,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(
+                        Icons.directions_car,
+                        _totalTrips.toString(),
+                        'Viajes',
+                      ),
+                      _buildStatItem(
+                        Icons.attach_money,
+                        'S/ ${_totalSpent.toStringAsFixed(2)}',
+                        'Gastado',
+                      ),
+                      _buildStatItem(
+                        Icons.star,
+                        _averageRating.toStringAsFixed(1),
+                        'Rating',
+                      ),
+                    ],
+                  ),
+                  AppSpacing.verticalSpaceMD,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(
+                        Icons.route,
+                        '${_totalDistance.toStringAsFixed(1)} km',
+                        'Distancia',
+                      ),
+                      _buildStatItem(
+                        Icons.person,
+                        _favoriteDriverCount.toString(),
+                        'Conductores',
+                      ),
+                    ],
+                  ),
+                  if (_mostVisitedPlace.isNotEmpty) ...[
+                    AppSpacing.verticalSpaceMD,
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.favorite, color: Colors.white, size: 20),
+                          AppSpacing.horizontalSpaceSM,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Destino Favorito',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  _mostVisitedPlace,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+                ),
+              ),
+            )),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-        SizedBox(height: 8),
+        Icon(icon, color: Colors.white, size: 24),
+        AppSpacing.verticalSpaceXS,
         Text(
           value,
           style: TextStyle(
@@ -312,316 +342,353 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: Colors.white70,
             fontSize: 12,
           ),
         ),
       ],
     );
   }
-  
-  Widget _buildFilters() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Chips de filtro
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildFilterChip('Todos', 'all'),
-                SizedBox(width: 8),
-                _buildFilterChip('Completados', 'completed'),
-                SizedBox(width: 8),
-                _buildFilterChip('Cancelados', 'cancelled'),
-                SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _selectDateRange,
-                  icon: Icon(Icons.calendar_today, size: 16),
-                  label: Text(
-                    _dateRange == null
-                        ? 'Fecha'
-                        : '${_dateRange!.start.day}/${_dateRange!.start.month} - ${_dateRange!.end.day}/${_dateRange!.end.month}',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: ModernTheme.oasisGreen,
-                    side: BorderSide(color: ModernTheme.oasisGreen),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-                if (_dateRange != null) ...[
-                  SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(Icons.clear, size: 20),
-                    onPressed: () => setState(() => _dateRange = null),
-                  ),
-                ],
-              ],
+
+  Widget _buildTripsList(List<Map<String, dynamic>> trips) {
+    if (trips.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.directions_car_outlined,
+              size: 80,
+              color: ModernTheme.textSecondary.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No hay viajes en esta categoría',
+              style: TextStyle(
+                fontSize: 18,
+                color: ModernTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            AppSpacing.verticalSpaceXS,
+            Text(
+              'Tus viajes aparecerán aquí',
+              style: TextStyle(
+                fontSize: 14,
+                color: ModernTheme.textSecondary.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: AppSpacing.all(AppSpacing.md),
+      itemCount: trips.length,
+      itemBuilder: (context, index) {
+        final trip = trips[index];
+        return _buildTripCard(trip, index);
+      },
+    );
+  }
+
+  Widget _buildTripCard(Map<String, dynamic> trip, int index) {
+    final timestamp = trip['requestedAt'] as Timestamp?;
+    final date = timestamp?.toDate() ?? DateTime.now();
+    final status = trip['status'] ?? 'unknown';
+    final fare = (trip['finalFare'] ?? trip['estimatedFare'] ?? 0.0).toDouble();
+
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final delay = index * 0.1;
+        final animation = Tween<double>(
+          begin: 0,
+          end: 1,
+        ).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Interval(
+              delay.clamp(0.0, 1.0),
+              (delay + 0.5).clamp(0.0, 1.0),
+              curve: Curves.easeOutBack,
             ),
           ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _selectedFilter == value;
-    
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedFilter = value;
-        });
-      },
-      selectedColor: ModernTheme.oasisGreen,
-      backgroundColor: Colors.white,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : ModernTheme.textPrimary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected ? ModernTheme.oasisGreen : Colors.grey.shade300,
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildTripCard(TripModel trip) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: ModernTheme.cardShadow,
-      ),
-      child: InkWell(
-        onTap: () => _showTripDetails(trip),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(trip.status).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _getStatusIcon(trip.status),
-                          color: _getStatusColor(trip.status),
-                          size: 20,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatDate(trip.requestedAt),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            _formatTime(trip.requestedAt),
-                            style: TextStyle(
-                              color: ModernTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Text(
-                    '\$${(trip.finalFare ?? trip.estimatedFare).toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: ModernTheme.oasisGreen,
-                    ),
-                  ),
-                ],
-              ),
-              
-              SizedBox(height: 16),
-              
-              // Ruta
-              Row(
-                children: [
-                  Column(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: ModernTheme.oasisGreen,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Container(
-                        width: 2,
-                        height: 30,
-                        color: Colors.grey.shade300,
-                      ),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: ModernTheme.error,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
+        );
+
+        return Transform.translate(
+          offset: Offset(50 * (1 - animation.value), 0),
+          child: Opacity(
+            opacity: animation.value,
+            child: Container(
+              margin: EdgeInsets.only(bottom: AppSpacing.md),
+              child: OasisCard.elevated(
+                child: InkWell(
+                  onTap: () => _showTripDetails(trip),
+                  borderRadius: AppSpacing.borderRadiusLG,
+                  child: Padding(
+                    padding: AppSpacing.all(AppSpacing.md),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          trip.pickupAddress,
-                          style: TextStyle(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: 20),
-                        Text(
-                          trip.destinationAddress,
-                          style: TextStyle(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              
-              SizedBox(height: 16),
-              
-              // Info adicional
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-                        child: Icon(
-                          Icons.person,
-                          size: 16,
-                          color: ModernTheme.oasisGreen,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Header con fecha y estado
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Conductor',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.star, size: 12, color: Colors.amber),
                               Text(
-                                ' ${(trip.driverRating ?? 5.0).toStringAsFixed(1)}',
+                                DateFormat('dd MMM yyyy').format(date),
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                DateFormat('HH:mm').format(date),
+                                style: TextStyle(
                                   color: ModernTheme.textSecondary,
+                                  fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  
-                  if (trip.status == 'completed' && trip.passengerRating != null)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.star, size: 14, color: Colors.amber),
-                          SizedBox(width: 4),
-                          Text(
-                            'Tu calificación: ${trip.passengerRating?.toStringAsFixed(1)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.amber.shade800,
-                              fontWeight: FontWeight.w600,
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(status)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getStatusColor(status),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _getStatusText(status),
+                              style: TextStyle(
+                                color: _getStatusColor(status),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
+
+                      AppSpacing.verticalSpaceMD,
+
+                      // Ruta
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.circle,
+                                  size: 10,
+                                  color: ModernTheme.oasisGreen,
+                                ),
+                                Container(
+                                  width: 2,
+                                  height: 30,
+                                  color: ModernTheme.textSecondary
+                                      .withValues(alpha: 0.3),
+                                ),
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: ModernTheme.error,
+                                ),
+                              ],
+                            ),
+                          ),
+                          AppSpacing.horizontalSpaceSM,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  trip['pickupAddress'] ?? 'Origen',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  trip['dropoffAddress'] ?? 'Destino',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      AppSpacing.verticalSpaceMD,
+
+                      // Footer con precio y calificación
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.attach_money,
+                                size: 20,
+                                color: ModernTheme.oasisGreen,
+                              ),
+                              Text(
+                                'S/ ${fare.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: ModernTheme.oasisGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (status == 'completed' &&
+                              trip['passengerRating'] != null)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  size: 18,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  trip['passengerRating'].toString(),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (status == 'completed' &&
+                              trip['passengerRating'] == null)
+                            TextButton.icon(
+                              onPressed: () => _rateTrip(trip),
+                              icon: Icon(Icons.star_border, size: 18),
+                              label: Text('Calificar'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: ModernTheme.oasisGreen,
+                              ),
+                            ),
+                        ],
+                      ),
+
+                      // Información del conductor si existe
+                      if (trip['driverName'] != null) ...[
+                        Divider(height: 24),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor:
+                                  ModernTheme.oasisGreen.withValues(alpha: 0.1),
+                              child: Icon(
+                                Icons.person,
+                                size: 18,
+                                color: ModernTheme.oasisGreen,
+                              ),
+                            ),
+                            AppSpacing.horizontalSpaceSM,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    trip['driverName'] ?? 'Conductor',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (trip['vehicleInfo'] != null)
+                                    Text(
+                                      '${trip['vehicleInfo']['brand'] ?? ''} ${trip['vehicleInfo']['model'] ?? ''} - ${trip['vehicleInfo']['plate'] ?? ''}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: ModernTheme.textSecondary,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                     ),
-                ],
+                  ),
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
+        );
+      },
     );
   }
-  
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.history,
-            size: 80,
-            color: ModernTheme.textSecondary.withValues(alpha: 0.3),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No hay viajes',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: ModernTheme.textSecondary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Ajusta los filtros para ver más resultados',
-            style: TextStyle(
-              color: ModernTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'completed':
+        return ModernTheme.success;
+      case 'cancelled':
+      case 'cancelled_by_passenger':
+      case 'cancelled_by_driver':
+        return ModernTheme.error;
+      case 'requested':
+      case 'accepted':
+      case 'on_the_way':
+      case 'arrived':
+      case 'in_progress':
+        return ModernTheme.warning;
+      default:
+        return ModernTheme.textSecondary;
+    }
   }
-  
-  void _showTripDetails(TripModel trip) {
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'completed':
+        return 'Completado';
+      case 'cancelled':
+        return 'Cancelado';
+      case 'cancelled_by_passenger':
+        return 'Cancelado por ti';
+      case 'cancelled_by_driver':
+        return 'Cancelado por conductor';
+      case 'requested':
+        return 'Solicitado';
+      case 'accepted':
+        return 'Aceptado';
+      case 'on_the_way':
+        return 'En camino';
+      case 'arrived':
+        return 'Conductor llegó';
+      case 'in_progress':
+        return 'En progreso';
+      default:
+        return 'Desconocido';
+    }
+  }
+
+  void _showTripDetails(Map<String, dynamic> trip) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -629,61 +696,34 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       builder: (context) => TripDetailsModal(trip: trip),
     );
   }
-  
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'completed':
-        return ModernTheme.success;
-      case 'cancelled':
-        return ModernTheme.error;
-      default:
-        return ModernTheme.textSecondary;
-    }
-  }
-  
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'completed':
-        return Icons.check_circle;
-      case 'cancelled':
-        return Icons.cancel;
-      default:
-        return Icons.info;
-    }
-  }
-  
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date).inDays;
-    
-    if (difference == 0) return 'Hoy';
-    if (difference == 1) return 'Ayer';
-    if (difference < 7) return 'Hace $difference días';
-    
-    return '${date.day}/${date.month}/${date.year}';
-  }
-  
-  String _formatTime(DateTime date) {
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+  void _rateTrip(Map<String, dynamic> trip) {
+    // Implementar diálogo de calificación
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Función de calificación en desarrollo'),
+        backgroundColor: ModernTheme.info,
+      ),
+    );
   }
 }
 
 // Modal de detalles del viaje
-class TripDetailsModal extends StatefulWidget {
-  final TripModel trip;
-  
-  const TripDetailsModal({super.key, required this.trip});
-  
-  @override
-  // ignore: library_private_types_in_public_api
-  _TripDetailsModalState createState() => _TripDetailsModalState();
-}
+class TripDetailsModal extends StatelessWidget {
+  final Map<String, dynamic> trip;
 
-class _TripDetailsModalState extends State<TripDetailsModal> {
+  const TripDetailsModal({super.key, required this.trip});
+
   @override
   Widget build(BuildContext context) {
+    final timestamp = trip['requestedAt'] as Timestamp?;
+    final date = timestamp?.toDate() ?? DateTime.now();
+    final fare = (trip['finalFare'] ?? trip['estimatedFare'] ?? 0.0).toDouble();
+    final distance = (trip['estimatedDistance'] ?? 0.0).toDouble();
+    final duration = trip['estimatedDuration'] ?? 0;
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -700,7 +740,7 @@ class _TripDetailsModalState extends State<TripDetailsModal> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: EdgeInsets.all(20),
@@ -721,152 +761,150 @@ class _TripDetailsModalState extends State<TripDetailsModal> {
               ],
             ),
           ),
-          
+
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ID y Estado
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'ID: ${widget.trip.id}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: ModernTheme.textSecondary,
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: widget.trip.status == 'completed' 
-                            ? ModernTheme.success.withValues(alpha: 0.1)
-                            : ModernTheme.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          widget.trip.status == 'completed' ? 'Completado' : 'Cancelado',
-                          style: TextStyle(
-                            color: widget.trip.status == 'completed' 
-                              ? ModernTheme.success
-                              : ModernTheme.error,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                  // Información del viaje
+                  _buildDetailSection(
+                    'Información del Viaje',
+                    [
+                      _buildDetailRow(Icons.calendar_today, 'Fecha',
+                          DateFormat('dd/MM/yyyy').format(date)),
+                      _buildDetailRow(Icons.access_time, 'Hora',
+                          DateFormat('HH:mm').format(date)),
+                      _buildDetailRow(
+                          Icons.tag, 'ID del viaje', trip['id'] ?? 'N/A'),
+                      _buildDetailRow(Icons.info, 'Estado',
+                          _getStatusText(trip['status'] ?? 'unknown')),
                     ],
                   ),
-                  
-                  SizedBox(height: 24),
-                  
-                  // Mapa simulado
-                  Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.map,
-                        size: 60,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                  ),
-                  
-                  SizedBox(height: 24),
-                  
-                  // Información del viaje
+
+                  AppSpacing.verticalSpaceLG,
+
+                  // Ruta
                   _buildDetailSection(
                     'Ruta del Viaje',
                     [
-                      _buildDetailRow(Icons.trip_origin, 'Origen', widget.trip.pickupAddress),
-                      _buildDetailRow(Icons.location_on, 'Destino', widget.trip.destinationAddress),
-                      _buildDetailRow(Icons.route, 'Distancia', '${widget.trip.estimatedDistance.toStringAsFixed(1)} km'),
-                      _buildDetailRow(Icons.timer, 'Duración', widget.trip.tripDuration?.inMinutes.toString() ?? 'N/A min'),
+                      _buildDetailRow(Icons.trip_origin, 'Origen',
+                          trip['pickupAddress'] ?? 'No especificado'),
+                      _buildDetailRow(Icons.location_on, 'Destino',
+                          trip['dropoffAddress'] ?? 'No especificado'),
+                      _buildDetailRow(Icons.route, 'Distancia',
+                          '${distance.toStringAsFixed(2)} km'),
+                      _buildDetailRow(Icons.timer, 'Duración estimada',
+                          '$duration minutos'),
                     ],
                   ),
-                  
-                  SizedBox(height: 20),
-                  
-                  // Información del conductor
-                  _buildDetailSection(
-                    'Conductor',
-                    [
-                      _buildDetailRow(Icons.person, 'ID Conductor', widget.trip.driverId ?? 'N/A'),
-                      _buildDetailRow(Icons.star, 'Calificación', '${widget.trip.driverRating ?? 'N/A'}'),
-                      _buildDetailRow(Icons.directions_car, 'Vehículo', widget.trip.vehicleInfo?.toString() ?? 'N/A'),
-                    ],
-                  ),
-                  
-                  SizedBox(height: 20),
-                  
+
+                  AppSpacing.verticalSpaceLG,
+
                   // Información de pago
                   _buildDetailSection(
-                    'Pago',
+                    'Información de Pago',
                     [
-                      _buildDetailRow(Icons.attach_money, 'Monto', '\$${(widget.trip.finalFare ?? widget.trip.estimatedFare).toStringAsFixed(2)}'),
-                      _buildDetailRow(Icons.payment, 'Método', 'Efectivo'), // Default payment method
+                      _buildDetailRow(Icons.attach_money, 'Tarifa',
+                          'S/ ${fare.toStringAsFixed(2)}'),
+                      _buildDetailRow(Icons.payment, 'Método de pago',
+                          trip['paymentMethod'] ?? 'Efectivo'),
+                      if (trip['discount'] != null && trip['discount'] > 0)
+                        _buildDetailRow(Icons.local_offer, 'Descuento',
+                            'S/ ${trip['discount'].toStringAsFixed(2)}'),
                     ],
                   ),
-                  
-                  if (widget.trip.status == 'completed' && widget.trip.passengerRating == null) ...[
-                    SizedBox(height: 24),
-                    AnimatedPulseButton(
-                      text: 'Calificar Viaje',
-                      icon: Icons.star,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Mostrar dialog de calificación
-                        RatingDialog.show(
-                          context: context,
-                          driverName: widget.trip.driverId ?? 'Conductor',
-                          driverPhoto: '', // Se obtiene del perfil del conductor desde Firebase
-                          tripId: widget.trip.id,
-                          onSubmit: (rating, comment, tags) async {
-                            // Actualizar la calificación del viaje en Firebase
-                            await _updateTripRating(widget.trip.id, rating.toDouble(), comment ?? '', tags);
-                          },
-                        );
-                      },
-                      color: ModernTheme.oasisGreen,
+
+                  // Información del conductor
+                  if (trip['driverName'] != null) ...[
+                    AppSpacing.verticalSpaceLG,
+                    _buildDetailSection(
+                      'Información del Conductor',
+                      [
+                        _buildDetailRow(Icons.person, 'Nombre',
+                            trip['driverName'] ?? 'No disponible'),
+                        if (trip['driverRating'] != null)
+                          _buildDetailRow(Icons.star, 'Calificación',
+                              '${trip['driverRating']} ⭐'),
+                        if (trip['vehicleInfo'] != null) ...[
+                          _buildDetailRow(Icons.directions_car, 'Vehículo',
+                              '${trip['vehicleInfo']['brand'] ?? ''} ${trip['vehicleInfo']['model'] ?? ''}'),
+                          _buildDetailRow(Icons.pin, 'Placa',
+                              trip['vehicleInfo']['plate'] ?? 'N/A'),
+                        ],
+                      ],
                     ),
                   ],
-                  
-                  SizedBox(height: 24),
-                  
+
+                  // Calificación del pasajero
+                  if (trip['passengerRating'] != null) ...[
+                    AppSpacing.verticalSpaceLG,
+                    _buildDetailSection(
+                      'Tu Calificación',
+                      [
+                        Row(
+                          children: [
+                            Icon(Icons.star, color: Colors.amber),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${trip['passengerRating']} estrellas',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (trip['passengerComment'] != null)
+                          Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text(
+                              trip['passengerComment'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: ModernTheme.textSecondary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+
+                  AppSpacing.verticalSpaceXL,
+
                   // Botones de acción
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: Icon(Icons.help_outline),
-                          label: Text('Reportar problema'),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        child: OasisButton.primary(
+                          text: 'Repetir viaje',
+                          icon: Icons.refresh,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Función en desarrollo'),
+                                backgroundColor: ModernTheme.info,
+                              ),
+                            );
+                          },
                         ),
                       ),
-                      SizedBox(width: 12),
+                      AppSpacing.horizontalSpaceSM,
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: Icon(Icons.receipt),
-                          label: Text('Ver recibo'),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        child: OasisButton.outlined(
+                          text: 'Ver recibo',
+                          icon: Icons.receipt,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Función en desarrollo'),
+                                backgroundColor: ModernTheme.info,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -879,39 +917,7 @@ class _TripDetailsModalState extends State<TripDetailsModal> {
       ),
     );
   }
-  
-  // Actualizar calificación del viaje en Firebase
-  Future<void> _updateTripRating(String tripId, double rating, String comment, List<String> tags) async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userId = authProvider.currentUser?.id;
-      
-      if (userId != null) {
-        // Actualizar calificación en Firebase
-        await Provider.of<RideProvider>(context, listen: false)
-            .updateTripRating(tripId, userId, rating, comment, tags);
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Calificación enviada correctamente'),
-              backgroundColor: ModernTheme.success,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al enviar calificación: $e'),
-            backgroundColor: ModernTheme.error,
-          ),
-        );
-      }
-    }
-  }
-  
+
   Widget _buildDetailSection(String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -924,13 +930,8 @@ class _TripDetailsModalState extends State<TripDetailsModal> {
             color: ModernTheme.textPrimary,
           ),
         ),
-        SizedBox(height: 12),
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: ModernTheme.backgroundLight,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        const SizedBox(height: 12),
+        OasisCard.elevated(
           child: Column(
             children: children,
           ),
@@ -938,25 +939,53 @@ class _TripDetailsModalState extends State<TripDetailsModal> {
       ],
     );
   }
-  
+
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, size: 20, color: ModernTheme.textSecondary),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(color: ModernTheme.textSecondary),
           ),
           Spacer(),
-          Text(
-            value,
-            style: TextStyle(fontWeight: FontWeight.w600),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.right,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'completed':
+        return 'Completado';
+      case 'cancelled':
+        return 'Cancelado';
+      case 'cancelled_by_passenger':
+        return 'Cancelado por ti';
+      case 'cancelled_by_driver':
+        return 'Cancelado por conductor';
+      case 'requested':
+        return 'Solicitado';
+      case 'accepted':
+        return 'Aceptado';
+      case 'on_the_way':
+        return 'En camino';
+      case 'arrived':
+        return 'Conductor llegó';
+      case 'in_progress':
+        return 'En progreso';
+      default:
+        return 'Desconocido';
+    }
   }
 }

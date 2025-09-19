@@ -1,0 +1,76 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "drivers": {
+      "$driverId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid == $driverId || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
+        "location": {
+          ".validate": "newData.hasChildren(['latitude', 'longitude', 'timestamp'])"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() == 'available' || newData.val() == 'busy' || newData.val() == 'offline')"
+        }
+      }
+    },
+    "trips": {
+      "$tripId": {
+        ".read": "auth != null && (data.child('passengerId').val() == auth.uid || data.child('driverId').val() == auth.uid)",
+        ".write": "auth != null && (data.child('passengerId').val() == auth.uid || data.child('driverId').val() == auth.uid || !data.exists())",
+        "status": {
+          ".validate": "newData.isString() && (newData.val() == 'pending' || newData.val() == 'accepted' || newData.val() == 'in_progress' || newData.val() == 'completed' || newData.val() == 'cancelled')"
+        }
+      }
+    },
+    "locations": {
+      "drivers": {
+        "$driverId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $driverId",
+          "l": {
+            "0": {
+              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+            },
+            "1": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+            }
+          },
+          "g": {
+            ".validate": "newData.isString()"
+          }
+        }
+      },
+      "trips": {
+        "$tripId": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "chat": {
+      "$chatId": {
+        ".read": "auth != null && (data.child('participants').child(auth.uid).exists())",
+        ".write": "auth != null && (data.child('participants').child(auth.uid).exists() || !data.exists())"
+      }
+    },
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+    "config": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "rates": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('isAdmin').val() == true"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,19 +8,19 @@ class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  _AnalyticsScreenState createState() => _AnalyticsScreenState();
+  AnalyticsScreenState createState() => AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen>
+class AnalyticsScreenState extends State<AnalyticsScreen>
     with TickerProviderStateMixin {
   late AnimationController _chartAnimationController;
   late AnimationController _statsAnimationController;
   late AnimationController _pieChartController;
-  
+
   String _selectedPeriod = 'month';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = true;
-  
+
   // Datos de análisis desde Firebase
   Map<String, dynamic> _analyticsData = {
     'totalTrips': 0,
@@ -38,69 +38,45 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     'conversionRate': 0.0,
     'retentionRate': 0.0,
   };
-  
-  List<Map<String, dynamic>> _tripsByHour = [
-    {'hour': '00:00', 'trips': 45},
-    {'hour': '01:00', 'trips': 32},
-    {'hour': '02:00', 'trips': 28},
-    {'hour': '03:00', 'trips': 25},
-    {'hour': '04:00', 'trips': 30},
-    {'hour': '05:00', 'trips': 48},
-    {'hour': '06:00', 'trips': 125},
-    {'hour': '07:00', 'trips': 289},
-    {'hour': '08:00', 'trips': 345},
-    {'hour': '09:00', 'trips': 278},
-    {'hour': '10:00', 'trips': 234},
-    {'hour': '11:00', 'trips': 256},
-    {'hour': '12:00', 'trips': 312},
-    {'hour': '13:00', 'trips': 298},
-    {'hour': '14:00', 'trips': 267},
-    {'hour': '15:00', 'trips': 289},
-    {'hour': '16:00', 'trips': 324},
-    {'hour': '17:00', 'trips': 389},
-    {'hour': '18:00', 'trips': 456},
-    {'hour': '19:00', 'trips': 423},
-    {'hour': '20:00', 'trips': 367},
-    {'hour': '21:00', 'trips': 289},
-    {'hour': '22:00', 'trips': 198},
-    {'hour': '23:00', 'trips': 123},
-  ];
-  
-  List<Map<String, dynamic>> _zoneStatistics = [];
-  
-  List<Map<String, dynamic>> _driverPerformance = [];
-  
+
+  List<Map<String, dynamic>> _tripsByHour = [];
+
+  final List<Map<String, dynamic>> _zoneStatistics = [];
+
+  final List<Map<String, dynamic>> _driverPerformance = [];
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('AnalyticsScreen', 'initState');
+
     _chartAnimationController = AnimationController(
       duration: Duration(milliseconds: 1500),
       vsync: this,
     )..forward();
-    
+
     _statsAnimationController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    
+
     _pieChartController = AnimationController(
       duration: Duration(milliseconds: 2000),
       vsync: this,
     )..forward();
-    
+
     // Cargar datos desde Firebase
     _loadAnalyticsData();
   }
-  
+
   Future<void> _loadAnalyticsData() async {
     try {
       setState(() => _isLoading = true);
-      
+
       // Obtener fecha actual y período
       final now = DateTime.now();
       DateTime startDate;
-      
+
       switch (_selectedPeriod) {
         case 'day':
           startDate = DateTime(now.year, now.month, now.day);
@@ -117,25 +93,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         default:
           startDate = DateTime(now.year, now.month - 1, now.day);
       }
-      
+
       // Obtener total de usuarios
       final usersSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'passenger')
           .get();
-      
+
       // Obtener total de conductores
       final driversSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'driver')
           .get();
-      
+
       // Obtener viajes del período
       final ridesSnapshot = await _firestore
           .collection('rides')
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .get();
-      
+
       // Calcular estadísticas
       double totalRevenue = 0;
       double totalDistance = 0;
@@ -146,10 +123,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       int ratedTrips = 0;
       Map<int, int> tripsByHourMap = {};
       Map<String, int> tripsByDayMap = {};
-      
+
       for (var doc in ridesSnapshot.docs) {
         final data = doc.data();
-        
+
         if (data['status'] == 'completed') {
           completedTrips++;
           if (data['fare'] != null) {
@@ -168,20 +145,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         } else if (data['status'] == 'canceled') {
           canceledTrips++;
         }
-        
+
         // Contar viajes por hora
         if (data['createdAt'] != null) {
           final tripDate = (data['createdAt'] as Timestamp).toDate();
           final hour = tripDate.hour;
           tripsByHourMap[hour] = (tripsByHourMap[hour] ?? 0) + 1;
-          
+
           // Contar viajes por día de la semana
-          final dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+          final dayNames = [
+            'Lunes',
+            'Martes',
+            'Miércoles',
+            'Jueves',
+            'Viernes',
+            'Sábado',
+            'Domingo'
+          ];
           final dayName = dayNames[tripDate.weekday - 1];
           tripsByDayMap[dayName] = (tripsByDayMap[dayName] ?? 0) + 1;
         }
       }
-      
+
       // Encontrar hora pico
       int maxTrips = 0;
       int peakHour = 0;
@@ -191,7 +176,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           peakHour = hour;
         }
       });
-      
+
       // Encontrar día más ocupado
       String busiestDay = 'N/A';
       int maxDayTrips = 0;
@@ -201,7 +186,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           busiestDay = day;
         }
       });
-      
+
       // Actualizar trips por hora para el gráfico
       List<Map<String, dynamic>> hourlyTrips = [];
       for (int i = 0; i < 24; i++) {
@@ -210,15 +195,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           'trips': tripsByHourMap[i] ?? 0,
         });
       }
-      
+
       // Calcular métricas
       final totalTrips = ridesSnapshot.docs.length;
-      final avgTripPrice = completedTrips > 0 ? totalRevenue / completedTrips : 0.0;
-      final avgTripDistance = completedTrips > 0 ? totalDistance / completedTrips : 0.0;
-      final avgTripDuration = completedTrips > 0 ? totalDuration / completedTrips : 0.0;
+      final avgTripPrice =
+          completedTrips > 0 ? totalRevenue / completedTrips : 0.0;
+      final avgTripDistance =
+          completedTrips > 0 ? totalDistance / completedTrips : 0.0;
+      final avgTripDuration =
+          completedTrips > 0 ? totalDuration / completedTrips : 0.0;
       final avgRating = ratedTrips > 0 ? totalRating / ratedTrips : 0.0;
-      final cancelRate = totalTrips > 0 ? (canceledTrips / totalTrips) * 100 : 0.0;
-      
+      final cancelRate =
+          totalTrips > 0 ? (canceledTrips / totalTrips) * 100 : 0.0;
+
       // Calcular tasa de crecimiento (comparando con período anterior)
       DateTime previousStartDate;
       switch (_selectedPeriod) {
@@ -229,24 +218,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           previousStartDate = startDate.subtract(Duration(days: 7));
           break;
         case 'month':
-          previousStartDate = DateTime(startDate.year, startDate.month - 1, startDate.day);
+          previousStartDate =
+              DateTime(startDate.year, startDate.month - 1, startDate.day);
           break;
         case 'year':
-          previousStartDate = DateTime(startDate.year - 1, startDate.month, startDate.day);
+          previousStartDate =
+              DateTime(startDate.year - 1, startDate.month, startDate.day);
           break;
         default:
-          previousStartDate = DateTime(startDate.year, startDate.month - 1, startDate.day);
+          previousStartDate =
+              DateTime(startDate.year, startDate.month - 1, startDate.day);
       }
-      
+
       final previousRidesSnapshot = await _firestore
           .collection('rides')
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(previousStartDate))
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(previousStartDate))
           .where('createdAt', isLessThan: Timestamp.fromDate(startDate))
           .get();
-      
+
       final previousTrips = previousRidesSnapshot.docs.length;
-      final growthRate = previousTrips > 0 ? ((totalTrips - previousTrips) / previousTrips) * 100 : 0.0;
-      
+      final growthRate = previousTrips > 0
+          ? ((totalTrips - previousTrips) / previousTrips) * 100
+          : 0.0;
+
       setState(() {
         _analyticsData = {
           'totalTrips': totalTrips,
@@ -256,7 +251,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           'avgTripDistance': avgTripDistance,
           'avgTripDuration': avgTripDuration,
           'avgTripPrice': avgTripPrice,
-          'peakHour': '${peakHour.toString().padLeft(2, '0')}:00-${(peakHour + 1).toString().padLeft(2, '0')}:00',
+          'peakHour':
+              '${peakHour.toString().padLeft(2, '0')}:00-${(peakHour + 1).toString().padLeft(2, '0')}:00',
           'busiestDay': busiestDay,
           'growthRate': growthRate,
           'satisfactionRate': avgRating,
@@ -264,15 +260,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           'conversionRate': 68.9, // Esto requeriría tracking adicional
           'retentionRate': 82.3, // Esto requeriría tracking adicional
         };
-        
+
         _tripsByHour = hourlyTrips;
         _isLoading = false;
       });
-      
     } catch (e) {
-      print('Error cargando datos de analytics: $e');
+      AppLogger.error('cargando datos de analytics', e);
       setState(() => _isLoading = false);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -283,7 +278,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       }
     }
   }
-  
+
   @override
   void dispose() {
     _chartAnimationController.dispose();
@@ -291,7 +286,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _pieChartController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -326,7 +321,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   CircularProgressIndicator(
                     color: ModernTheme.oasisGreen,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     'Cargando datos de analytics...',
                     style: TextStyle(
@@ -341,77 +336,78 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               onRefresh: () async => await _loadAnalyticsData(),
               color: ModernTheme.oasisGreen,
               child: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Period selector
-            _buildPeriodSelector(),
-            
-            SizedBox(height: 20),
-            
-            // KPI Cards
-            AnimatedBuilder(
-              animation: _statsAnimationController,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, 50 * (1 - _statsAnimationController.value)),
-                  child: Opacity(
-                    opacity: _statsAnimationController.value,
-                    child: _buildKPICards(),
-                  ),
-                );
-              },
-            ),
-            
-            SizedBox(height: 24),
-            
-            // Charts Row 1
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: _buildTripsByHourChart(),
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Period selector
+                    _buildPeriodSelector(),
+
+                    const SizedBox(height: 20),
+
+                    // KPI Cards
+                    AnimatedBuilder(
+                      animation: _statsAnimationController,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(
+                              0, 50 * (1 - _statsAnimationController.value)),
+                          child: Opacity(
+                            opacity: _statsAnimationController.value,
+                            child: _buildKPICards(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Charts Row 1
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _buildTripsByHourChart(),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildZoneDistributionPieChart(),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // User Growth Chart
+                    _buildUserGrowthChart(),
+
+                    const SizedBox(height: 24),
+
+                    // Zone Statistics
+                    _buildZoneStatistics(),
+
+                    const SizedBox(height: 24),
+
+                    // Driver Performance
+                    _buildDriverPerformance(),
+
+                    const SizedBox(height: 24),
+
+                    // Satisfaction Metrics
+                    _buildSatisfactionMetrics(),
+
+                    const SizedBox(height: 24),
+
+                    // Revenue Analysis
+                    _buildRevenueAnalysis(),
+                  ],
                 ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _buildZoneDistributionPieChart(),
-                ),
-              ],
-            ),
-            
-            SizedBox(height: 24),
-            
-            // User Growth Chart
-            _buildUserGrowthChart(),
-            
-            SizedBox(height: 24),
-            
-            // Zone Statistics
-            _buildZoneStatistics(),
-            
-            SizedBox(height: 24),
-            
-            // Driver Performance
-            _buildDriverPerformance(),
-            
-            SizedBox(height: 24),
-            
-            // Satisfaction Metrics
-            _buildSatisfactionMetrics(),
-            
-            SizedBox(height: 24),
-            
-            // Revenue Analysis
-            _buildRevenueAnalysis(),
-          ],
-        ),
-      ),
+              ),
             ),
     );
   }
-  
+
   Widget _buildPeriodSelector() {
     return SizedBox(
       height: 40,
@@ -427,10 +423,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildPeriodChip(String label, String value) {
     final isSelected = _selectedPeriod == value;
-    
+
     return Container(
       margin: EdgeInsets.only(right: 8),
       child: ChoiceChip(
@@ -452,7 +448,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildKPICards() {
     return GridView.count(
       crossAxisCount: 4,
@@ -529,8 +525,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ],
     );
   }
-  
-  Widget _buildKPICard(String title, String value, IconData icon, Color color, String change, bool isPositive) {
+
+  Widget _buildKPICard(String title, String value, IconData icon, Color color,
+      String change, bool isPositive) {
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -550,7 +547,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: (isPositive ? ModernTheme.success : ModernTheme.error).withValues(alpha: 0.2),
+                  color: (isPositive ? ModernTheme.success : ModernTheme.error)
+                      .withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -559,13 +557,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     Icon(
                       isPositive ? Icons.trending_up : Icons.trending_down,
                       size: 10,
-                      color: isPositive ? ModernTheme.success : ModernTheme.error,
+                      color:
+                          isPositive ? ModernTheme.success : ModernTheme.error,
                     ),
-                    SizedBox(width: 2),
+                    const SizedBox(width: 2),
                     Text(
                       change,
                       style: TextStyle(
-                        color: isPositive ? ModernTheme.success : ModernTheme.error,
+                        color: isPositive
+                            ? ModernTheme.success
+                            : ModernTheme.error,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -599,7 +600,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildTripsByHourChart() {
     return Container(
       height: 300,
@@ -631,7 +632,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Expanded(
             child: AnimatedBuilder(
               animation: _chartAnimationController,
@@ -646,22 +647,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               },
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('00:00', style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10)),
-              Text('06:00', style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10)),
-              Text('12:00', style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10)),
-              Text('18:00', style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10)),
-              Text('23:00', style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10)),
+              Text('00:00',
+                  style: TextStyle(
+                      color: ModernTheme.textSecondary, fontSize: 10)),
+              Text('06:00',
+                  style: TextStyle(
+                      color: ModernTheme.textSecondary, fontSize: 10)),
+              Text('12:00',
+                  style: TextStyle(
+                      color: ModernTheme.textSecondary, fontSize: 10)),
+              Text('18:00',
+                  style: TextStyle(
+                      color: ModernTheme.textSecondary, fontSize: 10)),
+              Text('23:00',
+                  style: TextStyle(
+                      color: ModernTheme.textSecondary, fontSize: 10)),
             ],
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildZoneDistributionPieChart() {
     return Container(
       height: 300,
@@ -681,7 +692,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Expanded(
             child: AnimatedBuilder(
               animation: _pieChartController,
@@ -690,7 +701,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   size: Size.infinite,
                   painter: PieChartPainter(
                     progress: _pieChartController.value,
-                    data: _zoneStatistics.map((e) => e['trips'] as int).toList(),
+                    data:
+                        _zoneStatistics.map((e) => e['trips'] as int).toList(),
                     colors: [
                       ModernTheme.primaryBlue,
                       ModernTheme.success,
@@ -703,7 +715,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               },
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           // Legend
           Wrap(
             spacing: 12,
@@ -727,7 +739,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       shape: BoxShape.circle,
                     ),
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
                     _zoneStatistics[index]['zone'],
                     style: TextStyle(color: Colors.white70, fontSize: 11),
@@ -740,13 +752,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildUserGrowthChart() {
     final growthData = [
-      1200, 1350, 1500, 1680, 1890, 2100, 2340,
-      2580, 2820, 3050, 3280, 3456,
+      1200,
+      1350,
+      1500,
+      1680,
+      1890,
+      2100,
+      2340,
+      2580,
+      2820,
+      3050,
+      3280,
+      3456,
     ];
-    
+
     return Container(
       height: 250,
       padding: EdgeInsets.all(20),
@@ -785,7 +807,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Expanded(
             child: AnimatedBuilder(
               animation: _chartAnimationController,
@@ -801,14 +823,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               },
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                       'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+            children: [
+              'Ene',
+              'Feb',
+              'Mar',
+              'Abr',
+              'May',
+              'Jun',
+              'Jul',
+              'Ago',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dic'
+            ]
                 .map((month) => Text(
                       month,
-                      style: TextStyle(color: ModernTheme.textSecondary, fontSize: 10),
+                      style: TextStyle(
+                          color: ModernTheme.textSecondary, fontSize: 10),
                     ))
                 .toList(),
           ),
@@ -816,7 +851,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildZoneStatistics() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -835,8 +870,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
+
           // Table header
           Container(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -847,19 +882,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             ),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text('Zona', style: TextStyle(color: Colors.white70, fontSize: 12))),
-                Expanded(child: Text('Viajes', style: TextStyle(color: Colors.white70, fontSize: 12))),
-                Expanded(child: Text('Ingresos', style: TextStyle(color: Colors.white70, fontSize: 12))),
-                Expanded(child: Text('Precio Prom.', style: TextStyle(color: Colors.white70, fontSize: 12))),
+                Expanded(
+                    flex: 2,
+                    child: Text('Zona',
+                        style: TextStyle(color: Colors.white70, fontSize: 12))),
+                Expanded(
+                    child: Text('Viajes',
+                        style: TextStyle(color: Colors.white70, fontSize: 12))),
+                Expanded(
+                    child: Text('Ingresos',
+                        style: TextStyle(color: Colors.white70, fontSize: 12))),
+                Expanded(
+                    child: Text('Precio Prom.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12))),
               ],
             ),
           ),
-          
+
           // Table rows
           ..._zoneStatistics.map((zone) {
-            final maxTrips = _zoneStatistics.map((e) => e['trips'] as int).reduce(math.max);
+            final maxTrips =
+                _zoneStatistics.map((e) => e['trips'] as int).reduce(math.max);
             final percentage = (zone['trips'] as int) / maxTrips;
-            
+
             return Container(
               padding: EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
@@ -887,7 +932,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             ),
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           zone['zone'],
                           style: TextStyle(color: Colors.white, fontSize: 14),
@@ -910,7 +955,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   Expanded(
                     child: Text(
                       'S/ ${zone['avgPrice']}',
-                      style: TextStyle(color: ModernTheme.success, fontSize: 14),
+                      style:
+                          TextStyle(color: ModernTheme.success, fontSize: 14),
                     ),
                   ),
                 ],
@@ -921,7 +967,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildDriverPerformance() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -952,13 +998,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
           ..._driverPerformance.asMap().entries.map((entry) {
             final index = entry.key;
             final driver = entry.value;
-            final medal = index == 0 ? '🥇' : index == 1 ? '🥈' : index == 2 ? '🥉' : '  ';
-            
+            final medal = index == 0
+                ? '🥇'
+                : index == 1
+                    ? '🥈'
+                    : index == 2
+                        ? '🥉'
+                        : '  ';
+
             return Container(
               margin: EdgeInsets.only(bottom: 12),
               padding: EdgeInsets.all(12),
@@ -966,24 +1017,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: index == 0 
-                    ? ModernTheme.accentYellow.withValues(alpha: 0.3)
-                    : Colors.transparent,
+                  color: index == 0
+                      ? ModernTheme.accentYellow.withValues(alpha: 0.3)
+                      : Colors.transparent,
                 ),
               ),
               child: Row(
                 children: [
                   Text(medal, style: TextStyle(fontSize: 20)),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: ModernTheme.oasisGreen.withValues(alpha: 0.2),
+                    backgroundColor:
+                        ModernTheme.oasisGreen.withValues(alpha: 0.2),
                     child: Text(
                       driver['name'].split(' ').map((e) => e[0]).join(),
-                      style: TextStyle(color: ModernTheme.oasisGreen, fontSize: 12),
+                      style: TextStyle(
+                          color: ModernTheme.oasisGreen, fontSize: 12),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -999,7 +1052,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         Text(
                           '${driver['trips']} viajes • ${driver['hours']} horas',
                           style: TextStyle(
-                            color: ModernTheme.textSecondary.withValues(alpha: 0.7),
+                            color: ModernTheme.textSecondary
+                                .withValues(alpha: 0.7),
                             fontSize: 12,
                           ),
                         ),
@@ -1019,7 +1073,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       ),
                       Row(
                         children: [
-                          Icon(Icons.star, size: 14, color: ModernTheme.accentYellow),
+                          Icon(Icons.star,
+                              size: 14, color: ModernTheme.accentYellow),
                           Text(
                             ' ${driver['rating']}',
                             style: TextStyle(
@@ -1039,7 +1094,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildSatisfactionMetrics() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -1058,8 +1113,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
+
           Row(
             children: [
               Expanded(
@@ -1071,7 +1126,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   'de 5.0',
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildSatisfactionCard(
                   'Tasa de Conversión',
@@ -1081,7 +1136,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   'solicitudes aceptadas',
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildSatisfactionCard(
                   'Tasa de Cancelación',
@@ -1091,7 +1146,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   'viajes cancelados',
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildSatisfactionCard(
                   'Retención',
@@ -1103,9 +1158,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          
-          SizedBox(height: 20),
-          
+
+          const SizedBox(height: 20),
+
           // Rating distribution
           Text(
             'Distribución de Calificaciones',
@@ -1114,23 +1169,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               fontSize: 14,
             ),
           ),
-          SizedBox(height: 12),
-          
+          const SizedBox(height: 12),
+
           ...[5, 4, 3, 2, 1].map((stars) {
-            final percentage = stars == 5 ? 65 : stars == 4 ? 25 : stars == 3 ? 7 : stars == 2 ? 2 : 1;
-            
+            final percentage = stars == 5
+                ? 65
+                : stars == 4
+                    ? 25
+                    : stars == 3
+                        ? 7
+                        : stars == 2
+                            ? 2
+                            : 1;
+
             return Container(
               margin: EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
                   Row(
-                    children: List.generate(5, (index) => Icon(
-                      Icons.star,
-                      size: 12,
-                      color: index < stars ? ModernTheme.accentYellow : Colors.grey.shade300,
-                    )),
+                    children: List.generate(
+                        5,
+                        (index) => Icon(
+                              Icons.star,
+                              size: 12,
+                              color: index < stars
+                                  ? ModernTheme.accentYellow
+                                  : Colors.grey.shade300,
+                            )),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Container(
                       height: 8,
@@ -1150,7 +1217,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       ),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Text(
                     '$percentage%',
                     style: TextStyle(
@@ -1166,8 +1233,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
-  Widget _buildSatisfactionCard(String title, String value, IconData icon, Color color, String subtitle) {
+
+  Widget _buildSatisfactionCard(
+      String title, String value, IconData icon, Color color, String subtitle) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1180,7 +1248,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
@@ -1207,7 +1275,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildRevenueAnalysis() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -1226,8 +1294,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
+
           // Revenue breakdown
           Row(
             children: [
@@ -1242,7 +1310,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ],
                 ),
               ),
-              SizedBox(width: 32),
+              const SizedBox(width: 32),
               SizedBox(
                 width: 150,
                 height: 150,
@@ -1261,9 +1329,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          
+
           Divider(color: Colors.grey.shade300, height: 32),
-          
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1289,7 +1357,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   Widget _buildRevenueRow(String label, double amount, double percentage) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -1322,27 +1390,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
     );
   }
-  
+
   void _refreshData() async {
     // Recargar datos desde Firebase
     await _loadAnalyticsData();
-    
+
     // Reiniciar animaciones
     setState(() {
       _chartAnimationController.forward(from: 0);
       _statsAnimationController.forward(from: 0);
       _pieChartController.forward(from: 0);
     });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Datos actualizados'),
-        backgroundColor: ModernTheme.success,
-      ),
-    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Datos actualizados'),
+          backgroundColor: ModernTheme.success,
+        ),
+      );
+    }
   }
-  
+
   void _exportReport() {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Exportando reporte de analytics...'),
@@ -1356,29 +1427,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 class HourlyChartPainter extends CustomPainter {
   final double progress;
   final List<int> data;
-  
-  const HourlyChartPainter({super.repaint, required this.progress, required this.data});
-  
+
+  const HourlyChartPainter(
+      {super.repaint, required this.progress, required this.data});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.fill
       ..color = ModernTheme.oasisGreen.withValues(alpha: 0.8);
-    
+
     final maxValue = data.reduce(math.max);
     final barWidth = size.width / data.length;
-    
+
     for (int i = 0; i < data.length; i++) {
       final barHeight = (data[i] / maxValue) * size.height * 0.9 * progress;
       final x = i * barWidth;
       final y = size.height - barHeight;
-      
+
       // Draw bar
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x + 2, y, barWidth - 4, barHeight),
         Radius.circular(2),
       );
-      
+
       // Gradient effect
       paint.shader = LinearGradient(
         colors: [
@@ -1388,11 +1460,11 @@ class HourlyChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(rect.outerRect);
-      
+
       canvas.drawRRect(rect, paint);
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
@@ -1401,28 +1473,28 @@ class PieChartPainter extends CustomPainter {
   final double progress;
   final List<int> data;
   final List<Color> colors;
-  
+
   PieChartPainter({
     required this.progress,
     required this.data,
     required this.colors,
   });
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 10;
     final total = data.reduce((a, b) => a + b);
-    
+
     double startAngle = -math.pi / 2;
-    
+
     for (int i = 0; i < data.length; i++) {
       final sweepAngle = (data[i] / total) * 2 * math.pi * progress;
-      
+
       final paint = Paint()
         ..style = PaintingStyle.fill
         ..color = colors[i];
-      
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         startAngle,
@@ -1430,11 +1502,11 @@ class PieChartPainter extends CustomPainter {
         true,
         paint,
       );
-      
+
       startAngle += sweepAngle;
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
@@ -1443,13 +1515,13 @@ class LineChartPainter extends CustomPainter {
   final double progress;
   final List<double> data;
   final Color color;
-  
+
   LineChartPainter({
     required this.progress,
     required this.data,
     required this.color,
   });
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -1457,7 +1529,7 @@ class LineChartPainter extends CustomPainter {
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round
       ..color = color;
-    
+
     final fillPaint = Paint()
       ..style = PaintingStyle.fill
       ..shader = LinearGradient(
@@ -1468,54 +1540,57 @@ class LineChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    
+
     final path = Path();
     final fillPath = Path();
-    
+
     final maxValue = data.reduce(math.max);
     final stepX = size.width / (data.length - 1);
-    
+
     for (int i = 0; i < data.length; i++) {
       final x = i * stepX;
-      final y = size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
-      
+      final y =
+          size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
+
       if (i == 0) {
         path.moveTo(x, y);
         fillPath.moveTo(x, y);
       } else {
         // Smooth curve
         final prevX = (i - 1) * stepX;
-        final prevY = size.height - (data[i - 1] / maxValue) * size.height * 0.8 * progress;
+        final prevY = size.height -
+            (data[i - 1] / maxValue) * size.height * 0.8 * progress;
         final cpX = (prevX + x) / 2;
-        
+
         path.quadraticBezierTo(cpX, prevY, cpX, y);
         path.quadraticBezierTo(cpX, y, x, y);
-        
+
         fillPath.quadraticBezierTo(cpX, prevY, cpX, y);
         fillPath.quadraticBezierTo(cpX, y, x, y);
       }
     }
-    
+
     // Complete fill path
     fillPath.lineTo(size.width, size.height);
     fillPath.lineTo(0, size.height);
     fillPath.close();
-    
+
     // Draw fill
     canvas.drawPath(fillPath, fillPaint);
-    
+
     // Draw line
     canvas.drawPath(path, paint);
-    
+
     // Draw points
     final pointPaint = Paint()
       ..style = PaintingStyle.fill
       ..color = color;
-    
+
     for (int i = 0; i < data.length; i++) {
       final x = i * stepX;
-      final y = size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
-      
+      final y =
+          size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
+
       canvas.drawCircle(Offset(x, y), 3, pointPaint);
       canvas.drawCircle(
         Offset(x, y),
@@ -1527,7 +1602,7 @@ class LineChartPainter extends CustomPainter {
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
@@ -1536,30 +1611,30 @@ class DonutChartPainter extends CustomPainter {
   final double progress;
   final List<double> data;
   final List<Color> colors;
-  
+
   DonutChartPainter({
     required this.progress,
     required this.data,
     required this.colors,
   });
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2;
     final total = data.reduce((a, b) => a + b);
-    
+
     double startAngle = -math.pi / 2;
-    
+
     for (int i = 0; i < data.length; i++) {
       final sweepAngle = (data[i] / total) * 2 * math.pi * progress;
-      
+
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 30
         ..strokeCap = StrokeCap.round
         ..color = colors[i];
-      
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius - 15),
         startAngle,
@@ -1567,11 +1642,11 @@ class DonutChartPainter extends CustomPainter {
         false,
         paint,
       );
-      
+
       startAngle += sweepAngle;
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

@@ -1,31 +1,41 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../core/theme/modern_theme.dart';
+import '../../utils/app_logger.dart';
+import '../../services/google_maps_service.dart';
+import '../../services/tracking_service.dart';
+import '../../services/geofencing_service.dart';
+import '../../core/config/environment_config.dart';
 
 class NavigationScreen extends StatefulWidget {
   final Map<String, dynamic>? tripData;
-  
+
   NavigationScreen({super.key, this.tripData});
-  
+
   @override
-  _NavigationScreenState createState() => _NavigationScreenState();
+  NavigationScreenState createState() => NavigationScreenState();
 }
 
-class _NavigationScreenState extends State<NavigationScreen> 
+class NavigationScreenState extends State<NavigationScreen>
     with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
-  
+
+  // Service instances
+  final GoogleMapsService _mapsService = GoogleMapsService();
+  final TrackingService _trackingService = TrackingService();
+  final GeofencingService _geofencingService = GeofencingService();
+
   // Animation controllers
   late AnimationController _pulseController;
   late AnimationController _slideController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _slideAnimation;
-  
+
   // Navigation state
   bool _isNavigating = false;
   final bool _showInstructions = true;
@@ -35,30 +45,37 @@ class _NavigationScreenState extends State<NavigationScreen>
   int _estimatedTime = 0;
   double _totalDistance = 0;
   int _totalTime = 0;
-  
+
   // Current location simulation
   LatLng _currentLocation = LatLng(-12.0851, -76.9770);
   final LatLng _destination = LatLng(-12.0951, -76.9870);
   Timer? _locationTimer;
-  
+  Timer? _trafficTimer;
+
   // Route instructions
   List<RouteInstruction> _instructions = [];
   int _currentInstructionIndex = 0;
-  
+
+  // Tracking session
+  String? _activeRideId;
+  StreamSubscription<TrackingUpdate>? _trackingSubscription;
+  bool _useRealTracking = false; // Toggle for real vs simulated
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('NavigationScreen', 'initState');
+
     _pulseController = AnimationController(
       duration: Duration(seconds: 2),
       vsync: this,
     )..repeat();
-    
+
     _slideController = AnimationController(
       duration: Duration(milliseconds: 500),
       vsync: this,
     );
-    
+
     _pulseAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -66,27 +83,113 @@ class _NavigationScreenState extends State<NavigationScreen>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     _slideAnimation = CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeInOut,
     );
-    
+
     _slideController.forward();
     _initializeRoute();
   }
-  
+
   @override
   void dispose() {
     _pulseController.dispose();
     _slideController.dispose();
     _locationTimer?.cancel();
+    _trafficTimer?.cancel();
+    _trackingSubscription?.cancel();
+    _stopTracking();
     _mapController?.dispose();
     super.dispose();
   }
-  
-  void _initializeRoute() {
-    // Simulate route instructions
+
+  void _initializeRoute() async {
+    try {
+      AppLogger.info('Inicializando ruta con Google Maps API');
+
+      // Initialize Google Maps service
+      await _mapsService.initialize(googleMapsApiKey: EnvironmentConfig.googleMapsApiKey);
+
+      // Get real directions from Google Maps
+      final directionsResult = await _mapsService.getDirections(
+        origin: _currentLocation,
+        destination: _destination,
+        travelMode: TravelMode.driving,
+        avoidTolls: false,
+        avoidHighways: false,
+      );
+
+      if (directionsResult.success) {
+        setState(() {
+          // Convert real directions to route instructions
+          _instructions = directionsResult.steps?.map((step) => RouteInstruction(
+            instruction: step.instruction,
+            distance: step.distanceValue.toDouble(),
+            duration: step.durationValue,
+            turnIcon: _getIconForInstruction(step.instruction),
+            position: step.startLocation,
+          )).toList() ?? [];
+
+          _totalDistance = directionsResult.distanceValue?.toDouble() ?? 0.0;
+          _totalTime = directionsResult.durationValue ?? 0;
+
+          // Update polyline with real route
+          _polylines.clear();
+          if (directionsResult.polylinePoints != null) {
+            _polylines.add(
+              Polyline(
+                polylineId: PolylineId('route'),
+                points: directionsResult.polylinePoints!,
+                color: ModernTheme.primaryBlue,
+                width: 5,
+                patterns: [],
+              ),
+            );
+          }
+
+          // Add markers for origin and destination if missing
+          if (!_markers.any((m) => m.markerId.value == 'origin')) {
+            _markers.add(
+              Marker(
+                markerId: MarkerId('origin'),
+                position: _currentLocation,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                infoWindow: InfoWindow(title: 'Inicio'),
+              ),
+            );
+          }
+
+          if (!_markers.any((m) => m.markerId.value == 'destination')) {
+            _markers.add(
+              Marker(
+                markerId: MarkerId('destination'),
+                position: _destination,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                infoWindow: InfoWindow(title: 'Destino'),
+              ),
+            );
+          }
+        });
+
+        AppLogger.info('Ruta real cargada: ${(_totalDistance/1000).toStringAsFixed(1)} km, ${(_totalTime/60).round()} min');
+
+        _updateCurrentInstruction();
+      } else {
+        AppLogger.error('Error obteniendo direcciones: ${directionsResult.error}');
+        _initializeFallbackRoute();
+      }
+    } catch (e) {
+      AppLogger.error('Error inicializando ruta real', e);
+      _initializeFallbackRoute();
+    }
+  }
+
+  /// Fallback route with mock data if Google Maps fails
+  void _initializeFallbackRoute() {
+    AppLogger.warning('Usando ruta de respaldo con datos simulados');
+
     _instructions = [
       RouteInstruction(
         instruction: 'Dirígete hacia el norte por Av. Principal',
@@ -131,91 +234,363 @@ class _NavigationScreenState extends State<NavigationScreen>
         position: LatLng(-12.0941, -76.9860),
       ),
     ];
-    
+
     _totalDistance = _instructions.fold(0, (sum, inst) => sum + inst.distance);
     _totalTime = _instructions.fold(0, (sum, inst) => sum + inst.duration);
-    
+
     _updateCurrentInstruction();
-    _drawRoute();
+    _drawRoute(useFallback: true);
   }
-  
+
+  /// Get appropriate icon for navigation instruction
+  IconData _getIconForInstruction(String instruction) {
+    final lowerInstruction = instruction.toLowerCase();
+
+    if (lowerInstruction.contains('derecha') || lowerInstruction.contains('right')) {
+      return Icons.turn_right;
+    } else if (lowerInstruction.contains('izquierda') || lowerInstruction.contains('left')) {
+      return Icons.turn_left;
+    } else if (lowerInstruction.contains('recto') || lowerInstruction.contains('straight')) {
+      return Icons.straight;
+    } else if (lowerInstruction.contains('rotonda') || lowerInstruction.contains('roundabout')) {
+      return Icons.rotate_right;
+    } else if (lowerInstruction.contains('destino') || lowerInstruction.contains('destination')) {
+      return Icons.location_on;
+    } else {
+      return Icons.arrow_upward;
+    }
+  }
+
   void _updateCurrentInstruction() {
     if (_currentInstructionIndex < _instructions.length) {
       final current = _instructions[_currentInstructionIndex];
       _currentInstruction = current.instruction;
       _distanceToNext = current.distance.toDouble();
       _estimatedTime = current.duration;
-      
+
       if (_currentInstructionIndex + 1 < _instructions.length) {
-        _nextInstruction = _instructions[_currentInstructionIndex + 1].instruction;
+        _nextInstruction =
+            _instructions[_currentInstructionIndex + 1].instruction;
       } else {
         _nextInstruction = 'Llegando al destino';
       }
     }
   }
-  
-  void _drawRoute() {
-    // Create route polyline
-    List<LatLng> routePoints = _instructions.map((inst) => inst.position).toList();
-    routePoints.add(_destination);
-    
-    _polylines.add(
-      Polyline(
-        polylineId: PolylineId('route'),
-        points: routePoints,
-        color: ModernTheme.primaryBlue,
-        width: 5,
-        patterns: [],
-      ),
-    );
-    
-    // Add markers
-    _markers.add(
-      Marker(
-        markerId: MarkerId('origin'),
-        position: _currentLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(title: 'Inicio'),
-      ),
-    );
-    
-    _markers.add(
-      Marker(
-        markerId: MarkerId('destination'),
-        position: _destination,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: InfoWindow(title: 'Destino'),
-      ),
-    );
-    
+
+  void _drawRoute({bool useFallback = false}) {
+    if (useFallback) {
+      // Create fallback route polyline
+      List<LatLng> routePoints =
+          _instructions.map((inst) => inst.position).toList();
+      routePoints.add(_destination);
+
+      _polylines.add(
+        Polyline(
+          polylineId: PolylineId('route_fallback'),
+          points: routePoints,
+          color: ModernTheme.primaryBlue,
+          width: 5,
+          patterns: [],
+        ),
+      );
+    }
+
+    // Add markers only if they don't exist
+    if (!_markers.any((m) => m.markerId.value == 'origin')) {
+      _markers.add(
+        Marker(
+          markerId: MarkerId('origin'),
+          position: _currentLocation,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: InfoWindow(title: 'Inicio'),
+        ),
+      );
+    }
+
+    if (!_markers.any((m) => m.markerId.value == 'destination')) {
+      _markers.add(
+        Marker(
+          markerId: MarkerId('destination'),
+          position: _destination,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(title: 'Destino'),
+        ),
+      );
+    }
+
     setState(() {});
   }
-  
-  void _startNavigation() {
+
+  void _startNavigation() async {
     setState(() {
       _isNavigating = true;
     });
-    
-    // Simulate location updates
+
+    // Check if we should use real tracking
+    if (widget.tripData != null && widget.tripData!['rideId'] != null) {
+      _activeRideId = widget.tripData!['rideId'];
+      _useRealTracking = true;
+      await _startRealTracking();
+    } else {
+      // Fallback to simulation if no ride ID
+      _startSimulatedTracking();
+    }
+
+    // Start traffic monitoring
+    _startTrafficMonitoring();
+  }
+
+  /// Start real tracking using TrackingService
+  Future<void> _startRealTracking() async {
+    if (_activeRideId == null) return;
+
+    try {
+      // Initialize tracking service if needed
+      if (!_trackingService.isInitialized) {
+        await _trackingService.initialize(isProduction: EnvironmentConfig.isProduction);
+      }
+
+      // Start tracking session
+      final result = await _trackingService.startTracking(
+        rideId: _activeRideId!,
+        driverId: widget.tripData?['driverId'] ?? 'driver_id',
+        passengerId: widget.tripData?['passengerId'] ?? 'passenger_id',
+        origin: _currentLocation,
+        destination: _destination,
+      );
+
+      if (result.success) {
+        // Subscribe to tracking updates
+        _trackingSubscription = _trackingService.getTrackingUpdates(_activeRideId!).listen(
+          _handleTrackingUpdate,
+          onError: (error) => AppLogger.error('Error en tracking stream', error),
+        );
+
+        AppLogger.info('Tracking real iniciado para viaje $_activeRideId');
+      } else {
+        AppLogger.error('No se pudo iniciar tracking: ${result.error}');
+        // Fallback to simulation
+        _startSimulatedTracking();
+      }
+    } catch (e) {
+      AppLogger.error('Error iniciando tracking real', e);
+      _startSimulatedTracking();
+    }
+  }
+
+  /// Handle real tracking updates
+  void _handleTrackingUpdate(TrackingUpdate update) {
+    if (!mounted) return;
+
+    setState(() {
+      // Update current location from tracking
+      if (update.currentLocation != null) {
+        _currentLocation = update.currentLocation!;
+
+        // Update driver marker
+        _markers.removeWhere((m) => m.markerId.value == 'driver');
+        _markers.add(
+          Marker(
+            markerId: MarkerId('driver'),
+            position: _currentLocation,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            infoWindow: InfoWindow(title: 'Tu ubicación'),
+          ),
+        );
+
+        // Update camera position
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(_currentLocation),
+        );
+      }
+
+      // Update ETA if available
+      if (update.estimatedArrival != null) {
+        final now = DateTime.now();
+        final difference = update.estimatedArrival!.difference(now);
+        _estimatedTime = difference.inSeconds;
+      }
+
+      // Update current instruction based on location
+      _updateCurrentInstruction();
+    });
+  }
+
+  /// Start simulated tracking (fallback)
+  void _startSimulatedTracking() {
+    _useRealTracking = false;
     _locationTimer = Timer.periodic(Duration(seconds: 2), (timer) {
       _simulateMovement();
     });
+    AppLogger.info('Usando tracking simulado');
   }
-  
+
+  /// Stop tracking session
+  Future<void> _stopTracking() async {
+    if (_activeRideId != null && _useRealTracking) {
+      await _trackingService.stopTracking(_activeRideId!);
+      _trackingSubscription?.cancel();
+      AppLogger.info('Tracking detenido para viaje $_activeRideId');
+    }
+  }
+
+  /// Start real-time traffic monitoring
+  void _startTrafficMonitoring() {
+    if (!EnvironmentConfig.realTimeTraffic) return;
+
+    _trafficTimer = Timer.periodic(Duration(minutes: 2), (timer) async {
+      try {
+        final trafficInfo = await _mapsService.getTrafficInfo(
+          origin: _currentLocation,
+          destination: _destination,
+        );
+
+        if (trafficInfo.delayMinutes > 5) {
+          _showTrafficAlert(trafficInfo);
+        }
+      } catch (e) {
+        AppLogger.error('Error obteniendo información de tráfico', e);
+      }
+    });
+  }
+
+  /// Show traffic alert to user
+  void _showTrafficAlert(TrafficInfo trafficInfo) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.traffic, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Tráfico detectado: +${trafficInfo.delayMinutes} min de retraso',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _getTrafficColor(trafficInfo.trafficLevel),
+        duration: Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Ruta alternativa',
+          textColor: Colors.white,
+          onPressed: () => _suggestAlternativeRoute(),
+        ),
+      ),
+    );
+  }
+
+  /// Get color based on traffic level
+  Color _getTrafficColor(TrafficLevel level) {
+    switch (level) {
+      case TrafficLevel.light:
+        return Colors.green;
+      case TrafficLevel.moderate:
+        return Colors.orange;
+      case TrafficLevel.heavy:
+        return Colors.red;
+      case TrafficLevel.severe:
+        return Colors.red.shade900;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// Suggest alternative route
+  void _suggestAlternativeRoute() async {
+    try {
+      final alternatives = await _mapsService.getAlternativeRoutes(
+        origin: _currentLocation,
+        destination: _destination,
+        maxAlternatives: 3,
+      );
+
+      if (alternatives.isNotEmpty) {
+        _showAlternativeRoutesDialog(alternatives);
+      }
+    } catch (e) {
+      AppLogger.error('Error obteniendo rutas alternativas', e);
+    }
+  }
+
+  /// Show alternative routes dialog
+  void _showAlternativeRoutesDialog(List<DirectionsResult> alternatives) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Rutas Alternativas'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: alternatives.asMap().entries.map((entry) {
+            final index = entry.key;
+            final route = entry.value;
+            return ListTile(
+              leading: CircleAvatar(
+                child: Text('${index + 1}'),
+                backgroundColor: ModernTheme.oasisGreen,
+              ),
+              title: Text('${route.distance} - ${route.duration}'),
+              subtitle: Text('Ruta ${index + 1}'),
+              onTap: () {
+                Navigator.pop(context);
+                _switchToAlternativeRoute(route);
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Switch to selected alternative route
+  void _switchToAlternativeRoute(DirectionsResult route) {
+    setState(() {
+      _polylines.clear();
+      if (route.polylinePoints != null) {
+        _polylines.add(
+          Polyline(
+            polylineId: PolylineId('alternative_route'),
+            points: route.polylinePoints!,
+            color: Colors.blue,
+            width: 5,
+          ),
+        );
+      }
+
+      _totalDistance = route.distanceValue?.toDouble() ?? 0.0;
+      _totalTime = route.durationValue ?? 0;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ruta alternativa seleccionada'),
+        backgroundColor: ModernTheme.oasisGreen,
+      ),
+    );
+  }
+
   void _simulateMovement() {
     if (_currentInstructionIndex < _instructions.length - 1) {
       setState(() {
         _distanceToNext -= 50; // Reduce 50 meters
         _estimatedTime = math.max(0, _estimatedTime - 2);
-        
+
         if (_distanceToNext <= 50) {
           _currentInstructionIndex++;
           _updateCurrentInstruction();
-          
+
           // Voice instruction simulation
           _showVoiceNotification();
         }
-        
+
         // Update current location marker
         _currentLocation = _instructions[_currentInstructionIndex].position;
         _updateLocationMarker();
@@ -224,7 +599,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       _arriveAtDestination();
     }
   }
-  
+
   void _updateLocationMarker() {
     _markers.removeWhere((marker) => marker.markerId.value == 'current');
     _markers.add(
@@ -236,14 +611,14 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _showVoiceNotification() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(Icons.volume_up, color: Colors.white),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(child: Text(_currentInstruction)),
           ],
         ),
@@ -252,17 +627,17 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _arriveAtDestination() {
     _locationTimer?.cancel();
     setState(() {
       _isNavigating = false;
       _currentInstruction = '¡Has llegado a tu destino!';
     });
-    
+
     _showArrivalDialog();
   }
-  
+
   void _showArrivalDialog() {
     showDialog(
       context: context,
@@ -274,7 +649,7 @@ class _NavigationScreenState extends State<NavigationScreen>
         title: Row(
           children: [
             Icon(Icons.check_circle, color: ModernTheme.success, size: 32),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('¡Llegaste!'),
           ],
         ),
@@ -283,19 +658,19 @@ class _NavigationScreenState extends State<NavigationScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Has llegado a tu destino exitosamente.'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Icon(Icons.route, size: 20, color: ModernTheme.textSecondary),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text('${(_totalDistance / 1000).toStringAsFixed(1)} km'),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(Icons.timer, size: 20, color: ModernTheme.textSecondary),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text('${(_totalTime / 60).round()} min'),
               ],
             ),
@@ -313,7 +688,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -339,9 +714,10 @@ class _NavigationScreenState extends State<NavigationScreen>
             mapToolbarEnabled: false,
             compassEnabled: true,
             buildingsEnabled: true,
-            trafficEnabled: true,
+            trafficEnabled: EnvironmentConfig.realTimeTraffic,
+            mapType: MapType.normal,
           ),
-          
+
           // Top navigation bar
           SafeArea(
             child: AnimatedBuilder(
@@ -354,7 +730,7 @@ class _NavigationScreenState extends State<NavigationScreen>
               },
             ),
           ),
-          
+
           // Bottom instruction panel
           if (_showInstructions)
             Positioned(
@@ -371,7 +747,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                 },
               ),
             ),
-          
+
           // Floating action buttons
           Positioned(
             right: 16,
@@ -382,12 +758,12 @@ class _NavigationScreenState extends State<NavigationScreen>
                   Icons.my_location,
                   () => _recenterMap(),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildFloatingButton(
                   Icons.layers,
                   () => _toggleMapType(),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildFloatingButton(
                   Icons.volume_up,
                   () => _toggleVoice(),
@@ -395,7 +771,7 @@ class _NavigationScreenState extends State<NavigationScreen>
               ],
             ),
           ),
-          
+
           // Back button
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
@@ -416,7 +792,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   Widget _buildNavigationBar() {
     return Container(
       margin: EdgeInsets.all(16),
@@ -435,7 +811,7 @@ class _NavigationScreenState extends State<NavigationScreen>
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -446,7 +822,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                   size: 28,
                 ),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,7 +835,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         Text(
@@ -469,7 +845,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                             fontSize: 16,
                           ),
                         ),
-                        SizedBox(width: 16),
+                        const SizedBox(width: 16),
                         Text(
                           '$_estimatedTime seg',
                           style: TextStyle(
@@ -484,13 +860,13 @@ class _NavigationScreenState extends State<NavigationScreen>
               ),
             ],
           ),
-          
+
           // Progress bar
           Container(
             margin: EdgeInsets.only(top: 12),
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Colors.white.withOpacity(0.3),
               borderRadius: BorderRadius.circular(2),
             ),
             child: AnimatedBuilder(
@@ -508,7 +884,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   Widget _buildInstructionPanel() {
     return Container(
       decoration: BoxDecoration(
@@ -529,8 +905,8 @@ class _NavigationScreenState extends State<NavigationScreen>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
+
           // Trip info
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -562,8 +938,8 @@ class _NavigationScreenState extends State<NavigationScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
+
           // Next instruction preview
           if (_nextInstruction.isNotEmpty)
             Container(
@@ -574,9 +950,9 @@ class _NavigationScreenState extends State<NavigationScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.subdirectory_arrow_right, 
-                    color: ModernTheme.textSecondary),
-                  SizedBox(width: 12),
+                  Icon(Icons.subdirectory_arrow_right,
+                      color: ModernTheme.textSecondary),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,8 +977,8 @@ class _NavigationScreenState extends State<NavigationScreen>
                 ],
               ),
             ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
+
           // Action buttons
           Row(
             children: [
@@ -621,7 +997,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _cancelNavigation,
                 icon: Icon(Icons.close),
@@ -641,12 +1017,12 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   Widget _buildInfoItem(IconData icon, String value, String label) {
     return Column(
       children: [
         Icon(icon, color: ModernTheme.oasisGreen, size: 24),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -665,7 +1041,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ],
     );
   }
-  
+
   Widget _buildFloatingButton(IconData icon, VoidCallback onPressed) {
     return Container(
       decoration: BoxDecoration(
@@ -679,7 +1055,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _recenterMap() {
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
@@ -692,7 +1068,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _toggleMapType() {
     // Toggle between normal and satellite view
     ScaffoldMessenger.of(context).showSnackBar(
@@ -702,7 +1078,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _toggleVoice() {
     // Toggle voice instructions
     ScaffoldMessenger.of(context).showSnackBar(
@@ -712,7 +1088,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
+
   void _cancelNavigation() {
     showDialog(
       context: context,
@@ -738,19 +1114,15 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
     );
   }
-  
-  void _applyMapStyle() {
-    // Apply custom map style
-    const String mapStyle = '''
-    [
-      {
-        "featureType": "poi",
-        "elementType": "labels",
-        "stylers": [{"visibility": "off"}]
-      }
-    ]
-    ''';
-    _mapController?.setMapStyle(mapStyle);
+
+  void _applyMapStyle() async {
+    try {
+      final String style = await rootBundle.loadString('assets/map_style.json');
+      await _mapController?.setMapStyle(style);
+      AppLogger.info('Estilo de mapa personalizado aplicado exitosamente');
+    } catch (e) {
+      AppLogger.error('Error aplicando estilo de mapa', e, StackTrace.current);
+    }
   }
 }
 
@@ -760,7 +1132,7 @@ class RouteInstruction {
   final int duration;
   final IconData turnIcon;
   final LatLng position;
-  
+
   RouteInstruction({
     required this.instruction,
     required this.distance,

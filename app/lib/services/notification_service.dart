@@ -1,8 +1,8 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter
+import '../utils/app_logger.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -15,15 +15,17 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  
+
   bool _initialized = false;
-  
+
   // Stream controller para manejar notificaciones seleccionadas
-  final StreamController<String> _notificationSelectedController = StreamController<String>.broadcast();
-  
+  final StreamController<String> _notificationSelectedController =
+      StreamController<String>.broadcast();
+
   /// Stream para escuchar notificaciones seleccionadas
-  Stream<String>? get onNotificationSelected => _notificationSelectedController.stream;
-  
+  Stream<String>? get onNotificationSelected =>
+      _notificationSelectedController.stream;
+
   /// Canal de notificaciones para Android
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'oasis_taxi_channel',
@@ -40,8 +42,9 @@ class NotificationService {
     if (_initialized) return;
 
     // Configuración Android
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
     // Configuración iOS
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -61,8 +64,8 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
-    // Crear canal de notificaciones Android (solo si no es web)
-    if (!kIsWeb && Platform.isAndroid) {
+    // Crear canal de notificaciones Android (solo móvil)
+    if (Platform.isAndroid) {
       await _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
@@ -73,7 +76,7 @@ class NotificationService {
     await _setupFirebaseMessaging();
 
     _initialized = true;
-    debugPrint('✅ Servicio de notificaciones inicializado');
+    AppLogger.debug('✅ Servicio de notificaciones inicializado');
   }
 
   /// Configurar Firebase Messaging
@@ -85,7 +88,7 @@ class NotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
     // Obtener mensaje inicial si la app se abrió desde una notificación
-    RemoteMessage? initialMessage = 
+    RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
       _handleMessageOpenedApp(initialMessage);
@@ -97,8 +100,9 @@ class NotificationService {
 
   /// Handler para mensajes en primer plano
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    debugPrint('📱 Mensaje recibido en primer plano: ${message.messageId}');
-    
+    AppLogger.debug(
+        '📱 Mensaje recibido en primer plano: ${message.messageId}');
+
     // Mostrar notificación local
     await showNotification(
       title: message.notification?.title ?? 'Nueva notificación',
@@ -109,11 +113,34 @@ class NotificationService {
 
   /// Handler para cuando se abre la app desde notificación
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('📱 App abierta desde notificación: ${message.messageId}');
+    AppLogger.debug('📱 App abierta desde notificación: ${message.messageId}');
     _handleNotificationClick(message.data);
   }
 
   /// Mostrar notificación local
+  /// Enviar notificación push vía FCM
+  Future<void> sendNotification({
+    required String token,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    AppLogger.info(
+        'Enviando notificación push a token: ${token.substring(0, 10)}...');
+    // En una implementación real, aquí usaríamos el Admin SDK de Firebase
+    // Por ahora, mostrar notificación local
+    await showNotification(title: title, body: body);
+  }
+
+  /// Enviar notificación de viaje aceptado
+  Future<void> sendTripAcceptedNotification(String tripId) async {
+    AppLogger.info('Enviando notificación de viaje aceptado: $tripId');
+    await showNotification(
+      title: '🚗 Viaje Aceptado',
+      body: 'Un conductor ha aceptado tu viaje',
+    );
+  }
+
   Future<void> showNotification({
     required String title,
     required String body,
@@ -217,13 +244,13 @@ class NotificationService {
 
   /// Handler para respuesta a notificación
   static void _onNotificationResponse(NotificationResponse response) {
-    debugPrint('📱 Notificación clickeada: ${response.payload}');
+    AppLogger.debug('📱 Notificación clickeada: ${response.payload}');
     if (response.payload != null) {
       try {
         final data = json.decode(response.payload!);
         _instance._handleNotificationClick(data);
       } catch (e) {
-        debugPrint('Error procesando payload: $e');
+        AppLogger.debug('Error procesando payload: $e');
       }
     }
   }
@@ -231,31 +258,31 @@ class NotificationService {
   /// Manejar click en notificación y emitir evento
   void _handleNotificationClick(Map<String, dynamic> data) {
     final type = data['type'] ?? '';
-    
+
     // Emitir evento para que el NotificationHandler lo procese
     String payload = '';
-    
+
     switch (type) {
       case 'ride':
         final rideId = data['data']['rideId'] ?? '';
         payload = 'ride:$rideId';
-        debugPrint('Navegar a viaje: $rideId');
+        AppLogger.debug('Navegar a viaje: $rideId');
         break;
       case 'chat':
         payload = 'chat:${data['chatId']}';
-        debugPrint('Navegar a chat: ${data['chatId']}');
+        AppLogger.debug('Navegar a chat: ${data['chatId']}');
         break;
       case 'promo':
         payload = 'promo:${data['code']}';
-        debugPrint('Aplicar promo: ${data['code']}');
+        AppLogger.debug('Aplicar promo: ${data['code']}');
         break;
       case 'emergency':
         payload = 'emergency';
-        debugPrint('Manejar emergencia');
+        AppLogger.debug('Manejar emergencia');
         break;
       case 'price_negotiation':
         payload = 'price_negotiation';
-        debugPrint('Nueva negociación de precio');
+        AppLogger.debug('Nueva negociación de precio');
         break;
       case 'driver_found':
         payload = 'driver_found';
@@ -274,23 +301,13 @@ class NotificationService {
         break;
       default:
         payload = type;
-        debugPrint('Tipo de notificación desconocido: $type');
+        AppLogger.debug('Tipo de notificación desconocido: $type');
     }
-    
+
     // Emitir el payload al stream
     if (payload.isNotEmpty) {
       _notificationSelectedController.add(payload);
     }
-  }
-
-  /// Handler para notificaciones iOS en primer plano (legacy)
-  static void _onDidReceiveLocalNotification(
-    int id,
-    String? title,
-    String? body,
-    String? payload,
-  ) {
-    debugPrint('iOS notificación recibida: $title');
   }
 
   /// Obtener detalles de notificación pendiente
@@ -302,10 +319,10 @@ class NotificationService {
   Future<void> updateBadge(int count) async {
     if (Platform.isIOS) {
       // Implementar actualización de badge para iOS
-      debugPrint('Badge actualizado a: $count');
+      AppLogger.debug('Badge actualizado a: $count');
     }
   }
-  
+
   /// Limpiar recursos
   void dispose() {
     _notificationSelectedController.close();
@@ -315,6 +332,10 @@ class NotificationService {
 /// Handler para mensajes en segundo plano (debe ser top-level)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📱 Mensaje en segundo plano: ${message.messageId}');
+  // Verificar si Firebase está inicializado antes de inicializar
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp();
+  }
+  AppLogger.debug('📱 Mensaje en segundo plano: ${message.messageId}');
   // Procesar mensaje en segundo plano si es necesario
 }

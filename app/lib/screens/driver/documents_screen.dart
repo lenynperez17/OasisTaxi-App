@@ -1,182 +1,73 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../core/theme/modern_theme.dart';
+import '../../models/document_model.dart';
+import '../../providers/document_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/app_logger.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
 
   @override
-  _DocumentsScreenState createState() => _DocumentsScreenState();
+  DocumentsScreenState createState() => DocumentsScreenState();
 }
 
-class _DocumentsScreenState extends State<DocumentsScreen>
+class DocumentsScreenState extends State<DocumentsScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
-  
-  // Documents data
-  List<DocumentInfo> _documents = [];
-  bool _isLoading = true;
-  String _overallStatus = 'pending';
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('DocumentsScreen', 'initState');
+
     _fadeController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-    
+
     _slideAnimation = CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeOut,
     );
-    
+
     _loadDocuments();
   }
-  
+
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
   }
-  
+
   void _loadDocuments() async {
-    // Simulate loading documents
-    await Future.delayed(Duration(seconds: 1));
-    
-    setState(() {
-      _documents = [
-        DocumentInfo(
-          id: 'license',
-          name: 'Licencia de Conducir',
-          description: 'Licencia de conducir profesional vigente',
-          status: DocumentStatus.approved,
-          expiryDate: DateTime.now().add(Duration(days: 730)),
-          uploadDate: DateTime.now().subtract(Duration(days: 45)),
-          fileUrl: '/mock/license.jpg',
-          isRequired: true,
-          category: DocumentCategory.license,
-          rejectionReason: null,
-        ),
-        DocumentInfo(
-          id: 'id_card',
-          name: 'Documento de Identidad',
-          description: 'DNI o Pasaporte vigente',
-          status: DocumentStatus.approved,
-          expiryDate: DateTime.now().add(Duration(days: 1095)),
-          uploadDate: DateTime.now().subtract(Duration(days: 30)),
-          fileUrl: '/mock/dni.jpg',
-          isRequired: true,
-          category: DocumentCategory.identity,
-          rejectionReason: null,
-        ),
-        DocumentInfo(
-          id: 'vehicle_registration',
-          name: 'Tarjeta de Propiedad',
-          description: 'Registro vehicular vigente',
-          status: DocumentStatus.pending,
-          expiryDate: DateTime.now().add(Duration(days: 365)),
-          uploadDate: DateTime.now().subtract(Duration(days: 2)),
-          fileUrl: '/mock/tarjeta_propiedad.jpg',
-          isRequired: true,
-          category: DocumentCategory.vehicle,
-          rejectionReason: null,
-        ),
-        DocumentInfo(
-          id: 'insurance',
-          name: 'SOAT',
-          description: 'Seguro Obligatorio de Accidentes de Tránsito',
-          status: DocumentStatus.expiring,
-          expiryDate: DateTime.now().add(Duration(days: 25)),
-          uploadDate: DateTime.now().subtract(Duration(days: 340)),
-          fileUrl: '/mock/soat.jpg',
-          isRequired: true,
-          category: DocumentCategory.insurance,
-          rejectionReason: null,
-        ),
-        DocumentInfo(
-          id: 'technical_review',
-          name: 'Revisión Técnica',
-          description: 'Certificado de revisión técnica vehicular',
-          status: DocumentStatus.rejected,
-          expiryDate: DateTime.now().subtract(Duration(days: 10)),
-          uploadDate: DateTime.now().subtract(Duration(days: 5)),
-          fileUrl: '/mock/revision_tecnica.jpg',
-          isRequired: true,
-          category: DocumentCategory.vehicle,
-          rejectionReason: 'El documento se encuentra vencido. Por favor, renueve su revisión técnica.',
-        ),
-        DocumentInfo(
-          id: 'background_check',
-          name: 'Antecedentes Policiales',
-          description: 'Certificado de antecedentes policiales',
-          status: DocumentStatus.approved,
-          expiryDate: DateTime.now().add(Duration(days: 270)),
-          uploadDate: DateTime.now().subtract(Duration(days: 60)),
-          fileUrl: '/mock/antecedentes.jpg',
-          isRequired: true,
-          category: DocumentCategory.background,
-          rejectionReason: null,
-        ),
-        DocumentInfo(
-          id: 'bank_account',
-          name: 'Certificación Bancaria',
-          description: 'Certificado de cuenta bancaria para depósitos',
-          status: DocumentStatus.missing,
-          expiryDate: null,
-          uploadDate: null,
-          fileUrl: null,
-          isRequired: false,
-          category: DocumentCategory.financial,
-          rejectionReason: null,
-        ),
-      ];
-      
-      _overallStatus = _calculateOverallStatus();
-      _isLoading = false;
-    });
-    
-    _fadeController.forward();
-    _slideController.forward();
+    final authProvider = context.read<AuthProvider>();
+    final documentProvider = context.read<DocumentProvider>();
+
+    if (authProvider.user?.uid != null) {
+      await documentProvider.loadDriverDocuments(authProvider.user!.uid);
+      _fadeController.forward();
+      _slideController.forward();
+    }
   }
-  
-  String _calculateOverallStatus() {
-    final required = _documents.where((d) => d.isRequired);
-    
-    if (required.any((d) => d.status == DocumentStatus.rejected)) {
-      return 'rejected';
-    }
-    
-    if (required.any((d) => d.status == DocumentStatus.missing)) {
-      return 'incomplete';
-    }
-    
-    if (required.any((d) => d.status == DocumentStatus.pending)) {
-      return 'pending';
-    }
-    
-    if (required.any((d) => d.status == DocumentStatus.expiring)) {
-      return 'expiring';
-    }
-    
-    return 'approved';
-  }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,10 +93,22 @@ class _DocumentsScreenState extends State<DocumentsScreen>
           ),
         ],
       ),
-      body: _isLoading ? _buildLoadingState() : _buildDocumentsList(),
+      body: Consumer<DocumentProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return _buildLoadingState();
+          }
+
+          if (provider.error != null) {
+            return _buildErrorState(provider.error!);
+          }
+
+          return _buildDocumentsList(provider);
+        },
+      ),
     );
   }
-  
+
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -214,19 +117,77 @@ class _DocumentsScreenState extends State<DocumentsScreen>
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Cargando documentos...',
             style: TextStyle(
               color: ModernTheme.textSecondary,
             ),
           ),
+          if (context.read<DocumentProvider>().uploadProgress > 0) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(
+                value: context.read<DocumentProvider>().uploadProgress,
+                backgroundColor: Colors.grey.shade300,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Subiendo: ${(context.read<DocumentProvider>().uploadProgress * 100).toInt()}%',
+              style: TextStyle(
+                color: ModernTheme.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-  
-  Widget _buildDocumentsList() {
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error, size: 64, color: ModernTheme.error),
+          const SizedBox(height: 16),
+          Text(
+            'Error al cargar documentos',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ModernTheme.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _refreshDocuments,
+            icon: Icon(Icons.refresh),
+            label: Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ModernTheme.oasisGreen,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentsList(DocumentProvider provider) {
     return AnimatedBuilder(
       animation: _fadeAnimation,
       builder: (context, child) {
@@ -236,15 +197,15 @@ class _DocumentsScreenState extends State<DocumentsScreen>
             child: Column(
               children: [
                 // Status overview
-                _buildStatusOverview(),
-                
+                _buildStatusOverview(provider),
+
                 // Documents list
-                _buildDocumentsSection(),
-                
+                _buildDocumentsSection(provider),
+
                 // Actions
-                _buildActionsSection(),
-                
-                SizedBox(height: 24),
+                _buildActionsSection(provider),
+
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -252,8 +213,10 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       },
     );
   }
-  
-  Widget _buildStatusOverview() {
+
+  Widget _buildStatusOverview(DocumentProvider provider) {
+    final overallStatus = _calculateOverallStatus(provider);
+
     return AnimatedBuilder(
       animation: _slideAnimation,
       builder: (context, child) {
@@ -263,11 +226,11 @@ class _DocumentsScreenState extends State<DocumentsScreen>
             margin: EdgeInsets.all(16),
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: _getStatusGradient(),
+              gradient: _getStatusGradient(overallStatus),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: _getStatusColor().withValues(alpha: 0.3),
+                  color: _getStatusColor(overallStatus).withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: Offset(0, 10),
                 ),
@@ -284,18 +247,18 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        _getStatusIcon(),
+                        _getStatusIcon(overallStatus),
                         color: Colors.white,
                         size: 28,
                       ),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _getStatusTitle(),
+                            _getStatusTitle(overallStatus),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -303,7 +266,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                             ),
                           ),
                           Text(
-                            _getStatusDescription(),
+                            _getStatusDescription(overallStatus),
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
@@ -314,31 +277,58 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildStatItem(
                       'Total',
-                      '${_documents.length}',
+                      '${provider.documents.length}',
                       Icons.description,
                     ),
                     _buildStatItem(
                       'Aprobados',
-                      '${_documents.where((d) => d.status == DocumentStatus.approved).length}',
+                      '${provider.getDocumentsByStatus(DocumentStatus.approved).length}',
                       Icons.check_circle,
                     ),
                     _buildStatItem(
                       'Pendientes',
-                      '${_documents.where((d) => d.status == DocumentStatus.pending).length}',
+                      '${provider.getDocumentsByStatus(DocumentStatus.pending).length + provider.getDocumentsByStatus(DocumentStatus.underReview).length}',
                       Icons.schedule,
                     ),
                     _buildStatItem(
-                      'Por vencer',
-                      '${_documents.where((d) => d.status == DocumentStatus.expiring).length}',
-                      Icons.warning,
+                      'Rechazados',
+                      '${provider.getDocumentsByStatus(DocumentStatus.rejected).length}',
+                      Icons.error,
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                // Barra de progreso
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: provider.verificationProgress,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Progreso: ${(provider.verificationProgress * 100).toInt()}%',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -347,12 +337,12 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       },
     );
   }
-  
+
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
         Icon(icon, color: Colors.white70, size: 16),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -371,8 +361,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ],
     );
   }
-  
-  Widget _buildDocumentsSection() {
+
+  Widget _buildDocumentsSection(DocumentProvider provider) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -389,11 +379,11 @@ class _DocumentsScreenState extends State<DocumentsScreen>
               ),
             ),
           ),
-          ..._documents.asMap().entries.map((entry) {
+          ...provider.documents.asMap().entries.map((entry) {
             final index = entry.key;
             final document = entry.value;
             final delay = index * 0.1;
-            
+
             final animation = Tween<double>(
               begin: 0,
               end: 1,
@@ -407,7 +397,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                 ),
               ),
             );
-            
+
             return AnimatedBuilder(
               animation: animation,
               builder: (context, child) {
@@ -425,8 +415,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
-  Widget _buildDocumentCard(DocumentInfo document) {
+
+  Widget _buildDocumentCard(DocumentModel document) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -434,7 +424,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: ModernTheme.cardShadow,
         border: Border.all(
-          color: _getDocumentStatusColor(document.status).withValues(alpha: 0.3),
+          color:
+              _getDocumentStatusColor(document.status).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -451,16 +442,17 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   Container(
                     padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: _getDocumentStatusColor(document.status).withValues(alpha: 0.1),
+                      color: _getDocumentStatusColor(document.status)
+                          .withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _getDocumentIcon(document.category),
+                      _getDocumentIcon(document.type),
                       color: _getDocumentStatusColor(document.status),
                       size: 20,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,7 +461,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                           children: [
                             Expanded(
                               child: Text(
-                                document.name,
+                                document.type.displayName,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -477,14 +469,15 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                                 ),
                               ),
                             ),
-                            if (document.isRequired)
+                            if (document.type.isRequired)
                               Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: ModernTheme.error.withValues(alpha: 0.1),
+                                  color:
+                                      ModernTheme.error.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -498,9 +491,9 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                               ),
                           ],
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          document.description,
+                          document.type.description,
                           style: TextStyle(
                             fontSize: 12,
                             color: ModernTheme.textSecondary,
@@ -512,11 +505,12 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getDocumentStatusColor(document.status).withValues(alpha: 0.1),
+                      color: _getDocumentStatusColor(document.status)
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _getDocumentStatusText(document.status),
+                      document.status.displayName,
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -526,16 +520,16 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   ),
                 ],
               ),
-              
-              if (document.status != DocumentStatus.missing) ...[
-                SizedBox(height: 12),
+              if (document.url != null) ...[
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    if (document.uploadDate != null) ...[
-                      Icon(Icons.upload, size: 14, color: ModernTheme.textSecondary),
-                      SizedBox(width: 4),
+                    if (document.uploadedAt != null) ...[
+                      Icon(Icons.upload,
+                          size: 14, color: ModernTheme.textSecondary),
+                      const SizedBox(width: 4),
                       Text(
-                        'Subido: ${_formatDate(document.uploadDate!)}',
+                        'Subido: ${_formatDate(document.uploadedAt!)}',
                         style: TextStyle(
                           fontSize: 12,
                           color: ModernTheme.textSecondary,
@@ -543,20 +537,20 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                       ),
                     ],
                     if (document.expiryDate != null) ...[
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Icon(
                         Icons.schedule,
                         size: 14,
-                        color: document.status == DocumentStatus.expiring
+                        color: document.isExpiringSoon || document.isExpired
                             ? ModernTheme.warning
                             : ModernTheme.textSecondary,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
                         'Vence: ${_formatDate(document.expiryDate!)}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: document.status == DocumentStatus.expiring
+                          color: document.isExpiringSoon || document.isExpired
                               ? ModernTheme.warning
                               : ModernTheme.textSecondary,
                         ),
@@ -565,9 +559,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   ],
                 ),
               ],
-              
               if (document.rejectionReason != null) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -580,8 +573,9 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.error_outline, color: ModernTheme.error, size: 16),
-                      SizedBox(width: 8),
+                      Icon(Icons.error_outline,
+                          color: ModernTheme.error, size: 16),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           document.rejectionReason!,
@@ -595,37 +589,36 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   ),
                 ),
               ],
-              
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (document.status == DocumentStatus.missing ||
-                      document.status == DocumentStatus.rejected ||
-                      document.status == DocumentStatus.expiring)
+                  if (document.needsDriverAction)
                     ElevatedButton.icon(
-                      onPressed: () => _uploadDocument(document),
+                      onPressed: () => _uploadDocument(document.type),
                       icon: Icon(Icons.cloud_upload, size: 16),
                       label: Text(
-                        document.status == DocumentStatus.missing ? 'Subir' : 'Actualizar',
+                        document.url == null ? 'Subir' : 'Actualizar',
                         style: TextStyle(fontSize: 12),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ModernTheme.oasisGreen,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
-                  if (document.fileUrl != null) ...[
-                    SizedBox(width: 8),
+                  if (document.url != null) ...[
+                    const SizedBox(width: 8),
                     OutlinedButton.icon(
                       onPressed: () => _viewDocument(document),
                       icon: Icon(Icons.visibility, size: 16),
                       label: Text('Ver', style: TextStyle(fontSize: 12)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ModernTheme.primaryBlue,
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],
@@ -637,35 +630,62 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
-  Widget _buildActionsSection() {
+
+  Widget _buildActionsSection(DocumentProvider provider) {
     return Container(
       margin: EdgeInsets.all(16),
       child: Column(
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _uploadAllDocuments,
-              icon: Icon(Icons.upload_file),
-              label: Text('Subir Documentos Faltantes'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ModernTheme.oasisGreen,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          if (!provider.allRequiredDocumentsApproved) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: provider.getDocumentsNeedingAction().isNotEmpty
+                    ? _uploadMissingDocuments
+                    : null,
+                icon: Icon(Icons.upload_file),
+                label: Text('Subir Documentos Faltantes'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ModernTheme.oasisGreen,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
-          SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
+          if (provider.documents
+                      .where((d) => d.url != null && d.type.isRequired)
+                      .length ==
+                  provider.requiredDocumentTypes.length &&
+              !provider.allRequiredDocumentsApproved) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _requestVerification,
+                icon: Icon(Icons.verified_user),
+                label: Text('Solicitar Verificación'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ModernTheme.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _downloadTemplate,
-              icon: Icon(Icons.download),
-              label: Text('Descargar Lista de Documentos'),
+              onPressed: _showDocumentInfo,
+              icon: Icon(Icons.help_outline),
+              label: Text('Ayuda y Requisitos'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: ModernTheme.primaryBlue,
                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -679,9 +699,38 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
-  Color _getStatusColor() {
-    switch (_overallStatus) {
+
+  String _calculateOverallStatus(DocumentProvider provider) {
+    final documents = provider.documents;
+    final requiredDocuments = documents.where((d) => d.type.isRequired);
+
+    if (requiredDocuments.any((d) => d.status == DocumentStatus.rejected)) {
+      return 'rejected';
+    }
+
+    if (requiredDocuments.any((d) => d.url == null)) {
+      return 'incomplete';
+    }
+
+    if (requiredDocuments.any((d) =>
+        d.status == DocumentStatus.pending ||
+        d.status == DocumentStatus.underReview)) {
+      return 'pending';
+    }
+
+    if (requiredDocuments.any((d) => d.isExpiringSoon)) {
+      return 'expiring';
+    }
+
+    if (provider.allRequiredDocumentsApproved) {
+      return 'approved';
+    }
+
+    return 'pending';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
       case 'approved':
         return ModernTheme.success;
       case 'pending':
@@ -695,18 +744,18 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         return ModernTheme.textSecondary;
     }
   }
-  
-  LinearGradient _getStatusGradient() {
-    final color = _getStatusColor();
+
+  LinearGradient _getStatusGradient(String status) {
+    final color = _getStatusColor(status);
     return LinearGradient(
       colors: [color, color.withValues(alpha: 0.8)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
   }
-  
-  IconData _getStatusIcon() {
-    switch (_overallStatus) {
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
       case 'approved':
         return Icons.check_circle;
       case 'pending':
@@ -720,9 +769,9 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         return Icons.description;
     }
   }
-  
-  String _getStatusTitle() {
-    switch (_overallStatus) {
+
+  String _getStatusTitle(String status) {
+    switch (status) {
       case 'approved':
         return 'Documentos Aprobados';
       case 'pending':
@@ -737,9 +786,9 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         return 'Estado de Documentos';
     }
   }
-  
-  String _getStatusDescription() {
-    switch (_overallStatus) {
+
+  String _getStatusDescription(String status) {
+    switch (status) {
       case 'approved':
         return 'Todos tus documentos están aprobados y vigentes';
       case 'pending':
@@ -754,64 +803,54 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         return 'Revisa el estado de tus documentos';
     }
   }
-  
+
   Color _getDocumentStatusColor(DocumentStatus status) {
     switch (status) {
       case DocumentStatus.approved:
         return ModernTheme.success;
+      case DocumentStatus.underReview:
       case DocumentStatus.pending:
         return ModernTheme.warning;
       case DocumentStatus.rejected:
+      case DocumentStatus.expired:
         return ModernTheme.error;
-      case DocumentStatus.expiring:
-        return Colors.orange;
-      case DocumentStatus.missing:
-        return ModernTheme.textSecondary;
     }
   }
-  
-  String _getDocumentStatusText(DocumentStatus status) {
-    switch (status) {
-      case DocumentStatus.approved:
-        return 'Aprobado';
-      case DocumentStatus.pending:
-        return 'Pendiente';
-      case DocumentStatus.rejected:
-        return 'Rechazado';
-      case DocumentStatus.expiring:
-        return 'Por vencer';
-      case DocumentStatus.missing:
-        return 'Faltante';
-    }
-  }
-  
-  IconData _getDocumentIcon(DocumentCategory category) {
-    switch (category) {
-      case DocumentCategory.license:
+
+  IconData _getDocumentIcon(DocumentType type) {
+    switch (type) {
+      case DocumentType.license:
         return Icons.drive_eta;
-      case DocumentCategory.identity:
+      case DocumentType.dni:
         return Icons.badge;
-      case DocumentCategory.vehicle:
+      case DocumentType.criminalRecord:
+        return Icons.gavel;
+      case DocumentType.vehicleCard:
         return Icons.directions_car;
-      case DocumentCategory.insurance:
+      case DocumentType.soat:
         return Icons.security;
-      case DocumentCategory.background:
-        return Icons.verified_user;
-      case DocumentCategory.financial:
+      case DocumentType.technicalReview:
+        return Icons.build;
+      case DocumentType.vehiclePhotoFront:
+      case DocumentType.vehiclePhotoBack:
+      case DocumentType.vehiclePhotoPlate:
+      case DocumentType.vehiclePhotoInterior:
+        return Icons.photo_camera;
+      case DocumentType.bankAccount:
         return Icons.account_balance;
     }
   }
-  
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-  
-  void _viewDocument(DocumentInfo document) {
-    if (document.fileUrl == null) {
-      _uploadDocument(document);
+
+  void _viewDocument(DocumentModel document) {
+    if (document.url == null) {
+      _uploadDocument(document.type);
       return;
     }
-    
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -820,19 +859,23 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         ),
         child: Container(
           padding: EdgeInsets.all(20),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
                   Icon(
-                    _getDocumentIcon(document.category),
+                    _getDocumentIcon(document.type),
                     color: ModernTheme.oasisGreen,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      document.name,
+                      document.type.displayName,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -845,65 +888,49 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                   ),
                 ],
               ),
-              SizedBox(height: 16),
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: ModernTheme.backgroundLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image,
-                      size: 64,
-                      color: ModernTheme.textSecondary,
+              const SizedBox(height: 16),
+              Expanded(
+                child: CachedNetworkImage(
+                  imageUrl: document.url!,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => Center(
+                    child: CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Vista previa del documento',
-                      style: TextStyle(
-                        color: ModernTheme.textSecondary,
-                      ),
+                  ),
+                  errorWidget: (context, url, error) => Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image,
+                          size: 64,
+                          color: ModernTheme.textSecondary,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar imagen',
+                          style: TextStyle(
+                            color: ModernTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '(Simulación)',
-                      style: TextStyle(
-                        color: ModernTheme.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _uploadDocument(document);
+                        _uploadDocument(document.type);
                       },
                       icon: Icon(Icons.cloud_upload),
                       label: Text('Actualizar'),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _downloadDocument(document);
-                      },
-                      icon: Icon(Icons.download),
-                      label: Text('Descargar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ModernTheme.oasisGreen,
-                      ),
                     ),
                   ),
                 ],
@@ -914,8 +941,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
-  void _uploadDocument(DocumentInfo document) {
+
+  void _uploadDocument(DocumentType documentType) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -924,20 +951,29 @@ class _DocumentsScreenState extends State<DocumentsScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Subir ${document.name}',
+              'Subir ${documentType.displayName}',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Text(
+              documentType.description,
+              style: TextStyle(
+                color: ModernTheme.textSecondary,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
-                    _pickFromCamera(document);
+                    _pickFromCamera(documentType);
                   },
                   child: Column(
                     children: [
@@ -953,7 +989,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                           size: 32,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text('Cámara'),
                     ],
                   ),
@@ -961,7 +997,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
-                    _pickFromGallery(document);
+                    _pickFromGallery(documentType);
                   },
                   child: Column(
                     children: [
@@ -977,144 +1013,80 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                           size: 32,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text('Galería'),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickFromFiles(document);
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.folder,
-                          color: Colors.orange,
-                          size: 32,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text('Archivos'),
                     ],
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
-  
-  void _pickFromCamera(DocumentInfo document) {
-    // Simulate camera upload
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Documento capturado y subido exitosamente'),
-        backgroundColor: ModernTheme.success,
-      ),
-    );
-    
-    setState(() {
-      final index = _documents.indexWhere((d) => d.id == document.id);
-      if (index != -1) {
-        _documents[index] = DocumentInfo(
-          id: document.id,
-          name: document.name,
-          description: document.description,
-          status: DocumentStatus.pending,
-          expiryDate: document.expiryDate,
-          uploadDate: DateTime.now(),
-          fileUrl: '/mock/camera/${document.id}.jpg',
-          isRequired: document.isRequired,
-          category: document.category,
-          rejectionReason: null,
+
+  void _pickFromCamera(DocumentType documentType) async {
+    final authProvider = context.read<AuthProvider>();
+    final documentProvider = context.read<DocumentProvider>();
+
+    if (authProvider.user?.uid != null) {
+      final success = await documentProvider.takePhotoFromCamera(
+        driverId: authProvider.user!.uid,
+        documentType: documentType,
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Documento subido exitosamente'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+      } else if (mounted && documentProvider.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(documentProvider.error!),
+            backgroundColor: ModernTheme.error,
+          ),
         );
       }
-      _overallStatus = _calculateOverallStatus();
-    });
+    }
   }
-  
-  void _pickFromGallery(DocumentInfo document) {
-    // Simulate gallery upload
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Documento seleccionado y subido exitosamente'),
-        backgroundColor: ModernTheme.success,
-      ),
-    );
-    
-    setState(() {
-      final index = _documents.indexWhere((d) => d.id == document.id);
-      if (index != -1) {
-        _documents[index] = DocumentInfo(
-          id: document.id,
-          name: document.name,
-          description: document.description,
-          status: DocumentStatus.pending,
-          expiryDate: document.expiryDate,
-          uploadDate: DateTime.now(),
-          fileUrl: '/mock/gallery/${document.id}.jpg',
-          isRequired: document.isRequired,
-          category: document.category,
-          rejectionReason: null,
+
+  void _pickFromGallery(DocumentType documentType) async {
+    final authProvider = context.read<AuthProvider>();
+    final documentProvider = context.read<DocumentProvider>();
+
+    if (authProvider.user?.uid != null) {
+      final success = await documentProvider.pickImageFromGallery(
+        driverId: authProvider.user!.uid,
+        documentType: documentType,
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Documento subido exitosamente'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+      } else if (mounted && documentProvider.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(documentProvider.error!),
+            backgroundColor: ModernTheme.error,
+          ),
         );
       }
-      _overallStatus = _calculateOverallStatus();
-    });
+    }
   }
-  
-  void _pickFromFiles(DocumentInfo document) {
-    // Simulate file upload
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Archivo seleccionado y subido exitosamente'),
-        backgroundColor: ModernTheme.success,
-      ),
-    );
-    
-    setState(() {
-      final index = _documents.indexWhere((d) => d.id == document.id);
-      if (index != -1) {
-        _documents[index] = DocumentInfo(
-          id: document.id,
-          name: document.name,
-          description: document.description,
-          status: DocumentStatus.pending,
-          expiryDate: document.expiryDate,
-          uploadDate: DateTime.now(),
-          fileUrl: '/mock/files/${document.id}.pdf',
-          isRequired: document.isRequired,
-          category: document.category,
-          rejectionReason: null,
-        );
-      }
-      _overallStatus = _calculateOverallStatus();
-    });
-  }
-  
-  void _downloadDocument(DocumentInfo document) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Descargando ${document.name}...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _uploadAllDocuments() {
-    final missingDocs = _documents.where((d) => 
-        d.isRequired && (d.status == DocumentStatus.missing || d.status == DocumentStatus.rejected));
-    
+
+  void _uploadMissingDocuments() {
+    final provider = context.read<DocumentProvider>();
+    final missingDocs = provider.getDocumentsNeedingAction();
+
     if (missingDocs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1124,72 +1096,85 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       );
       return;
     }
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: Text('Subir Documentos Faltantes'),
+        title: Text('Documentos Pendientes'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Documentos pendientes:'),
-            SizedBox(height: 8),
-            ...missingDocs.map((doc) => Padding(
-              padding: EdgeInsets.symmetric(vertical: 2),
-              child: Text('• ${doc.name}'),
-            )),
+            Text('Documentos que necesitan acción:'),
+            const SizedBox(height: 12),
+            ...missingDocs.map((doc) => Container(
+                  margin: EdgeInsets.symmetric(vertical: 4),
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _getDocumentStatusColor(doc.status)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getDocumentIcon(doc.type),
+                        size: 16,
+                        color: _getDocumentStatusColor(doc.status),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(doc.type.displayName)),
+                      Text(
+                        doc.status.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _getDocumentStatusColor(doc.status),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _bulkUploadDocuments(missingDocs.toList());
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.oasisGreen,
-            ),
-            child: Text('Continuar'),
+            child: Text('Cerrar'),
           ),
         ],
       ),
     );
   }
-  
-  void _bulkUploadDocuments(List<DocumentInfo> documents) {
-    // Simulate bulk upload
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Iniciando carga masiva de documentos...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-    
-    // Show upload for each document with a delay
-    for (int i = 0; i < documents.length; i++) {
-      Future.delayed(Duration(seconds: i * 2), () {
-        _uploadDocument(documents[i]);
-      });
+
+  void _requestVerification() async {
+    final authProvider = context.read<AuthProvider>();
+    final documentProvider = context.read<DocumentProvider>();
+
+    if (authProvider.user?.uid != null) {
+      final success =
+          await documentProvider.requestVerification(authProvider.user!.uid);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Solicitud de verificación enviada exitosamente'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+      } else if (mounted && documentProvider.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(documentProvider.error!),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
     }
   }
-  
-  void _downloadTemplate() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Descargando lista de documentos requeridos...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
+
   void _showDocumentInfo() {
     showDialog(
       context: context,
@@ -1200,7 +1185,7 @@ class _DocumentsScreenState extends State<DocumentsScreen>
         title: Row(
           children: [
             Icon(Icons.info, color: ModernTheme.oasisGreen),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text('Información de Documentos'),
           ],
         ),
@@ -1213,22 +1198,44 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                 'Estados de Documentos:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
-              _buildInfoItem(Icons.check_circle, 'Aprobado', 'El documento fue verificado y aceptado', ModernTheme.success),
-              _buildInfoItem(Icons.schedule, 'Pendiente', 'El documento está siendo revisado', ModernTheme.warning),
-              _buildInfoItem(Icons.error, 'Rechazado', 'El documento fue rechazado y debe ser actualizado', ModernTheme.error),
-              _buildInfoItem(Icons.warning, 'Por vencer', 'El documento está próximo a vencer', Colors.orange),
-              _buildInfoItem(Icons.description, 'Faltante', 'El documento no ha sido subido', ModernTheme.textSecondary),
-              SizedBox(height: 16),
+              const SizedBox(height: 8),
+              _buildInfoItem(
+                  Icons.check_circle,
+                  'Aprobado',
+                  'El documento fue verificado y aceptado',
+                  ModernTheme.success),
+              _buildInfoItem(
+                  Icons.schedule,
+                  'En Revisión',
+                  'El documento está siendo revisado por nuestro equipo',
+                  ModernTheme.warning),
+              _buildInfoItem(
+                  Icons.pending,
+                  'Pendiente',
+                  'El documento está pendiente de subir o revisar',
+                  ModernTheme.warning),
+              _buildInfoItem(
+                  Icons.error,
+                  'Rechazado',
+                  'El documento fue rechazado y debe ser actualizado',
+                  ModernTheme.error),
+              _buildInfoItem(
+                  Icons.timer_off,
+                  'Vencido',
+                  'El documento está vencido y debe renovarse',
+                  ModernTheme.error),
+              const SizedBox(height: 16),
               Text(
-                'Consejos:',
+                'Consejos importantes:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
-              Text('• Asegúrate de que los documentos sean legibles y estén vigentes'),
+              const SizedBox(height: 8),
+              Text(
+                  '• Asegúrate de que los documentos sean legibles y estén vigentes'),
               Text('• Usa buena iluminación al tomar las fotos'),
               Text('• Evita documentos borrosos o con reflejos'),
               Text('• Mantén tus documentos actualizados'),
+              Text('• Incluye todas las fotos del vehículo solicitadas'),
             ],
           ),
         ),
@@ -1244,15 +1251,16 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
-  Widget _buildInfoItem(IconData icon, String title, String description, Color color) {
+
+  Widget _buildInfoItem(
+      IconData icon, String title, String description, Color color) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 16),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1278,53 +1286,8 @@ class _DocumentsScreenState extends State<DocumentsScreen>
       ),
     );
   }
-  
+
   void _refreshDocuments() {
-    setState(() => _isLoading = true);
     _loadDocuments();
   }
-}
-
-// Models
-class DocumentInfo {
-  final String id;
-  final String name;
-  final String description;
-  final DocumentStatus status;
-  final DateTime? expiryDate;
-  final DateTime? uploadDate;
-  final String? fileUrl;
-  final bool isRequired;
-  final DocumentCategory category;
-  final String? rejectionReason;
-  
-  DocumentInfo({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.status,
-    this.expiryDate,
-    this.uploadDate,
-    this.fileUrl,
-    required this.isRequired,
-    required this.category,
-    this.rejectionReason,
-  });
-}
-
-enum DocumentStatus {
-  approved,
-  pending,
-  rejected,
-  expiring,
-  missing,
-}
-
-enum DocumentCategory {
-  license,
-  identity,
-  vehicle,
-  insurance,
-  background,
-  financial,
 }

@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/modern_theme.dart';
@@ -18,10 +18,11 @@ class TripVerificationCodeScreen extends StatefulWidget {
   });
 
   @override
-  _TripVerificationCodeScreenState createState() => _TripVerificationCodeScreenState();
+  TripVerificationCodeScreenState createState() =>
+      TripVerificationCodeScreenState();
 }
 
-class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
+class TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _slideController;
@@ -31,12 +32,14 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle(
+        'TripVerificationCodeScreen', 'initState - TripId: ${widget.trip.id}');
+
     // Listener para detectar cuando el código sea verificado
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupTripListener();
     });
-    
+
     _pulseController = AnimationController(
       duration: Duration(seconds: 2),
       vsync: this,
@@ -65,25 +68,27 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
 
     _slideController.forward();
   }
-  
+
   void _setupTripListener() {
     final rideProvider = Provider.of<RideProvider>(context, listen: false);
     rideProvider.addListener(_onTripStatusChanged);
   }
-  
+
   void _onTripStatusChanged() {
     if (!mounted) return;
-    
+
     final rideProvider = Provider.of<RideProvider>(context, listen: false);
     final currentTrip = rideProvider.currentTrip;
-    
+
     if (currentTrip != null && currentTrip.id == widget.trip.id) {
       // Si el código fue verificado (viaje en progreso), volver a la pantalla anterior
-      if (currentTrip.status == 'in_progress' && currentTrip.isVerificationCodeUsed) {
+      if (currentTrip.status == 'in_progress' &&
+          currentTrip.isVerificationCodeUsed) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('¡Código verificado exitosamente! Tu viaje ha comenzado.'),
+            content:
+                Text('¡Código verificado exitosamente! Tu viaje ha comenzado.'),
             backgroundColor: ModernTheme.success,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -99,7 +104,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
   void dispose() {
     // No acceder al context en dispose - el listener se limpiará automáticamente
     // cuando el widget sea desmontado
-    
+
     _pulseController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -122,27 +127,27 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                 children: [
                   // Información del conductor
                   _buildDriverInfo(),
-                  
-                  SizedBox(height: 40),
-                  
+
+                  const SizedBox(height: 40),
+
                   // Código de verificación principal
                   SlideTransition(
                     position: _slideAnimation,
                     child: _buildVerificationCode(),
                   ),
-                  
-                  SizedBox(height: 30),
-                  
+
+                  const SizedBox(height: 30),
+
                   // Instrucciones
                   _buildInstructions(),
-                  
+
                   Spacer(),
-                  
+
                   // Estado del viaje
                   _buildTripStatus(),
-                  
-                  SizedBox(height: 20),
-                  
+
+                  const SizedBox(height: 20),
+
                   // Botón de emergencia
                   _buildEmergencyButton(),
                 ],
@@ -174,7 +179,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
               color: ModernTheme.oasisGreen,
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           // Info del conductor
           Expanded(
             child: Column(
@@ -188,11 +193,11 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                     color: ModernTheme.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Icon(Icons.star, size: 16, color: Colors.amber),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       widget.trip.driverRating?.toStringAsFixed(1) ?? '5.0',
                       style: TextStyle(
@@ -200,9 +205,10 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                         fontSize: 14,
                       ),
                     ),
-                    SizedBox(width: 16),
-                    Icon(Icons.directions_car, size: 16, color: ModernTheme.textSecondary),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 16),
+                    Icon(Icons.directions_car,
+                        size: 16, color: ModernTheme.textSecondary),
+                    const SizedBox(width: 4),
                     Text(
                       widget.trip.vehicleInfo?['model'] ?? 'Vehículo',
                       style: TextStyle(
@@ -238,7 +244,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
 
   Widget _buildVerificationCode() {
     final code = widget.trip.verificationCode ?? '----';
-    
+
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
@@ -271,7 +277,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                   size: 48,
                   color: Colors.white,
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                   'Tu Código de Verificación',
                   style: TextStyle(
@@ -280,7 +286,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: code.split('').map((digit) {
@@ -344,7 +350,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                   size: 20,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Instrucciones de Seguridad',
@@ -357,7 +363,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildInstructionItem(
             '1',
             'Muestra este código al conductor cuando llegue',
@@ -403,7 +409,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
               ),
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
@@ -432,22 +438,22 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
           Container(
             padding: EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: widget.trip.status == 'driver_arriving' 
-                ? Colors.orange.withValues(alpha: 0.1)
-                : ModernTheme.oasisGreen.withValues(alpha: 0.1),
+              color: widget.trip.status == 'driver_arriving'
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : ModernTheme.oasisGreen.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              widget.trip.status == 'driver_arriving' 
-                ? Icons.directions_car
-                : Icons.check_circle,
-              color: widget.trip.status == 'driver_arriving' 
-                ? Colors.orange
-                : ModernTheme.oasisGreen,
+              widget.trip.status == 'driver_arriving'
+                  ? Icons.directions_car
+                  : Icons.check_circle,
+              color: widget.trip.status == 'driver_arriving'
+                  ? Colors.orange
+                  : ModernTheme.oasisGreen,
               size: 20,
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,9 +466,9 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
                   ),
                 ),
                 Text(
-                  widget.trip.status == 'driver_arriving' 
-                    ? 'Tu conductor está llegando'
-                    : 'Esperando verificación',
+                  widget.trip.status == 'driver_arriving'
+                      ? 'Tu conductor está llegando'
+                      : 'Esperando verificación',
                   style: TextStyle(
                     color: ModernTheme.textSecondary,
                     fontSize: 12,
@@ -504,7 +510,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
         title: Row(
           children: [
             Icon(Icons.emergency, color: Colors.red),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text('Emergencia'),
           ],
         ),
@@ -519,7 +525,8 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
           ElevatedButton(
             onPressed: _triggerRealEmergency,
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Llamar Emergencia', style: TextStyle(color: Colors.white)),
+            child: Text('Llamar Emergencia',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -534,7 +541,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
   /// Activar emergencia real con el EmergencyServiceReal
   Future<void> _triggerRealEmergency() async {
     Navigator.pop(context);
-    
+
     // Mostrar loading dialog
     showDialog(
       context: context,
@@ -544,10 +551,12 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             CircularProgressIndicator(color: Colors.red),
-            SizedBox(height: 16),
-            Text('🚨 Activando emergencia...', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('Notificando autoridades y contactos', textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            Text('🚨 Activando emergencia...',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Notificando autoridades y contactos',
+                textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -557,31 +566,31 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
       final emergencyService = EmergencyService();
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final currentUser = authProvider.currentUser;
-      
+
       final response = await emergencyService.triggerSOS(
         userId: currentUser?.id ?? '',
         userType: currentUser?.userType ?? 'passenger',
+        emergencyType: EmergencyService.getEmergencyTypes()
+            .first, // Usar emergencia general
       );
 
       // Cerrar loading dialog
       if (mounted) Navigator.pop(context);
 
-      if (response.success) {
+      if (response['success'] == true) {
         // Mostrar confirmación
         _showEmergencySuccessDialog(response);
-        
-        // Log para auditoría
-        debugPrint('SOS activado - Trip: ${widget.trip.id}');
-        
-      } else {
-        _showEmergencyErrorDialog(response.message ?? 'Error desconocido');
-      }
 
+        // Log para auditoría
+        AppLogger.debug('SOS activado - Trip: ${widget.trip.id}');
+      } else {
+        _showEmergencyErrorDialog(response['message'] ?? 'Error desconocido');
+      }
     } catch (e) {
       // Cerrar loading dialog si aún está abierto
       if (mounted) Navigator.pop(context);
-      
-      debugPrint('Error activando SOS: $e');
+
+      AppLogger.debug('Error activando SOS: $e');
       _showEmergencyErrorDialog('Error activando emergencia: $e');
     }
   }
@@ -595,7 +604,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
         title: Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 32),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('🚨 SOS ACTIVADO'),
           ],
         ),
@@ -604,15 +613,15 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('✅ Emergencia activada exitosamente'),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text('📞 Llamada de emergencia iniciada'),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text('📱 ${response.contactsNotified} contactos notificados'),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text('🎤 Grabación de audio iniciada'),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text('📍 Ubicación enviada a autoridades'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -658,7 +667,7 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
         title: Row(
           children: [
             Icon(Icons.error, color: Colors.orange, size: 32),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('Error de Emergencia'),
           ],
         ),
@@ -666,12 +675,12 @@ class _TripVerificationCodeScreenState extends State<TripVerificationCodeScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('No se pudo activar completamente el SOS:'),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               errorMessage,
               style: TextStyle(color: Colors.red, fontSize: 12),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(

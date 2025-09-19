@@ -1,103 +1,73 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart' as app_auth;
 import '../../core/theme/modern_theme.dart';
+import '../auth/modern_login_screen.dart';
+import 'help_center_screen.dart';
+import 'terms_conditions_screen.dart';
+import 'privacy_policy_screen.dart';
+import '../../utils/app_logger.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String? userType; // 'passenger', 'driver', 'admin'
-  
-  SettingsScreen({super.key, this.userType});
-  
+
+  const SettingsScreen({super.key, this.userType});
+
   @override
-  // ignore: library_private_types_in_public_api
-  _SettingsScreenState createState() => _SettingsScreenState();
+  SettingsScreenState createState() => SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> 
-    with TickerProviderStateMixin {
+class SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
-  // General settings
+
+  // Configuraciones esenciales
   bool _notificationsEnabled = true;
   bool _locationServices = true;
-  bool _darkMode = false;
-  String _language = 'es';
-  String _currency = 'PEN';
-  
-  // Privacy settings
-  bool _shareLocation = true;
-  bool _shareTrips = false;
-  bool _analytics = true;
-  bool _crashReports = true;
-  
-  // Notification settings
-  bool _pushNotifications = true;
-  bool _emailNotifications = true;
-  bool _smsNotifications = false;
-  bool _tripUpdates = true;
-  bool _promotions = true;
-  bool _newsUpdates = false;
-  
-  // Security settings
-  bool _biometricAuth = false;
-  bool _twoFactorAuth = false;
-  int _autoLockTime = 5; // minutes
-  
-  // App settings
-  bool _autoUpdate = true;
-  bool _offlineMaps = false;
-  String _mapStyle = 'standard';
-  bool _soundEffects = true;
-  bool _hapticFeedback = true;
-  
-  // Data settings
-  bool _syncOnWiFiOnly = false;
-  bool _compressImages = true;
-  String _cacheSize = '150 MB';
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle(
+        'SettingsScreen', 'initState - UserType: ${widget.userType}');
+
     _fadeController = AnimationController(
-      duration: Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-    
+
     _fadeController.forward();
   }
-  
+
   @override
   void dispose() {
     _fadeController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: ModernTheme.backgroundLight,
       appBar: AppBar(
         backgroundColor: ModernTheme.oasisGreen,
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Configuración',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.restore, color: Colors.white),
-            onPressed: _resetToDefaults,
-          ),
-        ],
       ),
       body: AnimatedBuilder(
         animation: _fadeAnimation,
@@ -107,20 +77,99 @@ class _SettingsScreenState extends State<SettingsScreen>
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // General section
+                  // Información del usuario
+                  if (user != null) ...[
+                    Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: ModernTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                ModernTheme.oasisGreen.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.2),
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user.displayName ?? 'Usuario',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  user.email ?? user.phoneNumber ?? '',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (widget.userType != null) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      _getUserTypeLabel(widget.userType!),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Configuración general
                   _buildSection(
                     'General',
                     Icons.settings,
                     ModernTheme.primaryBlue,
                     [
-                      _buildLanguageTile(),
-                      _buildCurrencyTile(),
                       _buildSwitchTile(
-                        'Modo Oscuro',
-                        'Cambiar apariencia de la app',
-                        Icons.dark_mode,
-                        _darkMode,
-                        (value) => setState(() => _darkMode = value),
+                        'Notificaciones',
+                        'Recibir alertas de viajes y promociones',
+                        Icons.notifications,
+                        _notificationsEnabled,
+                        (value) =>
+                            setState(() => _notificationsEnabled = value),
                       ),
                       _buildSwitchTile(
                         'Servicios de Ubicación',
@@ -131,268 +180,58 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ],
                   ),
-                  
-                  // Notifications section
-                  _buildSection(
-                    'Notificaciones',
-                    Icons.notifications,
-                    Colors.orange,
-                    [
-                      _buildSwitchTile(
-                        'Notificaciones Push',
-                        'Recibir notificaciones en tu dispositivo',
-                        Icons.notifications_active,
-                        _pushNotifications,
-                        (value) => setState(() => _pushNotifications = value),
-                      ),
-                      _buildSwitchTile(
-                        'Notificaciones por Email',
-                        'Recibir emails informativos',
-                        Icons.email,
-                        _emailNotifications,
-                        (value) => setState(() => _emailNotifications = value),
-                      ),
-                      _buildSwitchTile(
-                        'Mensajes SMS',
-                        'Recibir mensajes de texto',
-                        Icons.sms,
-                        _smsNotifications,
-                        (value) => setState(() => _smsNotifications = value),
-                      ),
-                      Divider(),
-                      _buildSwitchTile(
-                        'Actualizaciones de Viaje',
-                        'Estados del viaje y conductor',
-                        Icons.directions_car,
-                        _tripUpdates,
-                        (value) => setState(() => _tripUpdates = value),
-                      ),
-                      _buildSwitchTile(
-                        'Promociones',
-                        'Ofertas y descuentos especiales',
-                        Icons.local_offer,
-                        _promotions,
-                        (value) => setState(() => _promotions = value),
-                      ),
-                      _buildSwitchTile(
-                        'Noticias y Actualizaciones',
-                        'Novedades de la plataforma',
-                        Icons.newspaper,
-                        _newsUpdates,
-                        (value) => setState(() => _newsUpdates = value),
-                      ),
-                    ],
-                  ),
-                  
-                  // Privacy section
-                  _buildSection(
-                    'Privacidad',
-                    Icons.privacy_tip,
-                    Colors.purple,
-                    [
-                      _buildSwitchTile(
-                        'Compartir Ubicación',
-                        'Compartir ubicación durante viajes',
-                        Icons.share_location,
-                        _shareLocation,
-                        (value) => setState(() => _shareLocation = value),
-                      ),
-                      _buildSwitchTile(
-                        'Compartir Viajes',
-                        'Permitir que otros vean tus viajes',
-                        Icons.share,
-                        _shareTrips,
-                        (value) => setState(() => _shareTrips = value),
-                      ),
-                      _buildSwitchTile(
-                        'Análisis de Uso',
-                        'Ayudar a mejorar la app',
-                        Icons.analytics,
-                        _analytics,
-                        (value) => setState(() => _analytics = value),
-                      ),
-                      _buildSwitchTile(
-                        'Reportes de Errores',
-                        'Enviar reportes automáticos',
-                        Icons.bug_report,
-                        _crashReports,
-                        (value) => setState(() => _crashReports = value),
-                      ),
-                      Divider(),
-                      _buildActionTile(
-                        'Ver Política de Privacidad',
-                        'Consulta cómo manejamos tus datos',
-                        Icons.policy,
-                        _showPrivacyPolicy,
-                      ),
-                      _buildActionTile(
-                        'Descargar Mis Datos',
-                        'Obtener copia de tu información',
-                        Icons.download,
-                        _downloadData,
-                      ),
-                    ],
-                  ),
-                  
-                  // Security section
+
+                  // Seguridad
                   _buildSection(
                     'Seguridad',
                     Icons.security,
                     ModernTheme.error,
                     [
-                      _buildSwitchTile(
-                        'Autenticación Biométrica',
-                        'Usar huella dactilar o Face ID',
-                        Icons.fingerprint,
-                        _biometricAuth,
-                        (value) => setState(() => _biometricAuth = value),
-                      ),
-                      _buildSwitchTile(
-                        'Autenticación de Dos Factores',
-                        'Seguridad adicional para tu cuenta',
-                        Icons.security,
-                        _twoFactorAuth,
-                        (value) => setState(() => _twoFactorAuth = value),
-                      ),
-                      _buildAutoLockTile(),
-                      Divider(),
                       _buildActionTile(
                         'Cambiar Contraseña',
                         'Actualizar tu contraseña',
                         Icons.lock,
                         _changePassword,
                       ),
-                      _buildActionTile(
-                        'Dispositivos Conectados',
-                        'Ver sesiones activas',
-                        Icons.devices,
-                        _showConnectedDevices,
-                      ),
                     ],
                   ),
-                  
-                  // App preferences
+
+                  // Soporte
                   _buildSection(
-                    'Preferencias de la App',
-                    Icons.tune,
-                    ModernTheme.oasisGreen,
-                    [
-                      _buildSwitchTile(
-                        'Actualización Automática',
-                        'Descargar actualizaciones automáticamente',
-                        Icons.system_update,
-                        _autoUpdate,
-                        (value) => setState(() => _autoUpdate = value),
-                      ),
-                      _buildSwitchTile(
-                        'Mapas Sin Conexión',
-                        'Descargar mapas para uso offline',
-                        Icons.map,
-                        _offlineMaps,
-                        (value) => setState(() => _offlineMaps = value),
-                      ),
-                      _buildMapStyleTile(),
-                      _buildSwitchTile(
-                        'Efectos de Sonido',
-                        'Reproducir sonidos en la app',
-                        Icons.volume_up,
-                        _soundEffects,
-                        (value) => setState(() => _soundEffects = value),
-                      ),
-                      _buildSwitchTile(
-                        'Vibración',
-                        'Retroalimentación háptica',
-                        Icons.vibration,
-                        _hapticFeedback,
-                        (value) => setState(() => _hapticFeedback = value),
-                      ),
-                    ],
-                  ),
-                  
-                  // Data & Storage
-                  _buildSection(
-                    'Datos y Almacenamiento',
-                    Icons.storage,
-                    Colors.teal,
-                    [
-                      _buildSwitchTile(
-                        'Sincronizar Solo con Wi-Fi',
-                        'Ahorrar datos móviles',
-                        Icons.wifi,
-                        _syncOnWiFiOnly,
-                        (value) => setState(() => _syncOnWiFiOnly = value),
-                      ),
-                      _buildSwitchTile(
-                        'Comprimir Imágenes',
-                        'Reducir calidad para ahorrar espacio',
-                        Icons.compress,
-                        _compressImages,
-                        (value) => setState(() => _compressImages = value),
-                      ),
-                      _buildInfoTile(
-                        'Tamaño de Caché',
-                        _cacheSize,
-                        Icons.folder,
-                      ),
-                      Divider(),
-                      _buildActionTile(
-                        'Limpiar Caché',
-                        'Liberar espacio de almacenamiento',
-                        Icons.cleaning_services,
-                        _clearCache,
-                      ),
-                      _buildActionTile(
-                        'Gestionar Almacenamiento',
-                        'Ver uso detallado del espacio',
-                        Icons.pie_chart,
-                        _manageStorage,
-                      ),
-                    ],
-                  ),
-                  
-                  // Support & About
-                  _buildSection(
-                    'Soporte y Acerca de',
+                    'Soporte',
                     Icons.help,
                     Colors.indigo,
                     [
                       _buildActionTile(
                         'Centro de Ayuda',
-                        'Preguntas frecuentes y tutoriales',
+                        'Preguntas frecuentes',
                         Icons.help_center,
                         _openHelpCenter,
                       ),
                       _buildActionTile(
                         'Contactar Soporte',
-                        'Obtener ayuda personalizada',
+                        'Chat o llamada',
                         Icons.support_agent,
                         _contactSupport,
                       ),
                       _buildActionTile(
-                        'Reportar Problema',
-                        'Informar errores o sugerencias',
-                        Icons.report,
-                        _reportIssue,
-                      ),
-                      Divider(),
-                      _buildActionTile(
-                        'Acerca de la App',
-                        'Versión e información legal',
-                        Icons.info,
-                        _showAbout,
+                        'Términos y Condiciones',
+                        'Lee nuestros términos',
+                        Icons.description,
+                        _showTerms,
                       ),
                       _buildActionTile(
-                        'Calificar la App',
-                        'Ayúdanos con tu opinión',
-                        Icons.star_rate,
-                        _rateApp,
+                        'Política de Privacidad',
+                        'Cómo manejamos tus datos',
+                        Icons.privacy_tip,
+                        _showPrivacyPolicy,
                       ),
                     ],
                   ),
-                  
-                  // Account management
+
+                  // Cuenta
                   _buildSection(
-                    'Gestión de Cuenta',
+                    'Cuenta',
                     Icons.account_circle,
                     Colors.grey,
                     [
@@ -412,14 +251,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ],
                   ),
-                  
-                  SizedBox(height: 32),
-                  
-                  // App version
-                  Padding(
+
+                  const SizedBox(height: 32),
+
+                  // Versión de la app
+                  const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Oasis Taxi v1.0.0 (Build 100)',
+                      'Oasis Taxi v1.0.0',
                       style: TextStyle(
                         color: ModernTheme.textSecondary,
                         fontSize: 12,
@@ -427,8 +266,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  
-                  SizedBox(height: 32),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -437,17 +276,31 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
   }
-  
-  Widget _buildSection(String title, IconData icon, Color color, List<Widget> children) {
+
+  String _getUserTypeLabel(String userType) {
+    switch (userType) {
+      case 'passenger':
+        return 'Pasajero';
+      case 'driver':
+        return 'Conductor';
+      case 'admin':
+        return 'Administrador';
+      default:
+        return 'Usuario';
+    }
+  }
+
+  Widget _buildSection(
+      String title, IconData icon, Color color, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
           child: Row(
             children: [
               Icon(icon, color: color, size: 20),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 title,
                 style: TextStyle(
@@ -460,60 +313,54 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ),
         Container(
-          margin: EdgeInsets.symmetric(horizontal: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 5,
-                offset: Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: ModernTheme.cardShadow,
           ),
           child: Column(children: children),
         ),
       ],
     );
   }
-  
-  Widget _buildSwitchTile(String title, String subtitle, IconData icon, bool value, Function(bool) onChanged) {
+
+  Widget _buildSwitchTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    bool value,
+    Function(bool) onChanged,
+  ) {
     return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: ModernTheme.oasisGreen, size: 20),
-      ),
+      leading: Icon(icon, color: ModernTheme.textSecondary),
       title: Text(
         title,
-        style: TextStyle(fontWeight: FontWeight.w500),
+        style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
+        style: TextStyle(
+          fontSize: 12,
+          color: ModernTheme.textSecondary,
+        ),
       ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
       ),
     );
   }
-  
-  Widget _buildActionTile(String title, String subtitle, IconData icon, VoidCallback onTap, {Color? color}) {
+
+  Widget _buildActionTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap, {
+    Color? color,
+  }) {
     return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: (color ?? ModernTheme.primaryBlue).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: color ?? ModernTheme.primaryBlue, size: 20),
-      ),
+      leading: Icon(icon, color: color ?? ModernTheme.textSecondary),
       title: Text(
         title,
         style: TextStyle(
@@ -523,559 +370,343 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
+        style: TextStyle(
+          fontSize: 12,
+          color: ModernTheme.textSecondary,
+        ),
       ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: ModernTheme.textSecondary,
+      ),
       onTap: onTap,
     );
   }
-  
-  Widget _buildInfoTile(String title, String value, IconData icon) {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.textSecondary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+
+  void _changePassword() {
+    final TextEditingController currentPasswordController =
+        TextEditingController();
+    final TextEditingController newPasswordController = TextEditingController();
+    final TextEditingController confirmPasswordController =
+        TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Icon(icon, color: ModernTheme.textSecondary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      trailing: Text(
-        value,
-        style: TextStyle(
-          color: ModernTheme.textSecondary,
-          fontWeight: FontWeight.w500,
+        title: const Text('Cambiar Contraseña'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña actual',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: newPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Nueva contraseña',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.lock),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: confirmPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar nueva contraseña',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.lock),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-  
-  Widget _buildLanguageTile() {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(Icons.language, color: ModernTheme.oasisGreen, size: 20),
-      ),
-      title: Text(
-        'Idioma',
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        _language == 'es' ? 'Español' : 'English',
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
-      ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: _showLanguageDialog,
-    );
-  }
-  
-  Widget _buildCurrencyTile() {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(Icons.attach_money, color: ModernTheme.oasisGreen, size: 20),
-      ),
-      title: Text(
-        'Moneda',
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        _currency == 'PEN' ? 'Soles (S/)' : 'Dólares (\$)',
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
-      ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: _showCurrencyDialog,
-    );
-  }
-  
-  Widget _buildAutoLockTile() {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.error.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(Icons.lock_clock, color: ModernTheme.error, size: 20),
-      ),
-      title: Text(
-        'Bloqueo Automático',
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        'Bloquear después de $_autoLockTime minutos',
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(Icons.remove, size: 20),
+        actions: [
+          TextButton(
             onPressed: () {
-              if (_autoLockTime > 1) {
-                setState(() => _autoLockTime--);
+              currentPasswordController.dispose();
+              newPasswordController.dispose();
+              confirmPasswordController.dispose();
+              Navigator.pop(context);
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (newPasswordController.text !=
+                  confirmPasswordController.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Las contraseñas no coinciden'),
+                    backgroundColor: ModernTheme.error,
+                  ),
+                );
+                return;
+              }
+
+              if (newPasswordController.text.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('La contraseña debe tener al menos 6 caracteres'),
+                    backgroundColor: ModernTheme.error,
+                  ),
+                );
+                return;
+              }
+
+              try {
+                // Re-autenticar primero con la contraseña actual
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null && user.email != null) {
+                  final credential = EmailAuthProvider.credential(
+                    email: user.email!,
+                    password: currentPasswordController.text,
+                  );
+
+                  await user.reauthenticateWithCredential(credential);
+                  await user.updatePassword(newPasswordController.text);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Contraseña actualizada correctamente'),
+                        backgroundColor: ModernTheme.success,
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: ModernTheme.error,
+                    ),
+                  );
+                }
+              } finally {
+                currentPasswordController.dispose();
+                newPasswordController.dispose();
+                confirmPasswordController.dispose();
               }
             },
-          ),
-          Text('$_autoLockTime'),
-          IconButton(
-            icon: Icon(Icons.add, size: 20),
-            onPressed: () {
-              setState(() => _autoLockTime++);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildMapStyleTile() {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(Icons.map, color: ModernTheme.oasisGreen, size: 20),
-      ),
-      title: Text(
-        'Estilo de Mapa',
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        _getMapStyleText(),
-        style: TextStyle(fontSize: 12, color: ModernTheme.textSecondary),
-      ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: _showMapStyleDialog,
-    );
-  }
-  
-  String _getMapStyleText() {
-    switch (_mapStyle) {
-      case 'standard':
-        return 'Estándar';
-      case 'satellite':
-        return 'Satélite';
-      case 'terrain':
-        return 'Terreno';
-      case 'hybrid':
-        return 'Híbrido';
-      default:
-        return 'Estándar';
-    }
-  }
-  
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Seleccionar Idioma'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'es',
-                groupValue: _language,
-                onChanged: (value) {
-                  setState(() => _language = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Español'),
-              onTap: () {
-                setState(() => _language = 'es');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'en',
-                groupValue: _language,
-                onChanged: (value) {
-                  setState(() => _language = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('English'),
-              onTap: () {
-                setState(() => _language = 'en');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  void _showCurrencyDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Seleccionar Moneda'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'PEN',
-                groupValue: _currency,
-                onChanged: (value) {
-                  setState(() => _currency = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Soles Peruanos (S/)'),
-              onTap: () {
-                setState(() => _currency = 'PEN');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'USD',
-                groupValue: _currency,
-                onChanged: (value) {
-                  setState(() => _currency = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Dólares Americanos (\$)'),
-              onTap: () {
-                setState(() => _currency = 'USD');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  void _showMapStyleDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Estilo de Mapa'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'standard',
-                groupValue: _mapStyle,
-                onChanged: (value) {
-                  setState(() => _mapStyle = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Estándar'),
-              onTap: () {
-                setState(() => _mapStyle = 'standard');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'satellite',
-                groupValue: _mapStyle,
-                onChanged: (value) {
-                  setState(() => _mapStyle = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Satélite'),
-              onTap: () {
-                setState(() => _mapStyle = 'satellite');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'terrain',
-                groupValue: _mapStyle,
-                onChanged: (value) {
-                  setState(() => _mapStyle = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Terreno'),
-              onTap: () {
-                setState(() => _mapStyle = 'terrain');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'hybrid',
-                groupValue: _mapStyle,
-                onChanged: (value) {
-                  setState(() => _mapStyle = value!);
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Híbrido'),
-              onTap: () {
-                setState(() => _mapStyle = 'hybrid');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  void _resetToDefaults() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Restablecer Configuración'),
-        content: Text('¿Estás seguro de que deseas restablecer todas las configuraciones a sus valores predeterminados?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _notificationsEnabled = true;
-                _locationServices = true;
-                _darkMode = false;
-                _language = 'es';
-                _currency = 'PEN';
-                // Reset all other settings to defaults...
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Configuración restablecida'),
-                  backgroundColor: ModernTheme.success,
-                ),
-              );
-            },
             style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
+              backgroundColor: ModernTheme.oasisGreen,
             ),
-            child: Text('Restablecer'),
+            child: const Text('Cambiar'),
           ),
         ],
       ),
     );
   }
-  
-  void _showPrivacyPolicy() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Abriendo política de privacidad...'),
-        backgroundColor: ModernTheme.info,
+
+  void _openHelpCenter() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const HelpCenterScreen(),
       ),
     );
   }
-  
-  void _downloadData() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Iniciando descarga de datos...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _changePassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Redirigiendo a cambio de contraseña...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _showConnectedDevices() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Mostrando dispositivos conectados...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _clearCache() {
+
+  void _contactSupport() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Limpiar Caché'),
-        content: Text('Esto liberará $_cacheSize de espacio. ¿Continuar?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Caché limpiado exitosamente'),
-                  backgroundColor: ModernTheme.success,
-                ),
-              );
-              setState(() => _cacheSize = '0 MB');
-            },
-            child: Text('Limpiar'),
-          ),
-        ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Contactar Soporte'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.phone, color: ModernTheme.oasisGreen),
+              title: const Text('Llamar'),
+              subtitle: const Text('+51 999 999 999'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Llamando a soporte...'),
+                    backgroundColor: ModernTheme.oasisGreen,
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat, color: ModernTheme.primaryBlue),
+              title: const Text('Chat en vivo'),
+              subtitle: const Text('Disponible 24/7'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Iniciando chat...'),
+                    backgroundColor: ModernTheme.primaryBlue,
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.email, color: ModernTheme.warning),
+              title: const Text('Email'),
+              subtitle: const Text('soporte@oasistaxiapp.com'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Abriendo email...'),
+                    backgroundColor: ModernTheme.warning,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
-  
-  void _manageStorage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Abriendo gestión de almacenamiento...'),
-        backgroundColor: ModernTheme.info,
+
+  void _showTerms() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TermsConditionsScreen(),
       ),
     );
   }
-  
-  void _openHelpCenter() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Abriendo centro de ayuda...'),
-        backgroundColor: ModernTheme.info,
+
+  void _showPrivacyPolicy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PrivacyPolicyScreen(),
       ),
     );
   }
-  
-  void _contactSupport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Contactando con soporte...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _reportIssue() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Abriendo reporte de problemas...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _showAbout() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Mostrando información de la app...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _rateApp() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Abriendo tienda de aplicaciones...'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
+
   void _logout() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Cerrar Sesión'),
-        content: Text('¿Estás seguro de que deseas cerrar sesión?'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+
+              // Cerrar sesión con Firebase
+              await FirebaseAuth.instance.signOut();
+
+              // Limpiar provider de autenticación
+              _handleLogoutNavigation();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ModernTheme.warning,
             ),
-            child: Text('Cerrar Sesión'),
+            child: const Text('Cerrar Sesión'),
           ),
         ],
       ),
     );
   }
-  
+
   void _deleteAccount() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Eliminar Cuenta',
-          style: TextStyle(color: ModernTheme.error),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        content: Column(
+        title: const Text('Eliminar Cuenta'),
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Esta acción es irreversible. Se eliminará:'),
-            SizedBox(height: 8),
-            Text('• Todos tus datos personales'),
-            Text('• Historial de viajes'),
-            Text('• Métodos de pago'),
-            Text('• Calificaciones y comentarios'),
+            Icon(
+              Icons.warning,
+              color: ModernTheme.error,
+              size: 48,
+            ),
             SizedBox(height: 16),
             Text(
-              '¿Estás completamente seguro?',
+              'Esta acción es PERMANENTE y no se puede deshacer.',
+              textAlign: TextAlign.center,
               style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Se eliminarán todos tus datos, viajes, favoritos y configuraciones.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Solicitud de eliminación enviada'),
-                  backgroundColor: ModernTheme.error,
+                const SnackBar(
+                  content: Text(
+                      'Por seguridad, contacta a soporte para eliminar tu cuenta'),
+                  backgroundColor: ModernTheme.warning,
+                  duration: Duration(seconds: 5),
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ModernTheme.error,
             ),
-            child: Text('Eliminar Cuenta'),
+            child: const Text('Eliminar Cuenta'),
           ),
         ],
       ),
+    );
+  }
+
+  void _handleLogoutNavigation() {
+    if (!mounted) return;
+    context.read<app_auth.AuthProvider>().logout();
+
+    // Navegar a la pantalla de login
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => ModernLoginScreen()),
+      (route) => false,
     );
   }
 }

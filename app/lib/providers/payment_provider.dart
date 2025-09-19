@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 
 enum CardType { visa, mastercard, amex, discover, other }
+
 enum PaymentMethodType { card, cash, wallet, paypal }
 
 class PaymentMethod {
@@ -38,12 +39,12 @@ class PaymentMethod {
 
   // Getter para displayName
   String get displayName {
-    if (type == PaymentMethodType.card ) {
+    if (type == PaymentMethodType.card) {
       return '$name •••• ${cardNumber!.substring(cardNumber!.length - 4)}';
     }
     return name;
   }
-  
+
   // Getter para color
   Color get color => Color(int.parse(colorHex.replaceAll('#', '0xFF')));
 
@@ -181,7 +182,7 @@ class TransactionRecord {
       createdAt: data['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
           : DateTime.now(),
-      metadata: data['metadata'] != null 
+      metadata: data['metadata'] != null
           ? Map<String, dynamic>.from(data['metadata'])
           : null,
     );
@@ -210,7 +211,7 @@ class PaymentStatistics {
 
 class PaymentProvider with ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   // Estado de carga
   bool _isLoading = false;
   bool _isLoadingTransactions = false;
@@ -233,31 +234,35 @@ class PaymentProvider with ChangeNotifier {
   bool get isLoadingTransactions => _isLoadingTransactions;
   bool get isWalletLoading => _isWalletLoading;
   String? get error => _error;
-  
+
   List<PaymentMethod> get paymentMethods => List.unmodifiable(_paymentMethods);
-  List<PaymentMethod> get activePaymentMethods => 
+  List<PaymentMethod> get activePaymentMethods =>
       _paymentMethods.where((method) => method.isActive == true).toList();
   PaymentMethod? get selectedPaymentMethod => _defaultPaymentMethodId != null
-      ? _paymentMethods.firstWhere((m) => m.id == _defaultPaymentMethodId, orElse: () => _paymentMethods.first)
-      : _paymentMethods.isNotEmpty ? _paymentMethods.first : null;
-  
+      ? _paymentMethods.firstWhere((m) => m.id == _defaultPaymentMethodId,
+          orElse: () => _paymentMethods.first)
+      : _paymentMethods.isNotEmpty
+          ? _paymentMethods.first
+          : null;
+
   PaymentMethod? get defaultPaymentMethod => _paymentMethods.firstWhere(
-    (method) => method.isDefault == true && method.isActive == true,
-    orElse: () => _paymentMethods.isNotEmpty ? _paymentMethods.first : 
-        PaymentMethod(
-          id: 'cash',
-          type: PaymentMethodType.cash,
-          name: 'Efectivo',
-          isDefault: true,
-          iconName: 'money',
-          colorHex: '#4CAF50',
-        ),
-  );
-  
+        (method) => method.isDefault == true && method.isActive == true,
+        orElse: () => _paymentMethods.isNotEmpty
+            ? _paymentMethods.first
+            : PaymentMethod(
+                id: 'cash',
+                type: PaymentMethodType.cash,
+                name: 'Efectivo',
+                isDefault: true,
+                iconName: 'money',
+                colorHex: '#4CAF50',
+              ),
+      );
+
   List<TransactionRecord> get transactions => List.unmodifiable(_transactions);
   List<TransactionRecord> get successfulTransactions =>
       _transactions.where((t) => t.status == 'completed').toList();
-  
+
   PaymentStatistics? get statistics => _statistics;
   double get walletBalance => _walletBalance;
 
@@ -295,7 +300,6 @@ class PaymentProvider with ChangeNotifier {
       }
 
       AppLogger.info('Métodos de pago cargados: ${_paymentMethods.length}');
-
     } catch (e) {
       _error = 'Error al cargar métodos de pago: $e';
       AppLogger.error('Error cargando métodos de pago', e);
@@ -363,10 +367,9 @@ class PaymentProvider with ChangeNotifier {
           .set(methodToAdd.toFirestore());
 
       _paymentMethods.add(methodToAdd);
-      
+
       AppLogger.info('Método de pago agregado exitosamente');
       return true;
-
     } catch (e) {
       _error = 'Error al agregar método de pago: $e';
       AppLogger.error('Error agregando método de pago', e);
@@ -390,30 +393,33 @@ class PaymentProvider with ChangeNotifier {
       AppLogger.info('Estableciendo método predeterminado: $paymentMethodId');
 
       // Desmarcar método actual
-      if ( _defaultPaymentMethodId != paymentMethodId) {
+      if (_defaultPaymentMethodId != paymentMethodId) {
         await _updateDefaultStatus(userId, _defaultPaymentMethodId!, false);
-        
+
         // Actualizar en lista local
-        final oldIndex = _paymentMethods.indexWhere((m) => m.id == _defaultPaymentMethodId);
+        final oldIndex =
+            _paymentMethods.indexWhere((m) => m.id == _defaultPaymentMethodId);
         if (oldIndex != -1) {
-          _paymentMethods[oldIndex] = _paymentMethods[oldIndex].copyWith(isDefault: false);
+          _paymentMethods[oldIndex] =
+              _paymentMethods[oldIndex].copyWith(isDefault: false);
         }
       }
 
       // Marcar nuevo método como predeterminado
       await _updateDefaultStatus(userId, paymentMethodId, true);
-      
+
       // Actualizar en lista local
-      final newIndex = _paymentMethods.indexWhere((m) => m.id == paymentMethodId);
+      final newIndex =
+          _paymentMethods.indexWhere((m) => m.id == paymentMethodId);
       if (newIndex != -1) {
-        _paymentMethods[newIndex] = _paymentMethods[newIndex].copyWith(isDefault: true);
+        _paymentMethods[newIndex] =
+            _paymentMethods[newIndex].copyWith(isDefault: true);
       }
 
       _defaultPaymentMethodId = paymentMethodId;
-      
+
       AppLogger.info('Método predeterminado actualizado');
       return true;
-
     } catch (e) {
       _error = 'Error al establecer método predeterminado: $e';
       AppLogger.error('Error estableciendo método predeterminado', e);
@@ -425,16 +431,17 @@ class PaymentProvider with ChangeNotifier {
   }
 
   // Actualizar estado predeterminado en Firebase
-  Future<void> _updateDefaultStatus(String userId, String paymentMethodId, bool isDefault) async {
+  Future<void> _updateDefaultStatus(
+      String userId, String paymentMethodId, bool isDefault) async {
     await _firebaseService.firestore
         .collection('users')
         .doc(userId)
         .collection('paymentMethods')
         .doc(paymentMethodId)
         .update({
-          'isDefault': isDefault,
-          'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        });
+      'isDefault': isDefault,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
   // Eliminar método de pago
@@ -462,22 +469,23 @@ class PaymentProvider with ChangeNotifier {
           .collection('paymentMethods')
           .doc(paymentMethodId)
           .update({
-            'isActive': false,
-            'updatedAt': DateTime.now().millisecondsSinceEpoch,
-          });
+        'isActive': false,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
 
       // Remover de lista local
-      final wasDefault = _paymentMethods.any((m) => m.id == paymentMethodId && m.isDefault);
+      final wasDefault =
+          _paymentMethods.any((m) => m.id == paymentMethodId && m.isDefault);
       _paymentMethods.removeWhere((m) => m.id == paymentMethodId);
 
       // Si era el predeterminado, establecer otro
       if (wasDefault && _paymentMethods.isNotEmpty) {
-        await setDefaultPaymentMethod(userId: userId, paymentMethodId: _paymentMethods.first.id);
+        await setDefaultPaymentMethod(
+            userId: userId, paymentMethodId: _paymentMethods.first.id);
       }
 
       AppLogger.info('Método de pago eliminado');
       return true;
-
     } catch (e) {
       _error = 'Error al eliminar método de pago: $e';
       AppLogger.error('Error eliminando método de pago', e);
@@ -495,7 +503,8 @@ class PaymentProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      AppLogger.info('Cargando historial de transacciones para usuario: $userId');
+      AppLogger.info(
+          'Cargando historial de transacciones para usuario: $userId');
 
       final snapshot = await _firebaseService.firestore
           .collection('transactions')
@@ -512,7 +521,6 @@ class PaymentProvider with ChangeNotifier {
       _calculateStatistics();
 
       AppLogger.info('Transacciones cargadas: ${_transactions.length}');
-
     } catch (e) {
       _error = 'Error al cargar historial: $e';
       AppLogger.error('Error cargando transacciones', e);
@@ -537,17 +545,19 @@ class PaymentProvider with ChangeNotifier {
       return;
     }
 
-    final successful = _transactions.where((t) => t.status == 'completed').toList();
+    final successful =
+        _transactions.where((t) => t.status == 'completed').toList();
     final failed = _transactions.where((t) => t.status == 'failed').toList();
-    
+
     final totalSpent = successful.fold<double>(0, (sum, t) => sum + t.amount);
     final spendingByMethod = <String, double>{};
     final transactionsByMethod = <String, int>{};
 
     for (final transaction in successful) {
-      spendingByMethod[transaction.paymentMethodName] = 
-          (spendingByMethod[transaction.paymentMethodName] ?? 0) + transaction.amount;
-      transactionsByMethod[transaction.paymentMethodName] = 
+      spendingByMethod[transaction.paymentMethodName] =
+          (spendingByMethod[transaction.paymentMethodName] ?? 0) +
+              transaction.amount;
+      transactionsByMethod[transaction.paymentMethodName] =
           (transactionsByMethod[transaction.paymentMethodName] ?? 0) + 1;
     }
 
@@ -556,9 +566,8 @@ class PaymentProvider with ChangeNotifier {
       totalTransactions: _transactions.length,
       successfulTransactions: successful.length,
       failedTransactions: failed.length,
-      averageTransactionAmount: successful.isNotEmpty 
-          ? totalSpent / successful.length 
-          : 0,
+      averageTransactionAmount:
+          successful.isNotEmpty ? totalSpent / successful.length : 0,
       spendingByMethod: spendingByMethod,
       transactionsByMethod: transactionsByMethod,
     );
@@ -584,7 +593,8 @@ class PaymentProvider with ChangeNotifier {
       }
 
       // Actualizar método de billetera si existe
-      final walletIndex = _paymentMethods.indexWhere((m) => m.type == PaymentMethodType.wallet);
+      final walletIndex =
+          _paymentMethods.indexWhere((m) => m.type == PaymentMethodType.wallet);
       if (walletIndex != -1) {
         _paymentMethods[walletIndex] = _paymentMethods[walletIndex].copyWith(
           walletBalance: _walletBalance.toStringAsFixed(2),
@@ -592,7 +602,6 @@ class PaymentProvider with ChangeNotifier {
       }
 
       AppLogger.info('Balance de billetera cargado: $_walletBalance');
-
     } catch (e) {
       AppLogger.error('Error cargando balance de billetera', e);
     } finally {
@@ -622,7 +631,8 @@ class PaymentProvider with ChangeNotifier {
         amount: amount,
         paymentMethodId: paymentMethodId,
         paymentMethodName: 'Recarga de Billetera',
-        status: 'completed', // En un caso real, esto dependería del procesamiento
+        status:
+            'completed', // En un caso real, esto dependería del procesamiento
         createdAt: DateTime.now(),
         metadata: {'type': 'wallet_recharge'},
       );
@@ -635,19 +645,20 @@ class PaymentProvider with ChangeNotifier {
 
       // Actualizar balance
       _walletBalance += amount;
-      
+
       await _firebaseService.firestore
           .collection('users')
           .doc(userId)
           .collection('wallet')
           .doc('balance')
           .set({
-            'amount': _walletBalance,
-            'updatedAt': DateTime.now().millisecondsSinceEpoch,
-          });
+        'amount': _walletBalance,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
 
       // Actualizar método de billetera local
-      final walletIndex = _paymentMethods.indexWhere((m) => m.type == PaymentMethodType.wallet);
+      final walletIndex =
+          _paymentMethods.indexWhere((m) => m.type == PaymentMethodType.wallet);
       if (walletIndex != -1) {
         _paymentMethods[walletIndex] = _paymentMethods[walletIndex].copyWith(
           walletBalance: _walletBalance.toStringAsFixed(2),
@@ -660,7 +671,6 @@ class PaymentProvider with ChangeNotifier {
 
       AppLogger.info('Billetera recargada exitosamente');
       return true;
-
     } catch (e) {
       _error = 'Error al recargar billetera: $e';
       AppLogger.error('Error recargando billetera', e);
@@ -709,7 +719,8 @@ class PaymentProvider with ChangeNotifier {
         amount: amount,
         paymentMethodId: paymentMethodId,
         paymentMethodName: paymentMethod.name,
-        status: 'completed', // En producción esto dependería del procesamiento real
+        status:
+            'completed', // En producción esto dependería del procesamiento real
         createdAt: DateTime.now(),
         metadata: {
           'concept': concept,
@@ -726,19 +737,20 @@ class PaymentProvider with ChangeNotifier {
       // Si es pago con billetera, descontar balance
       if (paymentMethod.type == PaymentMethodType.wallet) {
         _walletBalance -= amount;
-        
+
         await _firebaseService.firestore
             .collection('users')
             .doc(userId)
             .collection('wallet')
             .doc('balance')
             .set({
-              'amount': _walletBalance,
-              'updatedAt': DateTime.now().millisecondsSinceEpoch,
-            });
+          'amount': _walletBalance,
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
 
         // Actualizar método de billetera local
-        final walletIndex = _paymentMethods.indexWhere((m) => m.type == PaymentMethodType.wallet);
+        final walletIndex = _paymentMethods
+            .indexWhere((m) => m.type == PaymentMethodType.wallet);
         if (walletIndex != -1) {
           _paymentMethods[walletIndex] = _paymentMethods[walletIndex].copyWith(
             walletBalance: _walletBalance.toStringAsFixed(2),
@@ -752,7 +764,6 @@ class PaymentProvider with ChangeNotifier {
 
       AppLogger.info('Pago procesado exitosamente');
       return true;
-
     } catch (e) {
       _error = 'Error al procesar pago: $e';
       AppLogger.error('Error procesando pago', e);
@@ -786,15 +797,15 @@ class PaymentProvider with ChangeNotifier {
   // Métodos adicionales para promociones y lealtad
   List<Map<String, dynamic>> _promotions = [];
   Map<String, dynamic>? _loyaltyProgram;
-  
+
   List<Map<String, dynamic>> get promotions => _promotions;
   Map<String, dynamic>? get loyaltyProgram => _loyaltyProgram;
-  
+
   Future<void> loadPromotions() async {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // Simulación de carga de promociones
       _promotions = [
         {
@@ -812,7 +823,7 @@ class PaymentProvider with ChangeNotifier {
           'expiresAt': DateTime.now().add(Duration(days: 15)),
         },
       ];
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -821,12 +832,12 @@ class PaymentProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   Future<void> loadLoyaltyProgram() async {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // Simulación de programa de lealtad
       _loyaltyProgram = {
         'points': 250,
@@ -838,7 +849,7 @@ class PaymentProvider with ChangeNotifier {
           'Soporte 24/7',
         ],
       };
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -847,7 +858,7 @@ class PaymentProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   Future<bool> applyPromotionCode(String code) async {
     try {
       // Buscar promoción por código
@@ -855,7 +866,7 @@ class PaymentProvider with ChangeNotifier {
         (p) => p['code'] == code,
         orElse: () => {},
       );
-      
+
       if (promo.isNotEmpty) {
         // Aplicar promoción
         return true;
@@ -866,7 +877,7 @@ class PaymentProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   Future<bool> usePromotion(String promotionId) async {
     try {
       // Usar promoción

@@ -1,203 +1,148 @@
-# Flutter/Dart
-.dart_tool/
-.packages
-.pub-cache/
-.pub/
-build/
-.flutter-plugins
-.flutter-plugins-dependencies
-*.iml
-*.ipr
-*.iws
-.idea/
+# 🚕 OASIS TAXI - GITIGNORE PROFESIONAL
 
-# Android
-*.apk
-*.ap_
-*.aab
-*.dex
-*.class
-local.properties
-**/android/**/gradle-wrapper.jar
-**/android/.gradle
-**/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/key.properties
+# ============================================
+# FLUTTER / DART
+# ============================================
+app/.dart_tool/
+app/.packages
+app/.pub-cache/
+app/.pub/
+app/build/
+app/*.iml
+app/*.lock
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# ============================================
+# ANDROID
+# ============================================
+app/android/.gradle/
+app/android/captures/
+app/android/local.properties
+app/android/*.iml
+app/android/**/*.apk
+app/android/**/*.aab
+app/android/**/*.dex
+app/android/**/*.class
+app/android/**/GeneratedPluginRegistrant.java
+
+# ============================================
+# iOS
+# ============================================
+app/ios/Flutter/
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/**/*.mode1v3
+app/ios/**/*.mode2v3
+app/ios/**/*.moved-aside
+app/ios/**/*.pbxuser
+app/ios/**/*.perspectivev3
+app/ios/**/DerivedData/
+app/ios/**/xcuserdata
+app/ios/Runner/GeneratedPluginRegistrant.*
+
+# ============================================
+# WEB
+# ============================================
+app/web/*.map
+app/.dart_tool/flutter_build/
+
+# ============================================
+# MACOS / WINDOWS / LINUX
+# ============================================
+app/macos/Flutter/
+app/windows/flutter/
+app/linux/flutter/
+
+# ============================================
+# CONFIGURACIÓN Y SECRETOS
+# ============================================
+app/.env
+app/.env.*
+!app/.env.example
+app/assets/*service-account*.json
+app/assets/*firebase-adminsdk*.json
+*.pem
+*.key
+*.p12
+*.p8
 *.jks
 
-# iOS
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*sync/
-**/ios/**/.sconsign.dblite
-**/ios/**/.tags*
-**/ios/**/.vagrant/
-**/ios/**/DerivedData/
-**/ios/**/Icon?
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/profile
-**/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/App.framework
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/app.flx
-**/ios/Flutter/app.zip
-**/ios/Flutter/flutter_assets/
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
+# ============================================
+# FIREBASE
+# ============================================
+app/firebase/firebase-debug.log
+app/firebase/firestore-debug.log
+app/firebase/ui-debug.log
+app/firebase/.firebase/
+firebase-debug.log*
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-.npm
-*.tgz
-.yarn-integrity
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-.cache
-.parcel-cache
-.next
-out
-.nuxt
-dist
-.cache/
-.vuepress/dist
-.serverless/
-.fusebox/
-.dynamodb/
-.tern-port
-.vscode-test
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
+# ============================================
+# TESTS Y COVERAGE
+# ============================================
+app/coverage/
+app/.test_coverage.dart
+app/test/reports/
 
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
-*.tfvars
-*.tfvars.json
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraformrc
-terraform.rc
-
-# Google Cloud
-*.json
-!package.json
-!package-lock.json
-!tsconfig.json
-!app.json
-service-account-*.json
-gcp-key.json
-
-# IDEs
-.vscode/
+# ============================================
+# IDE Y EDITORES
+# ============================================
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 .project
 .classpath
-.c9/
-*.launch
-.settings/
 *.sublime-workspace
 
-# OS
+# ============================================
+# SISTEMA OPERATIVO
+# ============================================
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 desktop.ini
+._*
 
-# Logs
-logs/
+# ============================================
+# LOGS Y TEMPORALES
+# ============================================
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-firebase-debug.log*
-firebase-debug.*.log*
-
-# Testing
-coverage/
-.nyc_output/
-*.lcov
-
-# Misc
-*.pem
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
-web-build/
-web-report/
-
-# Firebase
-.firebase/
-firebase-export-*
-
-# Build artifacts
-build/
-dist/
-tmp/
-temp/
 *.tmp
 *.temp
-
-# Documentation build
-docs/_build/
-docs/.docusaurus/
-site/
-
-# Secrets
-secrets/
-*.secret
-*.secrets
-
-# Database
-*.sqlite
-*.sqlite3
-*.db
-
-# Backup files
-*.backup
 *.bak
+*.backup
 *.old
 
-# Archives
-*.zip
-*.tar.gz
-*.rar
-*.7z
+# ============================================
+# BUILD Y DISTRIBUCIÓN
+# ============================================
+app/dist/
+app/release/
+app/debug/
+app/profile/
 
-# Custom
-.oasis-taxi-local/
-local-data/
-test-reports/
+# ============================================
+# DOCUMENTACIÓN GENERADA
+# ============================================
+app/doc/api/
+
+# ============================================
+# ARCHIVOS NO NECESARIOS
+# ============================================
+node_modules/
+package-lock.json
+yarn.lock
+npm-debug.log*
+yarn-error.log*
+
+# ============================================
+# ARCHIVOS PRIVADOS DEL PROYECTO
+# ============================================
+oasis-taxi-peru-firebase-adminsdk*.json
+private/
+secrets/# Firebase service account credentials
+app/android/app/app-oasis-taxi-firebase-adminsdk-*.json
+app/android/app/google-services.json
+*.keystore
+*.jks

@@ -1,0 +1,405 @@
+# Google Cloud Operations Suite Configuration for OasisTaxi
+# Production monitoring and alerting setup
+
+project_id: oasis-taxi-peru
+environment: production
+
+# Cloud Monitoring Configuration
+monitoring:
+  # Uptime Checks
+  uptime_checks:
+    - name: oasistaxi-api-health
+      display_name: "OasisTaxi API Health Check"
+      monitored_resource:
+        type: uptime_url
+        host: api.oasistaxiperu.com
+        path: /health
+      http_check:
+        port: 443
+        use_ssl: true
+        validate_ssl: true
+        accepted_response_codes:
+          - 200
+      period: 60s
+      timeout: 10s
+
+    - name: oasistaxi-web-app
+      display_name: "OasisTaxi Web App"
+      monitored_resource:
+        type: uptime_url
+        host: oasistaxiperu.com
+        path: /
+      http_check:
+        port: 443
+        use_ssl: true
+        validate_ssl: true
+      period: 60s
+      timeout: 10s
+
+    - name: firebase-functions-health
+      display_name: "Firebase Functions Health"
+      monitored_resource:
+        type: uptime_url
+        host: us-central1-oasis-taxi-peru.cloudfunctions.net
+        path: /health
+      http_check:
+        port: 443
+        use_ssl: true
+      period: 300s
+      timeout: 10s
+
+  # Custom Metrics
+  custom_metrics:
+    - metric_type: custom.googleapis.com/oasistaxiperu/trip_requests
+      display_name: "Trip Requests"
+      description: "Number of trip requests per minute"
+      metric_kind: GAUGE
+      value_type: INT64
+      unit: "requests/min"
+
+    - metric_type: custom.googleapis.com/oasistaxiperu/active_trips
+      display_name: "Active Trips"
+      description: "Number of active trips in progress"
+      metric_kind: GAUGE
+      value_type: INT64
+      unit: "trips"
+
+    - metric_type: custom.googleapis.com/oasistaxiperu/driver_online
+      display_name: "Drivers Online"
+      description: "Number of drivers currently online"
+      metric_kind: GAUGE
+      value_type: INT64
+      unit: "drivers"
+
+    - metric_type: custom.googleapis.com/oasistaxiperu/payment_success_rate
+      display_name: "Payment Success Rate"
+      description: "Percentage of successful payments"
+      metric_kind: GAUGE
+      value_type: DOUBLE
+      unit: "%"
+
+    - metric_type: custom.googleapis.com/oasistaxiperu/negotiation_success_rate
+      display_name: "Price Negotiation Success Rate"
+      description: "Percentage of successful price negotiations"
+      metric_kind: GAUGE
+      value_type: DOUBLE
+      unit: "%"
+
+  # Dashboards
+  dashboards:
+    - name: oasistaxiperu-production-overview
+      display_name: "OasisTaxi Production Overview"
+      grid_layout:
+        widgets:
+          - title: "API Request Rate"
+            xy_chart:
+              data_sets:
+                - time_series_query:
+                    time_series_filter:
+                      filter: metric.type="cloudfunctions.googleapis.com/function/execution_count"
+
+          - title: "API Latency (p95)"
+            xy_chart:
+              data_sets:
+                - time_series_query:
+                    time_series_filter:
+                      filter: metric.type="cloudfunctions.googleapis.com/function/execution_times"
+
+          - title: "Active Users"
+            scorecard:
+              time_series_query:
+                time_series_filter:
+                  filter: metric.type="firebase.googleapis.com/database/active_connections"
+
+          - title: "Error Rate"
+            xy_chart:
+              data_sets:
+                - time_series_query:
+                    time_series_filter:
+                      filter: metric.type="cloudfunctions.googleapis.com/function/execution_errors"
+
+    - name: oasistaxiperu-business-metrics
+      display_name: "OasisTaxi Business Metrics"
+      grid_layout:
+        widgets:
+          - title: "Trip Requests"
+            xy_chart:
+              data_sets:
+                - time_series_query:
+                    time_series_filter:
+                      filter: metric.type="custom.googleapis.com/oasistaxiperu/trip_requests"
+
+          - title: "Active Trips"
+            scorecard:
+              time_series_query:
+                time_series_filter:
+                  filter: metric.type="custom.googleapis.com/oasistaxiperu/active_trips"
+
+          - title: "Drivers Online"
+            scorecard:
+              time_series_query:
+                time_series_filter:
+                  filter: metric.type="custom.googleapis.com/oasistaxiperu/driver_online"
+
+          - title: "Payment Success Rate"
+            xy_chart:
+              data_sets:
+                - time_series_query:
+                    time_series_filter:
+                      filter: metric.type="custom.googleapis.com/oasistaxiperu/payment_success_rate"
+
+# Alerting Policies
+alerting_policies:
+  - display_name: "High API Error Rate"
+    conditions:
+      - display_name: "Error rate > 5%"
+        condition_threshold:
+          filter: metric.type="cloudfunctions.googleapis.com/function/execution_errors"
+          comparison: COMPARISON_GT
+          threshold_value: 0.05
+          duration: 300s
+          aggregations:
+            - alignment_period: 60s
+              per_series_aligner: ALIGN_RATE
+    notification_channels:
+      - email_critical
+      - sms_oncall
+      - slack_alerts
+
+  - display_name: "API Latency High"
+    conditions:
+      - display_name: "p95 latency > 2000ms"
+        condition_threshold:
+          filter: metric.type="cloudfunctions.googleapis.com/function/execution_times"
+          comparison: COMPARISON_GT
+          threshold_value: 2000
+          duration: 300s
+          aggregations:
+            - alignment_period: 60s
+              per_series_aligner: ALIGN_PERCENTILE_95
+    notification_channels:
+      - email_warning
+      - slack_alerts
+
+  - display_name: "Service Unavailable"
+    conditions:
+      - display_name: "Uptime check failed"
+        condition_uptime_check:
+          uptime_check_name: oasistaxi-api-health
+    notification_channels:
+      - email_critical
+      - sms_oncall
+      - pagerduty
+
+  - display_name: "Low Driver Availability"
+    conditions:
+      - display_name: "Drivers online < 10"
+        condition_threshold:
+          filter: metric.type="custom.googleapis.com/oasistaxiperu/driver_online"
+          comparison: COMPARISON_LT
+          threshold_value: 10
+          duration: 600s
+    notification_channels:
+      - email_operations
+      - slack_ops
+
+  - display_name: "Payment Failures Spike"
+    conditions:
+      - display_name: "Payment success rate < 90%"
+        condition_threshold:
+          filter: metric.type="custom.googleapis.com/oasistaxiperu/payment_success_rate"
+          comparison: COMPARISON_LT
+          threshold_value: 90
+          duration: 300s
+    notification_channels:
+      - email_critical
+      - slack_alerts
+
+  - display_name: "Firebase Quota Exceeded"
+    conditions:
+      - display_name: "Firestore reads > 50000/min"
+        condition_threshold:
+          filter: metric.type="firestore.googleapis.com/document/read_count"
+          comparison: COMPARISON_GT
+          threshold_value: 50000
+          duration: 60s
+          aggregations:
+            - alignment_period: 60s
+              per_series_aligner: ALIGN_RATE
+    notification_channels:
+      - email_warning
+      - slack_alerts
+
+# Notification Channels
+notification_channels:
+  - type: email
+    name: email_critical
+    display_name: "Critical Alerts - Email"
+    email_address: alerts-critical@oasistaxiperu.com
+
+  - type: email
+    name: email_warning
+    display_name: "Warning Alerts - Email"
+    email_address: alerts-warning@oasistaxiperu.com
+
+  - type: email
+    name: email_operations
+    display_name: "Operations Team - Email"
+    email_address: operations@oasistaxiperu.com
+
+  - type: sms
+    name: sms_oncall
+    display_name: "On-Call SMS"
+    phone_number: "+51999999999"
+
+  - type: slack
+    name: slack_alerts
+    display_name: "Slack - #alerts"
+    webhook_url: ${SLACK_WEBHOOK_ALERTS}
+
+  - type: slack
+    name: slack_ops
+    display_name: "Slack - #operations"
+    webhook_url: ${SLACK_WEBHOOK_OPS}
+
+  - type: pagerduty
+    name: pagerduty
+    display_name: "PagerDuty Integration"
+    service_key: ${PAGERDUTY_SERVICE_KEY}
+
+# Log-based Metrics
+log_metrics:
+  - name: emergency_sos_triggered
+    display_name: "Emergency SOS Triggered"
+    description: "Count of emergency SOS activations"
+    filter: |
+      resource.type="cloud_function"
+      jsonPayload.event="emergency_sos_triggered"
+    metric_descriptor:
+      metric_kind: DELTA
+      value_type: INT64
+      unit: "1"
+
+  - name: driver_verification_failed
+    display_name: "Driver Verification Failed"
+    description: "Count of failed driver verifications"
+    filter: |
+      resource.type="cloud_function"
+      jsonPayload.event="driver_verification_failed"
+    metric_descriptor:
+      metric_kind: DELTA
+      value_type: INT64
+      unit: "1"
+
+  - name: suspicious_activity_detected
+    display_name: "Suspicious Activity Detected"
+    description: "Count of suspicious activity detections"
+    filter: |
+      severity>=WARNING
+      jsonPayload.event="suspicious_activity"
+    metric_descriptor:
+      metric_kind: DELTA
+      value_type: INT64
+      unit: "1"
+
+# SLOs (Service Level Objectives)
+slos:
+  - name: api_availability
+    display_name: "API Availability"
+    service: oasistaxiperu-api
+    sli:
+      request_based:
+        good_total_ratio:
+          good_filter: |
+            metric.type="cloudfunctions.googleapis.com/function/execution_count"
+            AND response.code < 500
+          total_filter: |
+            metric.type="cloudfunctions.googleapis.com/function/execution_count"
+    goal: 0.999  # 99.9% availability
+    rolling_period: 30d
+
+  - name: api_latency
+    display_name: "API Latency"
+    service: oasistaxiperu-api
+    sli:
+      request_based:
+        distribution_cut:
+          range:
+            max: 1000  # 1000ms
+    goal: 0.95  # 95% of requests under 1000ms
+    rolling_period: 30d
+
+  - name: payment_success
+    display_name: "Payment Success Rate"
+    service: oasistaxiperu-payments
+    sli:
+      request_based:
+        good_total_ratio:
+          good_filter: |
+            metric.type="custom.googleapis.com/oasistaxiperu/payment_status"
+            AND status="success"
+          total_filter: |
+            metric.type="custom.googleapis.com/oasistaxiperu/payment_status"
+    goal: 0.98  # 98% payment success rate
+    rolling_period: 30d
+
+# Error Reporting Configuration
+error_reporting:
+  service_name: oasistaxiperu
+  service_version: ${APP_VERSION}
+  report_errors_to:
+    - email: engineering@oasistaxiperu.com
+  error_group_settings:
+    - name: critical_errors
+      filter: severity >= ERROR
+      notification_channels:
+        - email_critical
+        - pagerduty
+    - name: warnings
+      filter: severity = WARNING
+      notification_channels:
+        - email_warning
+
+# Trace Configuration
+trace:
+  sampling_rate: 0.1  # 10% of requests
+  excluded_paths:
+    - /health
+    - /metrics
+    - /favicon.ico
+  always_sample_errors: true
+
+# Profiler Configuration
+profiler:
+  enabled: true
+  service_name: oasistaxiperu
+  service_version: ${APP_VERSION}
+  heap_profiling: true
+  cpu_profiling: true
+  profile_duration: 30s
+
+# Export Configuration
+exports:
+  - type: bigquery
+    dataset: monitoring_data
+    tables:
+      - name: metrics
+        schema: |
+          timestamp:TIMESTAMP,
+          metric_name:STRING,
+          value:FLOAT,
+          labels:JSON
+      - name: logs
+        schema: |
+          timestamp:TIMESTAMP,
+          severity:STRING,
+          message:STRING,
+          metadata:JSON
+      - name: traces
+        schema: |
+          trace_id:STRING,
+          span_id:STRING,
+          parent_span_id:STRING,
+          operation:STRING,
+          duration_ms:INT64,
+          attributes:JSON

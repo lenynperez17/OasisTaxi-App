@@ -1,0 +1,173 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Función helper para verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Función helper para verificar si es el propietario
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Función helper para obtener el userType del usuario
+    function getUserType() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.userType;
+    }
+
+    // Función helper para verificar si es admin
+    function isAdmin() {
+      return isAuthenticated() && getUserType() == 'admin';
+    }
+
+    // Función helper para verificar si es driver
+    function isDriver() {
+      return isAuthenticated() && getUserType() == 'driver';
+    }
+
+    // Función helper para verificar el tamaño del archivo (max 10MB)
+    function fileSizeValid() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Función helper para verificar el tipo de imagen
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Función helper para verificar documentos PDF
+    function isPDF() {
+      return request.resource.contentType == 'application/pdf';
+    }
+
+    // Función helper para verificar tipos permitidos para documentos
+    function isDocument() {
+      return isPDF() || isImage();
+    }
+
+    // Imágenes de perfil de usuarios
+    match /users/{userId}/profile/{fileName} {
+      // Los usuarios pueden ver su propia foto de perfil
+      // Todos pueden ver fotos de perfil (para mostrar en la app)
+      allow read: if true;
+
+      // Los usuarios pueden subir/actualizar su propia foto de perfil
+      // Debe ser una imagen y menor a 10MB
+      allow write: if isOwner(userId) && isImage() && fileSizeValid();
+
+      // Los usuarios pueden eliminar su propia foto
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Documentos de verificación de conductores
+    match /drivers/{driverId}/documents/{fileName} {
+      // El conductor puede ver sus documentos
+      // Los admins pueden ver todos los documentos
+      allow read: if isOwner(driverId) || isAdmin();
+
+      // Los conductores pueden subir documentos
+      // Debe ser PDF o imagen y menor a 10MB
+      allow create: if isOwner(driverId) && isDocument() && fileSizeValid();
+
+      // Los conductores pueden actualizar sus documentos si aún no están verificados
+      allow update: if isOwner(driverId) && isDocument() && fileSizeValid();
+
+      // Solo admins pueden eliminar documentos (para cumplimiento legal)
+      allow delete: if isAdmin();
+    }
+
+    // Fotos de vehículos
+    match /vehicles/{vehicleId}/photos/{fileName} {
+      // Todos pueden ver fotos de vehículos (para mostrar en la app)
+      allow read: if true;
+
+      // Solo el propietario del vehículo puede subir fotos
+      allow create: if isDriver() && isImage() && fileSizeValid();
+
+      // El propietario puede actualizar las fotos
+      allow update: if isDriver() && isImage() && fileSizeValid();
+
+      // El propietario o admin puede eliminar
+      allow delete: if isDriver() || isAdmin();
+    }
+
+    // Imágenes de chat (capturas, fotos compartidas)
+    match /chats/{chatId}/media/{fileName} {
+      // Participantes del chat pueden ver las imágenes
+      allow read: if isAuthenticated();
+
+      // Participantes pueden subir imágenes
+      allow create: if isAuthenticated() && isImage() && fileSizeValid();
+
+      // No se pueden modificar imágenes una vez subidas
+      allow update: if false;
+
+      // Solo admin puede eliminar (por contenido inapropiado)
+      allow delete: if isAdmin();
+    }
+
+    // Evidencias de viajes (fotos de incidentes, etc.)
+    match /trips/{tripId}/evidence/{fileName} {
+      // Participantes del viaje y admins pueden ver
+      allow read: if isAuthenticated();
+
+      // Participantes pueden subir evidencia
+      allow create: if isAuthenticated() && isImage() && fileSizeValid();
+
+      // No se puede modificar evidencia
+      allow update: if false;
+
+      // No se puede eliminar evidencia (registro permanente)
+      allow delete: if false;
+    }
+
+    // Imágenes promocionales y banners (público)
+    match /public/promotions/{fileName} {
+      // Todos pueden ver material promocional
+      allow read: if true;
+
+      // Solo admins pueden gestionar material promocional
+      allow write: if isAdmin();
+    }
+
+    // Logos y assets de la aplicación
+    match /public/assets/{fileName} {
+      // Todos pueden ver assets públicos
+      allow read: if true;
+
+      // Solo admins pueden gestionar assets
+      allow write: if isAdmin();
+    }
+
+    // Documentos legales (términos, políticas)
+    match /public/legal/{fileName} {
+      // Todos pueden ver documentos legales
+      allow read: if true;
+
+      // Solo admins pueden actualizar documentos legales
+      allow write: if isAdmin();
+    }
+
+    // Archivos temporales (para uploads en proceso)
+    match /temp/{userId}/{fileName} {
+      // El usuario puede acceder a sus archivos temporales
+      allow read: if isOwner(userId);
+
+      // El usuario puede subir archivos temporales
+      allow create: if isOwner(userId) && fileSizeValid();
+
+      // El usuario puede eliminar sus archivos temporales
+      allow delete: if isOwner(userId);
+
+      // No se pueden actualizar archivos temporales
+      allow update: if false;
+    }
+
+    // Regla por defecto: denegar todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

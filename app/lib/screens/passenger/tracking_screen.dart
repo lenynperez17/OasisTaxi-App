@@ -1,10 +1,10 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../core/theme/modern_theme.dart';
 import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../utils/app_logger.dart';
 import '../shared/chat_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class TrackingScreen extends StatefulWidget {
   final String pickupAddress;
   final String destinationAddress;
   final double tripPrice;
-  
+
   const TrackingScreen({
     super.key,
     required this.tripId,
@@ -30,58 +30,60 @@ class TrackingScreen extends StatefulWidget {
     required this.destinationAddress,
     required this.tripPrice,
   });
-  
+
   @override
-  _TrackingScreenState createState() => _TrackingScreenState();
+  TrackingScreenState createState() => TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen>
+class TrackingScreenState extends State<TrackingScreen>
     with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
-  
+
   // Animaciones
   late AnimationController _bottomSheetController;
   late AnimationController _pulseController;
   late AnimationController _etaController;
-  
+
   // Estado del viaje
   String _tripStatus = 'arriving'; // arriving, arrived, ontrip, completed
   int _minutesRemaining = 5;
   double _distanceRemaining = 2.5;
-  
+
   // Posición del conductor (simulada)
   LatLng _driverPosition = LatLng(-12.0851, -76.9770);
   final LatLng _passengerPosition = LatLng(-12.0951, -76.9870);
   final LatLng _destinationPosition = LatLng(-12.1051, -77.0070);
-  
+
   Timer? _trackingTimer;
   Timer? _etaTimer;
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle(
+        'TrackingScreen', 'initState - TripId: ${widget.tripId}');
+
     _bottomSheetController = AnimationController(
       duration: Duration(milliseconds: 500),
       vsync: this,
     )..forward();
-    
+
     _pulseController = AnimationController(
       duration: Duration(seconds: 2),
       vsync: this,
     )..repeat();
-    
+
     _etaController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _setupMap();
     _startTracking();
   }
-  
+
   @override
   void dispose() {
     _bottomSheetController.dispose();
@@ -91,7 +93,7 @@ class _TrackingScreenState extends State<TrackingScreen>
     _etaTimer?.cancel();
     super.dispose();
   }
-  
+
   void _setupMap() {
     // Configurar marcadores
     _markers.add(
@@ -107,7 +109,7 @@ class _TrackingScreenState extends State<TrackingScreen>
         ),
       ),
     );
-    
+
     _markers.add(
       Marker(
         markerId: MarkerId('passenger'),
@@ -121,7 +123,7 @@ class _TrackingScreenState extends State<TrackingScreen>
         ),
       ),
     );
-    
+
     if (_tripStatus == 'ontrip') {
       _markers.add(
         Marker(
@@ -137,7 +139,7 @@ class _TrackingScreenState extends State<TrackingScreen>
         ),
       );
     }
-    
+
     // Configurar ruta
     _polylines.add(
       Polyline(
@@ -149,12 +151,12 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _startTracking() {
     // Simular movimiento del conductor
     _trackingTimer = Timer.periodic(Duration(seconds: 3), (timer) {
       if (!mounted) return;
-      
+
       setState(() {
         // Mover conductor hacia el pasajero
         if (_tripStatus == 'arriving') {
@@ -162,7 +164,7 @@ class _TrackingScreenState extends State<TrackingScreen>
             _driverPosition.latitude + 0.001,
             _driverPosition.longitude + 0.001,
           );
-          
+
           // Actualizar marcador
           _markers.removeWhere((m) => m.markerId.value == 'driver');
           _markers.add(
@@ -175,13 +177,13 @@ class _TrackingScreenState extends State<TrackingScreen>
               rotation: 45, // Simular rotación
             ),
           );
-          
+
           // Verificar si llegó
           final distance = _calculateDistance(
             _driverPosition,
             _passengerPosition,
           );
-          
+
           if (distance < 0.1) {
             _tripStatus = 'arrived';
             _showArrivedNotification();
@@ -192,19 +194,23 @@ class _TrackingScreenState extends State<TrackingScreen>
             _driverPosition.latitude + 0.0015,
             _driverPosition.longitude + 0.0015,
           );
-          
+
           // Actualizar ruta
           _polylines.clear();
           _polylines.add(
             Polyline(
               polylineId: PolylineId('route'),
-              points: [_passengerPosition, _driverPosition, _destinationPosition],
+              points: [
+                _passengerPosition,
+                _driverPosition,
+                _destinationPosition
+              ],
               color: ModernTheme.oasisGreen,
               width: 5,
             ),
           );
         }
-        
+
         // Centrar mapa
         _mapController?.animateCamera(
           CameraUpdate.newLatLngBounds(
@@ -214,11 +220,11 @@ class _TrackingScreenState extends State<TrackingScreen>
         );
       });
     });
-    
+
     // Actualizar ETA
     _etaTimer = Timer.periodic(Duration(seconds: 30), (timer) {
       if (!mounted) return;
-      
+
       setState(() {
         if (_minutesRemaining > 0) {
           _minutesRemaining--;
@@ -227,14 +233,14 @@ class _TrackingScreenState extends State<TrackingScreen>
       });
     });
   }
-  
+
   double _calculateDistance(LatLng pos1, LatLng pos2) {
     return math.sqrt(
       math.pow(pos1.latitude - pos2.latitude, 2) +
-      math.pow(pos1.longitude - pos2.longitude, 2),
+          math.pow(pos1.longitude - pos2.longitude, 2),
     );
   }
-  
+
   LatLngBounds _getBounds() {
     double minLat = math.min(
       _driverPosition.latitude,
@@ -252,20 +258,20 @@ class _TrackingScreenState extends State<TrackingScreen>
       _driverPosition.longitude,
       math.max(_passengerPosition.longitude, _destinationPosition.longitude),
     );
-    
+
     return LatLngBounds(
       southwest: LatLng(minLat, minLng),
       northeast: LatLng(maxLat, maxLng),
     );
   }
-  
+
   void _showArrivedNotification() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(Icons.directions_car, color: Colors.white),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('¡Tu conductor ha llegado!'),
           ],
         ),
@@ -282,7 +288,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,7 +316,7 @@ class _TrackingScreenState extends State<TrackingScreen>
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
           ),
-          
+
           // Indicador de posición del conductor con pulso
           if (_tripStatus == 'arriving' || _tripStatus == 'ontrip')
             Positioned(
@@ -324,15 +330,15 @@ class _TrackingScreenState extends State<TrackingScreen>
                     height: 60 + (20 * _pulseController.value),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: ModernTheme.oasisGreen.withValues(alpha: 
-                        0.3 * (1 - _pulseController.value),
+                      color: ModernTheme.oasisGreen.withValues(
+                        alpha: 0.3 * (1 - _pulseController.value),
                       ),
                     ),
                   );
                 },
               ),
             ),
-          
+
           // Header con información del viaje
           SafeArea(
             child: Container(
@@ -360,7 +366,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         AnimatedBuilder(
                           animation: _etaController,
                           builder: (context, child) {
@@ -372,7 +378,8 @@ class _TrackingScreenState extends State<TrackingScreen>
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
+                                  color: ModernTheme.oasisGreen
+                                      .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -397,7 +404,7 @@ class _TrackingScreenState extends State<TrackingScreen>
               ),
             ),
           ),
-          
+
           // Bottom sheet con información del conductor
           Positioned(
             left: 0,
@@ -413,7 +420,7 @@ class _TrackingScreenState extends State<TrackingScreen>
               },
             ),
           ),
-          
+
           // Botón de emergencia
           Positioned(
             right: 16,
@@ -429,7 +436,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   Widget _buildDriverInfoSheet() {
     return Container(
       decoration: BoxDecoration(
@@ -450,7 +457,7 @@ class _TrackingScreenState extends State<TrackingScreen>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Estado del viaje
           if (_tripStatus == 'arrived')
             Container(
@@ -466,7 +473,7 @@ class _TrackingScreenState extends State<TrackingScreen>
               child: Row(
                 children: [
                   Icon(Icons.check_circle, color: ModernTheme.success),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Tu conductor te está esperando',
@@ -485,7 +492,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                 ],
               ),
             ),
-          
+
           // Información del conductor
           Padding(
             padding: EdgeInsets.all(20),
@@ -507,8 +514,8 @@ class _TrackingScreenState extends State<TrackingScreen>
                         backgroundImage: NetworkImage(widget.driverPhoto),
                       ),
                     ),
-                    SizedBox(width: 16),
-                    
+                    const SizedBox(width: 16),
+
                     // Datos del conductor
                     Expanded(
                       child: Column(
@@ -523,7 +530,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -541,7 +548,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                                       size: 14,
                                       color: Colors.amber,
                                     ),
-                                    SizedBox(width: 2),
+                                    const SizedBox(width: 2),
                                     Text(
                                       widget.driverRating.toString(),
                                       style: TextStyle(
@@ -554,14 +561,14 @@ class _TrackingScreenState extends State<TrackingScreen>
                               ),
                             ],
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             widget.vehicleInfo,
                             style: TextStyle(
                               color: ModernTheme.textSecondary,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: 8,
@@ -582,13 +589,14 @@ class _TrackingScreenState extends State<TrackingScreen>
                         ],
                       ),
                     ),
-                    
+
                     // Botones de acción
                     Column(
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
+                            color:
+                                ModernTheme.oasisGreen.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
@@ -599,10 +607,11 @@ class _TrackingScreenState extends State<TrackingScreen>
                             onPressed: _callDriver,
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Container(
                           decoration: BoxDecoration(
-                            color: ModernTheme.primaryBlue.withValues(alpha: 0.1),
+                            color:
+                                ModernTheme.primaryBlue.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
@@ -617,9 +626,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                     ),
                   ],
                 ),
-                
-                SizedBox(height: 20),
-                
+
+                const SizedBox(height: 20),
+
                 // Detalles del viaje
                 Container(
                   padding: EdgeInsets.all(16),
@@ -640,7 +649,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                               shape: BoxShape.circle,
                             ),
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,7 +672,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                           ),
                         ],
                       ),
-                      
+
                       // Línea conectora
                       Container(
                         margin: EdgeInsets.only(left: 4, top: 4, bottom: 4),
@@ -671,7 +680,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                         height: 20,
                         color: Colors.grey.shade300,
                       ),
-                      
+
                       // Destino
                       Row(
                         children: [
@@ -683,7 +692,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                               shape: BoxShape.circle,
                             ),
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,9 +715,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                           ),
                         ],
                       ),
-                      
+
                       Divider(height: 24),
-                      
+
                       // Precio y método de pago
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -746,7 +755,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                                   size: 16,
                                   color: ModernTheme.textSecondary,
                                 ),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text(
                                   'Efectivo',
                                   style: TextStyle(
@@ -762,9 +771,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                     ],
                   ),
                 ),
-                
+
                 if (_tripStatus == 'ontrip') ...[
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   AnimatedPulseButton(
                     text: 'Finalizar Viaje',
                     icon: Icons.check_circle,
@@ -779,7 +788,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   String _getStatusText() {
     switch (_tripStatus) {
       case 'arriving':
@@ -794,7 +803,7 @@ class _TrackingScreenState extends State<TrackingScreen>
         return '';
     }
   }
-  
+
   void _shareLocation() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -803,7 +812,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _callDriver() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -812,7 +821,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _openChat() {
     Navigator.push(
       context,
@@ -825,7 +834,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _showEmergencyOptions() {
     showModalBottomSheet(
       context: context,
@@ -847,7 +856,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                 color: ModernTheme.error,
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ListTile(
               leading: Icon(Icons.call, color: ModernTheme.error),
               title: Text('Llamar al 911'),
@@ -885,7 +894,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _cancelTrip() {
     showDialog(
       context: context,
@@ -922,7 +931,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       ),
     );
   }
-  
+
   void _completeTrip() {
     setState(() => _tripStatus = 'completed');
     Navigator.pop(context);

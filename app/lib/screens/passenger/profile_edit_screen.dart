@@ -1,37 +1,48 @@
-// ignore_for_file: use_build_context_synchronously
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/oasis_button.dart';
+import '../../widgets/common/oasis_app_bar.dart';
+import '../../widgets/cards/oasis_card.dart';
+import '../../services/security_integration_service.dart';
+import '../../utils/app_logger.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
 
   @override
-  _ProfileEditScreenState createState() => _ProfileEditScreenState();
+  ProfileEditScreenState createState() => ProfileEditScreenState();
 }
 
-class _ProfileEditScreenState extends State<ProfileEditScreen> 
+class ProfileEditScreenState extends State<ProfileEditScreen>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ImagePicker _imagePicker = ImagePicker();
   String? _userId; // Se obtendrá del usuario actual
-  
+
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
-  
+
   // Form controllers
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emergencyNameController = TextEditingController();
-  final TextEditingController _emergencyPhoneController = TextEditingController();
-  
+  final TextEditingController _emergencyNameController =
+      TextEditingController();
+  final TextEditingController _emergencyPhoneController =
+      TextEditingController();
+
   // User data
   String _profileImagePath = '';
   String _birthDate = '';
@@ -42,39 +53,40 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   bool _smsEnabled = false;
   bool _emailPromotions = true;
   bool _locationSharing = true;
-  
+
   // Form state
   bool _isLoading = false;
   bool _hasChanges = false;
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('ProfileEditScreen', 'initState');
+
     _fadeController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-    
+
     _slideAnimation = CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeOut,
     );
-    
+
     _loadUserData();
     _fadeController.forward();
     _slideController.forward();
-    
+
     // Listen for changes
     _nameController.addListener(_onFieldChanged);
     _lastNameController.addListener(_onFieldChanged);
@@ -83,7 +95,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     _emergencyNameController.addListener(_onFieldChanged);
     _emergencyPhoneController.addListener(_onFieldChanged);
   }
-  
+
   @override
   void dispose() {
     _fadeController.dispose();
@@ -96,24 +108,37 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     _emergencyPhoneController.dispose();
     super.dispose();
   }
-  
+
   void _onFieldChanged() {
     if (!_hasChanges) {
       setState(() => _hasChanges = true);
     }
   }
-  
+
   Future<void> _loadUserData() async {
     try {
       setState(() => _isLoading = true);
-      
-      // Por ahora usar un userId de ejemplo
-      // En producción, esto vendría del usuario autenticado
-      _userId = 'test_user_id';
-      
+
+      // Obtener el usuario autenticado actual
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        // Si no hay usuario autenticado, regresar a la pantalla anterior
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Debe iniciar sesión para editar su perfil'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      _userId = currentUser.uid;
+
       // Cargar datos del usuario desde Firestore
       final userDoc = await _firestore.collection('users').doc(_userId).get();
-      
+
       if (userDoc.exists) {
         final data = userDoc.data()!;
         setState(() {
@@ -140,7 +165,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         });
       }
     } catch (e) {
-      print('Error cargando datos del usuario: $e');
+      AppLogger.error('cargando datos del usuario', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -155,41 +180,27 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       }
     }
   }
-  
-  
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (bool didPop) async {
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
         final shouldPop = await _onWillPop();
-        if (!mounted) return;
-        if (shouldPop) Navigator.of(context).pop();
+        _handlePop(shouldPop);
       },
       child: Scaffold(
         backgroundColor: ModernTheme.backgroundLight,
-        appBar: AppBar(
-          backgroundColor: ModernTheme.oasisGreen,
-          elevation: 0,
-          title: Text(
-            'Editar Perfil',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        appBar: OasisAppBar.standard(
+          title: 'Editar Perfil',
+          showBackButton: true,
           actions: [
             if (_hasChanges)
-              TextButton(
+              OasisButton.text(
+                text: 'Guardar',
                 onPressed: _isLoading ? null : _saveProfile,
-                child: Text(
-                  'Guardar',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                textColor: Colors.white,
               ),
           ],
         ),
@@ -201,43 +212,48 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
               child: Form(
                 key: _formKey,
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(16),
+                  padding: ModernTheme.getResponsivePadding(
+                    context,
+                    mobile: AppSpacing.all(AppSpacing.screenPadding),
+                    tablet: AppSpacing.all(AppSpacing.containerPaddingLarge),
+                    desktop: AppSpacing.all(AppSpacing.sectionPadding),
+                  ),
                   child: Column(
                     children: [
                       // Profile image section
                       _buildProfileImageSection(),
-                      
-                      SizedBox(height: 32),
-                      
+
+                      AppSpacing.verticalSpaceXXL,
+
                       // Personal information
                       _buildPersonalInfoSection(),
-                      
-                      SizedBox(height: 24),
-                      
+
+                      AppSpacing.verticalSpaceLG,
+
                       // Contact information
                       _buildContactInfoSection(),
-                      
-                      SizedBox(height: 24),
-                      
+
+                      AppSpacing.verticalSpaceLG,
+
                       // Document information
                       _buildDocumentInfoSection(),
-                      
-                      SizedBox(height: 24),
-                      
+
+                      AppSpacing.verticalSpaceLG,
+
                       // Emergency contact
                       _buildEmergencyContactSection(),
-                      
-                      SizedBox(height: 24),
-                      
+
+                      AppSpacing.verticalSpaceLG,
+
                       // Preferences
                       _buildPreferencesSection(),
-                      
-                      SizedBox(height: 32),
-                      
+
+                      AppSpacing.verticalSpaceXXL,
+
                       // Save button
                       _buildSaveButton(),
-                      
-                      SizedBox(height: 32),
+
+                      AppSpacing.verticalSpaceXXL,
                     ],
                   ),
                 ),
@@ -248,7 +264,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ),
     );
   }
-  
+
   Widget _buildProfileImageSection() {
     return AnimatedBuilder(
       animation: _slideAnimation,
@@ -266,22 +282,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                       shape: BoxShape.circle,
                       gradient: _profileImagePath.isEmpty
                           ? LinearGradient(
-                              colors: [ModernTheme.oasisGreen, ModernTheme.oasisGreen.withValues(alpha: 0.7)],
+                              colors: [
+                                ModernTheme.oasisGreen,
+                                ModernTheme.oasisGreen.withValues(alpha: 0.7)
+                              ],
                             )
                           : null,
                       image: _profileImagePath.isNotEmpty
                           ? DecorationImage(
-                              image: FileImage(File(_profileImagePath)),
+                              image: _isNetworkImage(_profileImagePath)
+                                  ? CachedNetworkImageProvider(
+                                      _profileImagePath) as ImageProvider
+                                  : FileImage(File(_profileImagePath))
+                                      as ImageProvider,
                               fit: BoxFit.cover,
                             )
                           : null,
-                      boxShadow: [
-                        BoxShadow(
-                          color: ModernTheme.oasisGreen.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
+                      boxShadow: ModernTheme.getCardShadows(context),
                     ),
                     child: _profileImagePath.isEmpty
                         ? Icon(
@@ -314,7 +331,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              AppSpacing.verticalSpaceMD,
               Text(
                 'Toca para cambiar foto',
                 style: TextStyle(
@@ -328,7 +345,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       },
     );
   }
-  
+
   Widget _buildPersonalInfoSection() {
     return _buildSection(
       'Información Personal',
@@ -350,7 +367,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                 },
               ),
             ),
-            SizedBox(width: 16),
+            AppSpacing.horizontalSpaceMD,
             Expanded(
               child: _buildTextFormField(
                 controller: _lastNameController,
@@ -366,24 +383,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             ),
           ],
         ),
-        SizedBox(height: 16),
+        AppSpacing.verticalSpaceMD,
         GestureDetector(
           onTap: _selectBirthDate,
           child: Container(
-            padding: EdgeInsets.all(16),
+            padding: AppSpacing.all(AppSpacing.md),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppSpacing.borderRadiusMD,
             ),
             child: Row(
               children: [
                 Icon(Icons.calendar_today, color: ModernTheme.textSecondary),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _birthDate.isEmpty ? 'Fecha de nacimiento' : _birthDate,
                     style: TextStyle(
-                      color: _birthDate.isEmpty ? ModernTheme.textSecondary : ModernTheme.textPrimary,
+                      color: _birthDate.isEmpty
+                          ? ModernTheme.textSecondary
+                          : ModernTheme.textPrimary,
                       fontSize: 16,
                     ),
                   ),
@@ -393,17 +412,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             ),
           ),
         ),
-        SizedBox(height: 16),
+        AppSpacing.verticalSpaceMD,
         DropdownButtonFormField<String>(
-          value: _gender,
+          initialValue: _gender,
           decoration: InputDecoration(
             labelText: 'Género',
             prefixIcon: Icon(Icons.wc),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppSpacing.borderRadiusMD,
             ),
           ),
-          items: ['Masculino', 'Femenino', 'Otro', 'Prefiero no decir'].map((gender) {
+          items: ['Masculino', 'Femenino', 'Otro', 'Prefiero no decir']
+              .map((gender) {
             return DropdownMenuItem(
               value: gender,
               child: Text(gender),
@@ -419,7 +439,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
+
   Widget _buildContactInfoSection() {
     return _buildSection(
       'Información de Contacto',
@@ -441,7 +461,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             return null;
           },
         ),
-        SizedBox(height: 16),
+        AppSpacing.verticalSpaceMD,
         _buildTextFormField(
           controller: _phoneController,
           label: 'Número de teléfono',
@@ -457,7 +477,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
+
   Widget _buildDocumentInfoSection() {
     return _buildSection(
       'Documento de Identidad',
@@ -469,7 +489,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             Expanded(
               flex: 2,
               child: DropdownButtonFormField<String>(
-                value: _documentType,
+                initialValue: _documentType,
                 decoration: InputDecoration(
                   labelText: 'Tipo',
                   prefixIcon: Icon(Icons.assignment_ind),
@@ -491,7 +511,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                 },
               ),
             ),
-            SizedBox(width: 16),
+            AppSpacing.horizontalSpaceMD,
             Expanded(
               flex: 3,
               child: TextFormField(
@@ -524,7 +544,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
+
   Widget _buildEmergencyContactSection() {
     return _buildSection(
       'Contacto de Emergencia',
@@ -542,7 +562,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             return null;
           },
         ),
-        SizedBox(height: 16),
+        AppSpacing.verticalSpaceMD,
         _buildTextFormField(
           controller: _emergencyPhoneController,
           label: 'Teléfono de emergencia',
@@ -558,7 +578,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
+
   Widget _buildPreferencesSection() {
     return _buildSection(
       'Preferencias',
@@ -616,21 +636,31 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
-  Widget _buildSection(String title, IconData icon, Color color, List<Widget> children) {
+
+  Widget _buildSection(
+      String title, IconData icon, Color color, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(bottom: 16),
+          padding: AppSpacing.only(bottom: AppSpacing.md),
           child: Row(
             children: [
-              Icon(icon, color: color, size: 20),
-              SizedBox(width: 8),
+              Icon(
+                icon,
+                color: color,
+                size: ModernTheme.getResponsiveIconSize(
+                  context,
+                  smallSize: AppSpacing.iconSizeSmall,
+                  mediumSize: AppSpacing.iconSizeMedium,
+                  largeSize: AppSpacing.iconSizeLarge,
+                ),
+              ),
+              AppSpacing.horizontalSpaceSM,
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: ModernTheme.getResponsiveFontSize(context, 18),
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -638,19 +668,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             ],
           ),
         ),
-        Container(
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
+        OasisCard.elevated(
+          padding: AppSpacing.cardPaddingLargeAll,
           child: Column(
             children: children,
           ),
@@ -658,73 +677,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       ],
     );
   }
-  
+
   Widget _buildTextFormField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
+    // Determinar el tipo de campo basado en el label
+    String fieldType = 'text';
+    if (label.toLowerCase().contains('nombre') ||
+        label.toLowerCase().contains('apellido')) {
+      fieldType = 'name';
+    } else if (label.toLowerCase().contains('correo') ||
+        label.toLowerCase().contains('email')) {
+      fieldType = 'email';
+    } else if (label.toLowerCase().contains('teléfono') ||
+        label.toLowerCase().contains('phone')) {
+      fieldType = 'phone';
+    }
+
+    return SecurityIntegrationService.buildSecureTextField(
+      context: context,
       controller: controller,
+      label: label,
+      fieldType: fieldType,
+      prefixIcon: Icon(icon),
       keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: ModernTheme.oasisGreen, width: 2),
-        ),
-      ),
     );
   }
-  
+
   Widget _buildSaveButton() {
-    return SizedBox(
+    return OasisButton.primary(
+      text: 'Guardar Cambios',
+      onPressed: _isLoading || !_hasChanges ? null : _saveProfile,
+      isLoading: _isLoading,
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading || !_hasChanges ? null : _saveProfile,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ModernTheme.oasisGreen,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
-        child: _isLoading
-            ? SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Text(
-                'Guardar Cambios',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-      ),
     );
   }
-  
+
   void _changeProfileImage() {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
-        padding: EdgeInsets.all(20),
+        padding: AppSpacing.cardPaddingLargeAll,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -735,7 +732,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 20),
+            AppSpacing.verticalSpaceLG,
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -747,7 +744,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                   child: Column(
                     children: [
                       Container(
-                        padding: EdgeInsets.all(16),
+                        padding: AppSpacing.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: ModernTheme.primaryBlue.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
@@ -758,7 +755,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                           size: 32,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      AppSpacing.verticalSpaceSM,
                       Text('Cámara'),
                     ],
                   ),
@@ -771,7 +768,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                   child: Column(
                     children: [
                       Container(
-                        padding: EdgeInsets.all(16),
+                        padding: AppSpacing.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
@@ -782,7 +779,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                           size: 32,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      AppSpacing.verticalSpaceSM,
                       Text('Galería'),
                     ],
                   ),
@@ -796,7 +793,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     child: Column(
                       children: [
                         Container(
-                          padding: EdgeInsets.all(16),
+                          padding: AppSpacing.all(AppSpacing.md),
                           decoration: BoxDecoration(
                             color: ModernTheme.error.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
@@ -807,73 +804,183 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                             size: 32,
                           ),
                         ),
-                        SizedBox(height: 8),
+                        AppSpacing.verticalSpaceSM,
                         Text('Eliminar'),
                       ],
                     ),
                   ),
               ],
             ),
-            SizedBox(height: 20),
+            AppSpacing.verticalSpaceLG,
           ],
         ),
       ),
     );
   }
-  
-  void _pickImageFromCamera() {
-    // Simulate image picking from camera
-    setState(() {
-      _profileImagePath = '/mock/camera/image.jpg';
-      _hasChanges = true;
-    });
-    
+
+  void _pickImageFromCamera() async {
+    try {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedImage != null) {
+        await _uploadAndSetProfileImage(File(pickedImage.path));
+      }
+    } catch (e) {
+      AppLogger.error('seleccionando imagen desde cámara', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al tomar foto desde la cámara'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _pickImageFromGallery() async {
+    try {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedImage != null) {
+        await _uploadAndSetProfileImage(File(pickedImage.path));
+      }
+    } catch (e) {
+      AppLogger.error('seleccionando imagen desde galería', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al seleccionar imagen de la galería'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeProfileImage() async {
+    try {
+      // Eliminar de Firebase Storage si existe
+      if (_profileImagePath.isNotEmpty &&
+          _profileImagePath.contains('firebase')) {
+        final Reference storageRef =
+            FirebaseStorage.instance.refFromURL(_profileImagePath);
+        await storageRef.delete();
+      }
+
+      setState(() {
+        _profileImagePath = '';
+        _hasChanges = true;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto de perfil eliminada'),
+            backgroundColor: ModernTheme.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('eliminando imagen de perfil', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al eliminar foto de perfil'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadAndSetProfileImage(File imageFile) async {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Foto tomada desde la cámara'),
-        backgroundColor: ModernTheme.info,
+
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Subiendo imagen...'),
+          ],
+        ),
       ),
     );
+
+    try {
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      // Crear referencia en Firebase Storage
+      final String fileName =
+          'profile_${currentUser.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Reference storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child(fileName);
+
+      // Subir archivo
+      final UploadTask uploadTask = storageRef.putFile(imageFile);
+      final TaskSnapshot snapshot = await uploadTask;
+
+      // Obtener URL de descarga
+      final String downloadURL = await snapshot.ref.getDownloadURL();
+
+      // Actualizar estado local
+      setState(() {
+        _profileImagePath = downloadURL;
+        _hasChanges = true;
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Cerrar dialog de loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imagen subida exitosamente'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('subiendo imagen de perfil', e);
+
+      if (mounted) {
+        Navigator.pop(context); // Cerrar dialog de loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir imagen: ${e.toString()}'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
+    }
   }
-  
-  void _pickImageFromGallery() {
-    // Simulate image picking from gallery
-    setState(() {
-      _profileImagePath = '/mock/gallery/image.jpg';
-      _hasChanges = true;
-    });
-    
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Imagen seleccionada de la galería'),
-        backgroundColor: ModernTheme.info,
-      ),
-    );
-  }
-  
-  void _removeProfileImage() {
-    setState(() {
-      _profileImagePath = '';
-      _hasChanges = true;
-    });
-    
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Foto de perfil eliminada'),
-        backgroundColor: ModernTheme.warning,
-      ),
-    );
-  }
-  
+
   void _selectBirthDate() async {
     final selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime(1990, 1, 1),
       firstDate: DateTime(1950),
-      lastDate: DateTime.now().subtract(Duration(days: 365 * 18)), // Minimum 18 years
+      lastDate:
+          DateTime.now().subtract(Duration(days: 365 * 18)), // Minimum 18 years
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -885,23 +992,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         );
       },
     );
-    
+
     if (selectedDate != null && mounted) {
       setState(() {
-        _birthDate = '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
+        _birthDate =
+            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
         _hasChanges = true;
       });
     }
   }
-  
+
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
-    
+
     final shouldDiscard = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('¿Descartar cambios?'),
-        content: Text('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?'),
+        content: Text(
+            'Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -909,23 +1018,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
-            ),
+            style: OasisButton.danger().style,
             child: Text('Descartar'),
           ),
         ],
       ),
     );
-    
+
     return shouldDiscard ?? false;
   }
-  
+
   void _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       // Guardar datos en Firestore
       await _firestore.collection('users').doc(_userId).update({
@@ -946,13 +1053,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         'locationSharing': _locationSharing,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       if (mounted) {
         setState(() {
           _isLoading = false;
           _hasChanges = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Perfil actualizado exitosamente'),
@@ -968,11 +1075,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         );
       }
     } catch (e) {
-      print('Error guardando perfil: $e');
-      
+      AppLogger.error('guardando perfil', e);
+
       if (mounted) {
         setState(() => _isLoading = false);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al actualizar el perfil'),
@@ -981,5 +1088,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         );
       }
     }
+  }
+
+  void _handlePop(bool shouldPop) {
+    if (!mounted || !shouldPop) return;
+    Navigator.of(context).pop();
+  }
+
+  bool _isNetworkImage(String path) {
+    return path.startsWith('http://') || path.startsWith('https://');
   }
 }

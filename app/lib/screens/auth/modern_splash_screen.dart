@@ -1,23 +1,22 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../core/theme/modern_theme.dart';
-import '../../utils/logger.dart';
+import '../../utils/app_logger.dart';
 
 class ModernSplashScreen extends StatefulWidget {
   const ModernSplashScreen({super.key});
 
   @override
-  _ModernSplashScreenState createState() => _ModernSplashScreenState();
+  ModernSplashScreenState createState() => ModernSplashScreenState();
 }
 
-class _ModernSplashScreenState extends State<ModernSplashScreen>
+class ModernSplashScreenState extends State<ModernSplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _logoController;
   late AnimationController _textController;
   late AnimationController _rippleController;
   late AnimationController _carController;
-  
+
   late Animation<double> _logoScaleAnimation;
   late Animation<double> _logoRotateAnimation;
   late Animation<double> _textFadeAnimation;
@@ -29,27 +28,27 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
   void initState() {
     super.initState();
     AppLogger.lifecycle('ModernSplashScreen', 'initState');
-    
+
     _logoController = AnimationController(
       duration: Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _textController = AnimationController(
       duration: Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _rippleController = AnimationController(
       duration: Duration(seconds: 2),
       vsync: this,
     );
-    
+
     _carController = AnimationController(
       duration: Duration(seconds: 3),
       vsync: this,
     );
-    
+
     _logoScaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -57,7 +56,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _logoController,
       curve: Curves.elasticOut,
     ));
-    
+
     _logoRotateAnimation = Tween<double>(
       begin: 0.0,
       end: 2 * math.pi,
@@ -65,7 +64,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _logoController,
       curve: Curves.easeInOut,
     ));
-    
+
     _textFadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -73,7 +72,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _textController,
       curve: Curves.easeIn,
     ));
-    
+
     _textSlideAnimation = Tween<double>(
       begin: 50.0,
       end: 0.0,
@@ -81,7 +80,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _textController,
       curve: Curves.easeOut,
     ));
-    
+
     _rippleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -89,7 +88,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _rippleController,
       curve: Curves.easeOut,
     ));
-    
+
     _carAnimation = Tween<double>(
       begin: -1.0,
       end: 1.0,
@@ -97,25 +96,25 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
       parent: _carController,
       curve: Curves.easeInOut,
     ));
-    
+
     _startAnimations();
   }
-  
+
   void _startAnimations() async {
     AppLogger.info('Iniciando animaciones del Splash Screen');
     await Future.delayed(Duration(milliseconds: 300));
     _logoController.forward();
-    
+
     await Future.delayed(Duration(milliseconds: 800));
     _textController.forward();
     _rippleController.repeat();
     _carController.repeat();
-    
+
     AppLogger.info('Esperando 3 segundos antes de navegar...');
     await Future.delayed(Duration(seconds: 3));
     _navigateToLogin();
   }
-  
+
   void _navigateToLogin() {
     AppLogger.navigation('ModernSplashScreen', '/login');
     if (!mounted) return;
@@ -154,7 +153,8 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 animation: _rippleController,
                 builder: (context, child) {
                   final delay = index * 0.3;
-                  final animValue = (_rippleAnimation.value - delay).clamp(0.0, 1.0);
+                  final animValue =
+                      (_rippleAnimation.value - delay).clamp(0.0, 1.0);
                   return Center(
                     child: Container(
                       width: MediaQuery.of(context).size.width * 2 * animValue,
@@ -162,7 +162,8 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2 * (1 - animValue)),
+                          color: Colors.white
+                              .withValues(alpha: 0.2 * (1 - animValue)),
                           width: 2,
                         ),
                       ),
@@ -171,7 +172,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 },
               );
             }),
-            
+
             // Carros animados en el fondo
             AnimatedBuilder(
               animation: _carAnimation,
@@ -190,13 +191,14 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 );
               },
             ),
-            
+
             AnimatedBuilder(
               animation: _carAnimation,
               builder: (context, child) {
                 return Positioned(
                   bottom: 100,
-                  right: MediaQuery.of(context).size.width * _carAnimation.value,
+                  right:
+                      MediaQuery.of(context).size.width * _carAnimation.value,
                   child: Opacity(
                     opacity: 0.3,
                     child: Transform.flip(
@@ -211,7 +213,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 );
               },
             ),
-            
+
             // Contenido principal
             Center(
               child: Column(
@@ -219,7 +221,8 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 children: [
                   // Logo animado
                   AnimatedBuilder(
-                    animation: Listenable.merge([_logoScaleAnimation, _logoRotateAnimation]),
+                    animation: Listenable.merge(
+                        [_logoScaleAnimation, _logoRotateAnimation]),
                     builder: (context, child) {
                       return Transform.scale(
                         scale: _logoScaleAnimation.value,
@@ -287,12 +290,13 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                       );
                     },
                   ),
-                  
-                  SizedBox(height: 40),
-                  
+
+                  const SizedBox(height: 40),
+
                   // Texto animado
                   AnimatedBuilder(
-                    animation: Listenable.merge([_textFadeAnimation, _textSlideAnimation]),
+                    animation: Listenable.merge(
+                        [_textFadeAnimation, _textSlideAnimation]),
                     builder: (context, child) {
                       return Opacity(
                         opacity: _textFadeAnimation.value,
@@ -309,16 +313,18 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                                   letterSpacing: 3,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black.withValues(alpha: 0.3),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.3),
                                       offset: Offset(2, 2),
                                       blurRadius: 10,
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Container(
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(20),
@@ -339,9 +345,9 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                       );
                     },
                   ),
-                  
-                  SizedBox(height: 80),
-                  
+
+                  const SizedBox(height: 80),
+
                   // Indicador de carga
                   AnimatedBuilder(
                     animation: _textFadeAnimation,
@@ -354,11 +360,12 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                               width: 60,
                               height: 60,
                               child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                                 strokeWidth: 3,
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             Text(
                               'Preparando tu experiencia...',
                               style: TextStyle(
@@ -374,7 +381,7 @@ class _ModernSplashScreenState extends State<ModernSplashScreen>
                 ],
               ),
             ),
-            
+
             // Versión en la parte inferior
             Positioned(
               bottom: 30,

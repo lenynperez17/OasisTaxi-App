@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-// ignore_for_file: unnecessary_cast
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 
 // Modelo para mensaje de chat
 class ChatMessage {
@@ -75,6 +74,7 @@ class ChatMessage {
 }
 
 enum MessageType { text, image, location, audio, system }
+
 enum MessageStatus { sending, sent, delivered, read, failed }
 
 // Modelo para conversación
@@ -152,7 +152,7 @@ class ParticipantInfo {
 class ChatProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   // Estado
   List<ChatMessage> _messages = [];
   List<ChatConversation> _conversations = [];
@@ -162,12 +162,12 @@ class ChatProvider extends ChangeNotifier {
   bool _isTyping = false;
   String? _typingUserId;
   final bool _isSendingMessage = false;
-  
+
   // Controladores para streams
   Stream<QuerySnapshot>? _messagesStream;
   Stream<QuerySnapshot>? _conversationsStream;
   Stream<DocumentSnapshot>? _typingStream;
-  
+
   // Getters
   List<ChatMessage> get messages => _messages;
   List<ChatConversation> get conversations => _conversations;
@@ -179,7 +179,8 @@ class ChatProvider extends ChangeNotifier {
   bool get isSendingMessage => _isSendingMessage;
 
   // Inicializar chat para un viaje
-  Future<void> initializeChatForTrip(String tripId, String otherUserId, String otherUserName, String otherUserRole) async {
+  Future<void> initializeChatForTrip(String tripId, String otherUserId,
+      String otherUserName, String otherUserRole) async {
     _setLoading(true);
     try {
       final user = _auth.currentUser;
@@ -204,7 +205,8 @@ class ChatProvider extends ChangeNotifier {
         );
       } else {
         // Crear nueva conversación
-        final currentUserDoc = await _firestore.collection('users').doc(user.uid).get();
+        final currentUserDoc =
+            await _firestore.collection('users').doc(user.uid).get();
         final currentUserData = currentUserDoc.data() ?? {};
 
         final conversationData = {
@@ -233,9 +235,10 @@ class ChatProvider extends ChangeNotifier {
           'createdAt': FieldValue.serverTimestamp(),
         };
 
-        final docRef = await _firestore.collection('conversations').add(conversationData);
+        final docRef =
+            await _firestore.collection('conversations').add(conversationData);
         conversationId = docRef.id;
-        
+
         _activeConversation = ChatConversation(
           id: conversationId,
           tripId: tripId,
@@ -249,13 +252,13 @@ class ChatProvider extends ChangeNotifier {
 
       // Configurar stream de mensajes
       _setupMessageStream(conversationId);
-      
+
       // Configurar stream de estado de escritura
       _setupTypingStream(conversationId);
-      
+
       // Marcar mensajes como leídos
       await markMessagesAsRead(conversationId);
-      
+
       _setLoading(false);
     } catch (e) {
       _setError('Error al inicializar chat: $e');
@@ -275,7 +278,8 @@ class ChatProvider extends ChangeNotifier {
 
     _messagesStream?.listen((snapshot) {
       _messages = snapshot.docs
-          .map((doc) => ChatMessage.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .map((doc) =>
+              ChatMessage.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
       notifyListeners();
     });
@@ -283,16 +287,14 @@ class ChatProvider extends ChangeNotifier {
 
   // Configurar stream de estado de escritura
   void _setupTypingStream(String conversationId) {
-    _typingStream = _firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .snapshots();
+    _typingStream =
+        _firestore.collection('conversations').doc(conversationId).snapshots();
 
     _typingStream?.listen((snapshot) {
       if (snapshot.exists) {
         final data = snapshot.data();
         final typingData = data is Map<String, dynamic> ? data['typing'] : null;
-        
+
         if (typingData != null) {
           final user = _auth.currentUser;
           typingData.forEach((userId, isTyping) {
@@ -326,7 +328,8 @@ class ChatProvider extends ChangeNotifier {
       final user = _auth.currentUser;
       if (user == null) throw Exception('Usuario no autenticado');
 
-      final currentUserDoc = await _firestore.collection('users').doc(user.uid).get();
+      final currentUserDoc =
+          await _firestore.collection('users').doc(user.uid).get();
       final currentUserData = currentUserDoc.data() ?? {};
 
       // Determinar receptor
@@ -370,7 +373,8 @@ class ChatProvider extends ChangeNotifier {
       await messageRef.update({'status': 'sent'});
 
       // Enviar notificación push al receptor
-      await _sendPushNotification(receiverId, message, currentUserData['name'] ?? 'Usuario');
+      await _sendPushNotification(
+          receiverId, message, currentUserData['name'] ?? 'Usuario');
 
       return true;
     } catch (e) {
@@ -396,7 +400,7 @@ class ChatProvider extends ChangeNotifier {
 
       // Batch update
       final batch = _firestore.batch();
-      
+
       for (var doc in unreadMessages.docs) {
         batch.update(doc.reference, {'status': 'read'});
       }
@@ -448,7 +452,8 @@ class ChatProvider extends ChangeNotifier {
 
       _conversationsStream?.listen((snapshot) {
         _conversations = snapshot.docs
-            .map((doc) => ChatConversation.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+            .map((doc) => ChatConversation.fromMap(
+                doc.data() as Map<String, dynamic>, doc.id))
             .toList();
         notifyListeners();
       });
@@ -516,7 +521,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   // Enviar notificación push
-  Future<void> _sendPushNotification(String userId, String message, String senderName) async {
+  Future<void> _sendPushNotification(
+      String userId, String message, String senderName) async {
     try {
       // Aquí integrarías con tu servicio de notificaciones push
       // Por ejemplo, FCM o OneSignal

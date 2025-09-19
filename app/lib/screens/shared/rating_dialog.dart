@@ -1,14 +1,14 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import '../../core/theme/modern_theme.dart';
 import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../utils/app_logger.dart';
 
 class RatingDialog extends StatefulWidget {
   final String driverName;
   final String driverPhoto;
   final String tripId;
   final Function(int rating, String? comment, List<String> tags)? onSubmit;
-  
+
   const RatingDialog({
     super.key,
     required this.driverName,
@@ -16,7 +16,7 @@ class RatingDialog extends StatefulWidget {
     required this.tripId,
     this.onSubmit,
   });
-  
+
   static Future<void> show({
     required BuildContext context,
     required String driverName,
@@ -35,53 +35,76 @@ class RatingDialog extends StatefulWidget {
       ),
     );
   }
-  
+
   @override
-  _RatingDialogState createState() => _RatingDialogState();
+  RatingDialogState createState() => RatingDialogState();
 }
 
-class _RatingDialogState extends State<RatingDialog> 
+class RatingDialogState extends State<RatingDialog>
     with TickerProviderStateMixin {
   int _rating = 0;
   final TextEditingController _commentController = TextEditingController();
-  
+
   // Animaciones
   late AnimationController _dialogController;
   late AnimationController _starsController;
   late AnimationController _submitController;
   late List<AnimationController> _starControllers;
-  
+
   // Tags predefinidos según la calificación
   final Map<int, List<String>> _ratingTags = {
-    5: ['Excelente servicio', 'Conductor amable', 'Vehículo limpio', 'Ruta eficiente', 'Muy puntual'],
-    4: ['Buen servicio', 'Conductor profesional', 'Viaje cómodo', 'Precio justo'],
+    5: [
+      'Excelente servicio',
+      'Conductor amable',
+      'Vehículo limpio',
+      'Ruta eficiente',
+      'Muy puntual'
+    ],
+    4: [
+      'Buen servicio',
+      'Conductor profesional',
+      'Viaje cómodo',
+      'Precio justo'
+    ],
     3: ['Servicio regular', 'Podría mejorar', 'Aceptable'],
-    2: ['Servicio deficiente', 'Conductor imprudente', 'Vehículo sucio', 'Ruta incorrecta'],
-    1: ['Muy mal servicio', 'Conductor grosero', 'Vehículo en mal estado', 'Experiencia terrible'],
+    2: [
+      'Servicio deficiente',
+      'Conductor imprudente',
+      'Vehículo sucio',
+      'Ruta incorrecta'
+    ],
+    1: [
+      'Muy mal servicio',
+      'Conductor grosero',
+      'Vehículo en mal estado',
+      'Experiencia terrible'
+    ],
   };
-  
+
   final List<String> _selectedTags = [];
   bool _isSubmitting = false;
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('RatingDialog',
+        'initState - TripId: ${widget.tripId}, Driver: ${widget.driverName}');
+
     _dialogController = AnimationController(
       duration: Duration(milliseconds: 500),
       vsync: this,
     );
-    
+
     _starsController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _submitController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Crear controladores individuales para cada estrella
     _starControllers = List.generate(
       5,
@@ -90,14 +113,14 @@ class _RatingDialogState extends State<RatingDialog>
         vsync: this,
       ),
     );
-    
+
     // Iniciar animaciones
     _dialogController.forward();
     Future.delayed(Duration(milliseconds: 300), () {
       _starsController.forward();
     });
   }
-  
+
   @override
   void dispose() {
     _dialogController.dispose();
@@ -109,26 +132,26 @@ class _RatingDialogState extends State<RatingDialog>
     _commentController.dispose();
     super.dispose();
   }
-  
+
   void _setRating(int rating) {
     setState(() {
       _rating = rating;
       _selectedTags.clear();
     });
-    
+
     // Animar las estrellas seleccionadas
     for (int i = 0; i < rating; i++) {
       _starControllers[i].forward().then((_) {
         _starControllers[i].reverse();
       });
     }
-    
+
     // Vibración haptica (simulada con animación)
     _starsController.forward().then((_) {
       _starsController.reverse();
     });
   }
-  
+
   void _toggleTag(String tag) {
     setState(() {
       if (_selectedTags.contains(tag)) {
@@ -138,7 +161,7 @@ class _RatingDialogState extends State<RatingDialog>
       }
     });
   }
-  
+
   void _submitRating() async {
     if (_rating == 0) {
       if (!mounted) return;
@@ -150,32 +173,34 @@ class _RatingDialogState extends State<RatingDialog>
       );
       return;
     }
-    
+
     setState(() => _isSubmitting = true);
-    
+
     _submitController.forward();
-    
+
     // Simular envío
     await Future.delayed(Duration(seconds: 2));
-    
+
     if (widget.onSubmit != null) {
       widget.onSubmit!(
         _rating,
-        _commentController.text.trim().isEmpty ? null : _commentController.text.trim(),
+        _commentController.text.trim().isEmpty
+            ? null
+            : _commentController.text.trim(),
         _selectedTags,
       );
     }
-    
+
     if (!mounted) return;
     Navigator.of(context).pop();
-    
+
     // Mostrar mensaje de agradecimiento
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('¡Gracias por tu calificación!'),
           ],
         ),
@@ -187,7 +212,7 @@ class _RatingDialogState extends State<RatingDialog>
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -235,10 +260,11 @@ class _RatingDialogState extends State<RatingDialog>
                                   backgroundColor: Colors.white,
                                   child: CircleAvatar(
                                     radius: 32,
-                                    backgroundImage: NetworkImage(widget.driverPhoto),
+                                    backgroundImage:
+                                        NetworkImage(widget.driverPhoto),
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Text(
                                   widget.driverName,
                                   style: TextStyle(
@@ -261,7 +287,7 @@ class _RatingDialogState extends State<RatingDialog>
                           ],
                         ),
                       ),
-                      
+
                       Padding(
                         padding: EdgeInsets.all(20),
                         child: Column(
@@ -275,7 +301,7 @@ class _RatingDialogState extends State<RatingDialog>
                                 color: ModernTheme.textPrimary,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
                               'Tu opinión nos ayuda a mejorar',
                               style: TextStyle(
@@ -283,15 +309,15 @@ class _RatingDialogState extends State<RatingDialog>
                                 color: ModernTheme.textSecondary,
                               ),
                             ),
-                            
-                            SizedBox(height: 24),
-                            
+
+                            const SizedBox(height: 24),
+
                             // Estrellas animadas
                             _buildAnimatedStars(),
-                            
+
                             if (_rating > 0) ...[
-                              SizedBox(height: 20),
-                              
+                              const SizedBox(height: 20),
+
                               // Mensaje según calificación
                               AnimatedSwitcher(
                                 duration: Duration(milliseconds: 300),
@@ -305,23 +331,25 @@ class _RatingDialogState extends State<RatingDialog>
                                   ),
                                 ),
                               ),
-                              
-                              SizedBox(height: 20),
-                              
+
+                              const SizedBox(height: 20),
+
                               // Tags sugeridos
                               _buildTagsSection(),
-                              
-                              SizedBox(height: 20),
-                              
+
+                              const SizedBox(height: 20),
+
                               // Campo de comentario
                               TextField(
                                 controller: _commentController,
                                 maxLines: 3,
                                 decoration: InputDecoration(
-                                  hintText: 'Cuéntanos más sobre tu experiencia (opcional)',
+                                  hintText:
+                                      'Cuéntanos más sobre tu experiencia (opcional)',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                    borderSide:
+                                        BorderSide(color: Colors.grey.shade300),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -334,9 +362,9 @@ class _RatingDialogState extends State<RatingDialog>
                                   fillColor: ModernTheme.backgroundLight,
                                 ),
                               ),
-                              
-                              SizedBox(height: 24),
-                              
+
+                              const SizedBox(height: 24),
+
                               // Botón de enviar
                               AnimatedBuilder(
                                 animation: _submitController,
@@ -344,23 +372,27 @@ class _RatingDialogState extends State<RatingDialog>
                                   return Transform.scale(
                                     scale: 1 - (0.1 * _submitController.value),
                                     child: AnimatedPulseButton(
-                                      text: _isSubmitting ? 'Enviando...' : 'Enviar calificación',
+                                      text: _isSubmitting
+                                          ? 'Enviando...'
+                                          : 'Enviar calificación',
                                       icon: _isSubmitting ? null : Icons.send,
-                                      onPressed: _isSubmitting ? () {} : _submitRating,
+                                      onPressed:
+                                          _isSubmitting ? () {} : _submitRating,
                                       color: ModernTheme.oasisGreen,
                                     ),
                                   );
                                 },
                               ),
                             ],
-                            
+
                             if (_rating == 0) ...[
-                              SizedBox(height: 24),
+                              const SizedBox(height: 24),
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(),
                                 child: Text(
                                   'Calificar más tarde',
-                                  style: TextStyle(color: ModernTheme.textSecondary),
+                                  style: TextStyle(
+                                      color: ModernTheme.textSecondary),
                                 ),
                               ),
                             ],
@@ -377,7 +409,7 @@ class _RatingDialogState extends State<RatingDialog>
       },
     );
   }
-  
+
   Widget _buildAnimatedStars() {
     return AnimatedBuilder(
       animation: _starsController,
@@ -399,7 +431,7 @@ class _RatingDialogState extends State<RatingDialog>
                 ),
               ),
             );
-            
+
             return AnimatedBuilder(
               animation: animation,
               builder: (context, child) {
@@ -408,8 +440,9 @@ class _RatingDialogState extends State<RatingDialog>
                   child: AnimatedBuilder(
                     animation: _starControllers[index],
                     builder: (context, child) {
-                      final starScale = 1 + (0.3 * _starControllers[index].value);
-                      
+                      final starScale =
+                          1 + (0.3 * _starControllers[index].value);
+
                       return Transform.scale(
                         scale: starScale,
                         child: IconButton(
@@ -417,9 +450,9 @@ class _RatingDialogState extends State<RatingDialog>
                           icon: Icon(
                             index < _rating ? Icons.star : Icons.star_border,
                             size: 40,
-                            color: index < _rating 
-                              ? Colors.amber 
-                              : Colors.grey.shade400,
+                            color: index < _rating
+                                ? Colors.amber
+                                : Colors.grey.shade400,
                           ),
                         ),
                       );
@@ -433,10 +466,10 @@ class _RatingDialogState extends State<RatingDialog>
       },
     );
   }
-  
+
   Widget _buildTagsSection() {
     final tags = _ratingTags[_rating] ?? [];
-    
+
     return AnimatedSwitcher(
       duration: Duration(milliseconds: 300),
       child: Column(
@@ -451,13 +484,13 @@ class _RatingDialogState extends State<RatingDialog>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: tags.map((tag) {
               final isSelected = _selectedTags.contains(tag);
-              
+
               return InkWell(
                 onTap: () => _toggleTag(tag),
                 borderRadius: BorderRadius.circular(20),
@@ -465,13 +498,13 @@ class _RatingDialogState extends State<RatingDialog>
                   duration: Duration(milliseconds: 200),
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                      ? ModernTheme.oasisGreen.withValues(alpha: 0.1)
-                      : Colors.transparent,
+                    color: isSelected
+                        ? ModernTheme.oasisGreen.withValues(alpha: 0.1)
+                        : Colors.transparent,
                     border: Border.all(
-                      color: isSelected 
-                        ? ModernTheme.oasisGreen 
-                        : Colors.grey.shade300,
+                      color: isSelected
+                          ? ModernTheme.oasisGreen
+                          : Colors.grey.shade300,
                       width: isSelected ? 2 : 1,
                     ),
                     borderRadius: BorderRadius.circular(20),
@@ -485,17 +518,16 @@ class _RatingDialogState extends State<RatingDialog>
                           size: 16,
                           color: ModernTheme.oasisGreen,
                         ),
-                      if (isSelected) SizedBox(width: 4),
+                      if (isSelected) const SizedBox(width: 4),
                       Text(
                         tag,
                         style: TextStyle(
                           fontSize: 13,
-                          color: isSelected 
-                            ? ModernTheme.oasisGreen 
-                            : ModernTheme.textSecondary,
-                          fontWeight: isSelected 
-                            ? FontWeight.w600 
-                            : FontWeight.normal,
+                          color: isSelected
+                              ? ModernTheme.oasisGreen
+                              : ModernTheme.textSecondary,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -508,7 +540,7 @@ class _RatingDialogState extends State<RatingDialog>
       ),
     );
   }
-  
+
   String _getRatingMessage() {
     switch (_rating) {
       case 5:
@@ -525,7 +557,7 @@ class _RatingDialogState extends State<RatingDialog>
         return '';
     }
   }
-  
+
   Color _getRatingColor() {
     switch (_rating) {
       case 5:
@@ -552,7 +584,7 @@ class PatternPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    
+
     // Dibujar patrón de líneas diagonales
     for (double i = -size.height; i < size.width + size.height; i += 20) {
       canvas.drawLine(
@@ -562,7 +594,7 @@ class PatternPainter extends CustomPainter {
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

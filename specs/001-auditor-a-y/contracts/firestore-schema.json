@@ -1,0 +1,255 @@
+{
+  "collections": {
+    "users": {
+      "description": "User accounts for passengers, drivers, and admins",
+      "fields": {
+        "uid": "string",
+        "email": "string",
+        "phoneNumber": "string",
+        "displayName": "string",
+        "photoUrl": "string?",
+        "role": "enum:passenger|driver|admin",
+        "isActive": "boolean",
+        "emailVerified": "boolean",
+        "phoneVerified": "boolean",
+        "mfaEnabled": "boolean",
+        "createdAt": "timestamp",
+        "lastLogin": "timestamp",
+        "metadata": "map"
+      },
+      "subcollections": {
+        "notifications": {
+          "fields": {
+            "type": "string",
+            "title": "string",
+            "body": "string",
+            "data": "map",
+            "isRead": "boolean",
+            "createdAt": "timestamp",
+            "readAt": "timestamp?"
+          }
+        }
+      }
+    },
+    "trips": {
+      "description": "Trip requests and journey tracking",
+      "fields": {
+        "tripId": "string",
+        "passengerId": "string",
+        "driverId": "string?",
+        "status": "enum:requested|negotiating|accepted|driverArrived|inProgress|completed|cancelled|disputed",
+        "pickupLocation": {
+          "latitude": "number",
+          "longitude": "number",
+          "address": "string"
+        },
+        "destinationLocation": {
+          "latitude": "number",
+          "longitude": "number",
+          "address": "string"
+        },
+        "estimatedDistance": "number",
+        "actualDistance": "number?",
+        "agreedPrice": "number",
+        "verificationCode": "string?",
+        "requestedAt": "timestamp",
+        "acceptedAt": "timestamp?",
+        "startedAt": "timestamp?",
+        "completedAt": "timestamp?",
+        "cancellationReason": "string?",
+        "vehicleType": "enum:economy|comfort|premium|xl",
+        "paymentMethod": "enum:cash|card|wallet"
+      }
+    },
+    "vehicles": {
+      "description": "Driver vehicle information",
+      "fields": {
+        "vehicleId": "string",
+        "driverId": "string",
+        "brand": "string",
+        "model": "string",
+        "year": "number",
+        "licensePlate": "string",
+        "color": "string",
+        "type": "enum:economy|comfort|premium|xl",
+        "maxPassengers": "number",
+        "isActive": "boolean",
+        "isVerified": "boolean",
+        "registeredAt": "timestamp",
+        "verifiedAt": "timestamp?",
+        "verifiedBy": "string?"
+      }
+    },
+    "documents": {
+      "description": "Driver verification documents",
+      "fields": {
+        "documentId": "string",
+        "userId": "string",
+        "type": "enum:dni|driverLicense|criminalRecord|soat|vehicleRegistration|bankAccount",
+        "documentNumber": "string",
+        "fileUrl": "string?",
+        "status": "enum:pending|verified|rejected|expired",
+        "uploadedAt": "timestamp",
+        "verifiedAt": "timestamp?",
+        "verifiedBy": "string?",
+        "expiryDate": "timestamp",
+        "rejectionReason": "string?"
+      }
+    },
+    "payments": {
+      "description": "Payment transactions",
+      "fields": {
+        "paymentId": "string",
+        "tripId": "string",
+        "passengerId": "string",
+        "driverId": "string",
+        "amount": "number",
+        "driverAmount": "number",
+        "platformFee": "number",
+        "method": "enum:cash|card|wallet",
+        "status": "enum:pending|processing|completed|failed|refunded",
+        "createdAt": "timestamp",
+        "processedAt": "timestamp?",
+        "transactionId": "string?",
+        "failureReason": "string?"
+      }
+    },
+    "ratings": {
+      "description": "Bidirectional trip ratings",
+      "fields": {
+        "ratingId": "string",
+        "tripId": "string",
+        "fromUserId": "string",
+        "toUserId": "string",
+        "stars": "number:1-5",
+        "comment": "string?",
+        "tags": "array<string>",
+        "createdAt": "timestamp",
+        "isFromPassenger": "boolean"
+      }
+    },
+    "wallets": {
+      "description": "Driver digital wallets",
+      "fields": {
+        "walletId": "string",
+        "userId": "string",
+        "balance": "number",
+        "totalEarnings": "number",
+        "totalWithdrawals": "number",
+        "lastTransaction": "timestamp"
+      },
+      "subcollections": {
+        "transactions": {
+          "fields": {
+            "transactionId": "string",
+            "type": "enum:earning|withdrawal|bonus|penalty",
+            "amount": "number",
+            "balanceBefore": "number",
+            "balanceAfter": "number",
+            "referenceId": "string?",
+            "description": "string",
+            "createdAt": "timestamp"
+          }
+        }
+      }
+    },
+    "priceNegotiations": {
+      "description": "Price negotiation process",
+      "fields": {
+        "negotiationId": "string",
+        "tripId": "string",
+        "passengerId": "string",
+        "initialPrice": "number",
+        "agreedPrice": "number?",
+        "status": "enum:open|negotiating|agreed|expired|cancelled",
+        "createdAt": "timestamp",
+        "completedAt": "timestamp?",
+        "offerCount": "number"
+      },
+      "subcollections": {
+        "offers": {
+          "fields": {
+            "offerId": "string",
+            "driverId": "string",
+            "offeredPrice": "number",
+            "offeredAt": "timestamp",
+            "isCounterOffer": "boolean",
+            "wasAccepted": "boolean"
+          }
+        }
+      }
+    },
+    "emergencies": {
+      "description": "Emergency/SOS reports",
+      "fields": {
+        "emergencyId": "string",
+        "tripId": "string",
+        "reporterId": "string",
+        "type": "enum:accident|assault|breakdown|medical|other",
+        "description": "string",
+        "location": {
+          "latitude": "number",
+          "longitude": "number"
+        },
+        "status": "enum:reported|responding|resolved|false_alarm",
+        "reportedAt": "timestamp",
+        "resolvedAt": "timestamp?",
+        "resolutionNotes": "string?",
+        "notifiedContacts": "array<string>"
+      }
+    },
+    "systemConfig": {
+      "description": "System configuration and settings",
+      "fields": {
+        "commissionRate": "number:0.20",
+        "minTripPrice": "number:5.00",
+        "maxTripPrice": "number:500.00",
+        "negotiationTimeout": "number:300",
+        "verificationCodeLength": "number:4",
+        "maxNegotiationOffers": "number:10",
+        "emergencyContacts": "array<string>",
+        "maintenanceMode": "boolean",
+        "supportedVehicleTypes": "array<string>",
+        "supportedPaymentMethods": "array<string>"
+      }
+    }
+  },
+  "indexes": [
+    {
+      "collection": "trips",
+      "fields": ["passengerId", "status", "requestedAt:DESC"]
+    },
+    {
+      "collection": "trips",
+      "fields": ["driverId", "status", "acceptedAt:DESC"]
+    },
+    {
+      "collection": "trips",
+      "fields": ["status", "vehicleType", "requestedAt:DESC"]
+    },
+    {
+      "collection": "documents",
+      "fields": ["userId", "type", "status"]
+    },
+    {
+      "collection": "documents",
+      "fields": ["status", "uploadedAt:DESC"]
+    },
+    {
+      "collection": "payments",
+      "fields": ["driverId", "status", "createdAt:DESC"]
+    },
+    {
+      "collection": "priceNegotiations",
+      "fields": ["status", "createdAt:DESC"]
+    },
+    {
+      "collection": "emergencies",
+      "fields": ["tripId", "status"]
+    },
+    {
+      "collection": "ratings",
+      "fields": ["toUserId", "createdAt:DESC"]
+    }
+  ]
+}

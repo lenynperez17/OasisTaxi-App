@@ -1,17 +1,77 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/modern_theme.dart';
 import '../../widgets/common/oasis_app_bar.dart';
 
+// Enums necesarios
+enum UserStatus { active, inactive, suspended, pending }
+
+enum UserType { passenger, driver, admin }
+
+// Clase User para panel de administración
+class User {
+  final String id;
+  final String name;
+  final String email;
+  final String phone;
+  final UserType type;
+  UserStatus status; // Cambiado a no-final para poder modificar
+  final DateTime registrationDate;
+  final DateTime lastActivity;
+  final int totalTrips;
+  final double rating;
+  final double balance;
+  final bool verified;
+
+  User({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.type,
+    required this.status,
+    required this.registrationDate,
+    required this.lastActivity,
+    required this.totalTrips,
+    required this.rating,
+    required this.balance,
+    required this.verified,
+  });
+
+  String get typeString {
+    switch (type) {
+      case UserType.driver:
+        return 'Conductor';
+      case UserType.passenger:
+        return 'Pasajero';
+      case UserType.admin:
+        return 'Admin';
+    }
+  }
+
+  String get statusString {
+    switch (status) {
+      case UserStatus.active:
+        return 'Activo';
+      case UserStatus.inactive:
+        return 'Inactivo';
+      case UserStatus.suspended:
+        return 'Suspendido';
+      case UserStatus.pending:
+        return 'Pendiente';
+    }
+  }
+}
+
 class UsersManagementScreen extends StatefulWidget {
   const UsersManagementScreen({super.key});
 
   @override
-  _UsersManagementScreenState createState() => _UsersManagementScreenState();
+  UsersManagementScreenState createState() => UsersManagementScreenState();
 }
 
-class _UsersManagementScreenState extends State<UsersManagementScreen> {
+class UsersManagementScreenState extends State<UsersManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _selectedFilter = 'Todos';
@@ -22,6 +82,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('UsersManagementScreen', 'initState');
     _loadUsersFromFirebase();
   }
 
@@ -29,7 +90,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   Future<void> _loadUsersFromFirebase() async {
     try {
       setState(() => _isLoading = true);
-      
+
       // Obtener usuarios desde Firebase
       final QuerySnapshot snapshot = await _firestore
           .collection('users')
@@ -37,14 +98,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           .get();
 
       final List<User> loadedUsers = [];
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
+
         // Calcular número de viajes del usuario
         int tripCount = 0;
         double avgRating = 0.0;
-        
+
         // Obtener estadísticas de viajes según el rol
         if (data['role'] == 'driver') {
           final tripsSnapshot = await _firestore
@@ -53,7 +114,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
               .where('status', isEqualTo: 'completed')
               .get();
           tripCount = tripsSnapshot.size;
-          
+
           // Calcular rating promedio
           if (tripsSnapshot.docs.isNotEmpty) {
             double totalRating = 0;
@@ -77,54 +138,67 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           tripCount = tripsSnapshot.size;
           avgRating = data['rating'] ?? 4.5;
         }
-        
+
         loadedUsers.add(User(
           id: doc.id,
           name: data['name'] ?? 'Sin nombre',
           email: data['email'] ?? '',
           phone: data['phone'] ?? '',
-          type: data['role'] == 'driver' ? 'Conductor' : 'Pasajero',
-          status: data['isActive'] == true ? 'Activo' : 
-                  data['isSuspended'] == true ? 'Suspendido' : 'Inactivo',
-          registrationDate: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          lastLogin: (data['lastLogin'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          trips: tripCount,
+          type: data['role'] == 'driver' ? UserType.driver : UserType.passenger,
+          status: data['isActive'] == true
+              ? UserStatus.active
+              : data['isSuspended'] == true
+                  ? UserStatus.suspended
+                  : UserStatus.inactive,
+          registrationDate:
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          lastActivity:
+              (data['lastLogin'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          totalTrips: tripCount,
           rating: avgRating,
+          balance: (data['balance'] as num?)?.toDouble() ?? 0.0,
+          verified: data['isVerified'] ?? false,
         ));
       }
-      
+
       setState(() {
         _users = loadedUsers;
         _filteredUsers = loadedUsers;
         _isLoading = false;
       });
-      
     } catch (e) {
-      print('Error cargando usuarios: $e');
+      AppLogger.error('cargando usuarios', e);
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cargar usuarios: $e'),
-          backgroundColor: ModernTheme.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar usuarios: $e'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
     }
   }
 
   void _filterUsers(String query) {
     setState(() {
       _filteredUsers = _users.where((user) {
-        final matchesSearch = user.name.toLowerCase().contains(query.toLowerCase()) ||
-            user.email.toLowerCase().contains(query.toLowerCase()) ||
-            user.phone.contains(query);
-        
+        final matchesSearch =
+            user.name.toLowerCase().contains(query.toLowerCase()) ||
+                user.email.toLowerCase().contains(query.toLowerCase()) ||
+                user.phone.contains(query);
+
         final matchesFilter = _selectedFilter == 'Todos' ||
-            (_selectedFilter == 'Activos' && user.status == 'Activo') ||
-            (_selectedFilter == 'Suspendidos' && user.status == 'Suspendido') ||
-            (_selectedFilter == 'Inactivos' && user.status == 'Inactivo') ||
-            (_selectedFilter == 'Pasajeros' && user.type == 'Pasajero') ||
-            (_selectedFilter == 'Conductores' && user.type == 'Conductor');
-        
+            (_selectedFilter == 'Activos' &&
+                user.status == UserStatus.active) ||
+            (_selectedFilter == 'Suspendidos' &&
+                user.status == UserStatus.suspended) ||
+            (_selectedFilter == 'Inactivos' &&
+                user.status == UserStatus.inactive) ||
+            (_selectedFilter == 'Pasajeros' &&
+                user.type == UserType.passenger) ||
+            (_selectedFilter == 'Conductores' && user.type == UserType.driver);
+
         return matchesSearch && matchesFilter;
       }).toList();
     });
@@ -166,22 +240,22 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   ),
                   onChanged: _filterUsers,
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 // Chips de filtros
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
                       _buildFilterChip('Todos'),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Activos'),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Suspendidos'),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Inactivos'),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Pasajeros'),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Conductores'),
                     ],
                   ),
@@ -189,21 +263,43 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
               ],
             ),
           ),
-          
+
           // Estadísticas
           Container(
             padding: EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatCard('Total', _users.length.toString(), Icons.people, Colors.blue),
-                _buildStatCard('Activos', _users.where((u) => u.status == 'Activo').length.toString(), Icons.check_circle, Colors.green),
-                _buildStatCard('Suspendidos', _users.where((u) => u.status == 'Suspendido').length.toString(), Icons.warning, Colors.orange),
-                _buildStatCard('Inactivos', _users.where((u) => u.status == 'Inactivo').length.toString(), Icons.cancel, Colors.grey),
+                _buildStatCard('Total', _users.length.toString(), Icons.people,
+                    Colors.blue),
+                _buildStatCard(
+                    'Activos',
+                    _users
+                        .where((u) => u.status == UserStatus.active)
+                        .length
+                        .toString(),
+                    Icons.check_circle,
+                    Colors.green),
+                _buildStatCard(
+                    'Suspendidos',
+                    _users
+                        .where((u) => u.status == UserStatus.suspended)
+                        .length
+                        .toString(),
+                    Icons.warning,
+                    Colors.orange),
+                _buildStatCard(
+                    'Inactivos',
+                    _users
+                        .where((u) => u.status == UserStatus.inactive)
+                        .length
+                        .toString(),
+                    Icons.cancel,
+                    Colors.grey),
               ],
             ),
           ),
-          
+
           // Lista de usuarios con indicador de carga
           Expanded(
             child: _isLoading
@@ -212,9 +308,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              ModernTheme.oasisGreen),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           'Cargando usuarios desde Firebase...',
                           style: TextStyle(color: ModernTheme.textSecondary),
@@ -230,9 +327,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                             Icon(
                               Icons.person_off,
                               size: 64,
-                              color: ModernTheme.textSecondary.withValues(alpha: 0.5),
+                              color: ModernTheme.textSecondary
+                                  .withValues(alpha: 0.5),
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(
                               'No se encontraron usuarios',
                               style: TextStyle(
@@ -240,7 +338,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                                 fontSize: 16,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             ElevatedButton(
                               onPressed: _loadUsersFromFirebase,
                               style: ElevatedButton.styleFrom(
@@ -289,7 +387,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -299,7 +398,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       child: Column(
         children: [
           Icon(icon, color: color, size: 20),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
@@ -336,14 +435,17 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
               // Avatar
               CircleAvatar(
                 radius: 30,
-                backgroundColor: _getUserTypeColor(user.type).withValues(alpha: 0.2),
+                backgroundColor:
+                    _getUserTypeColor(user.type).withValues(alpha: 0.2),
                 child: Icon(
-                  user.type == 'Conductor' ? Icons.directions_car : Icons.person,
+                  user.type == UserType.driver
+                      ? Icons.directions_car
+                      : Icons.person,
                   color: _getUserTypeColor(user.type),
                 ),
               ),
-              SizedBox(width: 16),
-              
+              const SizedBox(width: 16),
+
               // Información del usuario
               Expanded(
                 child: Column(
@@ -358,15 +460,17 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _getUserTypeColor(user.type).withValues(alpha: 0.1),
+                            color: _getUserTypeColor(user.type)
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            user.type,
+                            user.typeString,
                             style: TextStyle(
                               fontSize: 12,
                               color: _getUserTypeColor(user.type),
@@ -376,7 +480,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       user.email,
                       style: TextStyle(
@@ -384,11 +488,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                         fontSize: 14,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.phone, size: 14, color: ModernTheme.textSecondary),
-                        SizedBox(width: 4),
+                        Icon(Icons.phone,
+                            size: 14, color: ModernTheme.textSecondary),
+                        const SizedBox(width: 4),
                         Text(
                           user.phone,
                           style: TextStyle(
@@ -396,9 +501,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                             fontSize: 12,
                           ),
                         ),
-                        SizedBox(width: 16),
-                        Icon(Icons.star, size: 14, color: ModernTheme.accentYellow),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 16),
+                        Icon(Icons.star,
+                            size: 14, color: ModernTheme.accentYellow),
+                        const SizedBox(width: 4),
                         Text(
                           user.rating.toStringAsFixed(1),
                           style: TextStyle(
@@ -406,11 +512,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 16),
-                        Icon(Icons.route, size: 14, color: ModernTheme.textSecondary),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 16),
+                        Icon(Icons.route,
+                            size: 14, color: ModernTheme.textSecondary),
+                        const SizedBox(width: 4),
                         Text(
-                          '${user.trips} viajes',
+                          '${user.totalTrips} viajes',
                           style: TextStyle(
                             color: ModernTheme.textSecondary,
                             fontSize: 12,
@@ -421,18 +528,19 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   ],
                 ),
               ),
-              
+
               // Estado y acciones
               Column(
                 children: [
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(user.status).withValues(alpha: 0.1),
+                      color:
+                          _getStatusColor(user.status).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      user.status,
+                      user.statusString,
                       style: TextStyle(
                         color: _getStatusColor(user.status),
                         fontSize: 12,
@@ -440,9 +548,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: ModernTheme.textSecondary),
+                    icon:
+                        Icon(Icons.more_vert, color: ModernTheme.textSecondary),
                     onSelected: (value) => _handleUserAction(user, value),
                     itemBuilder: (context) => [
                       PopupMenuItem(
@@ -450,7 +559,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                         child: Row(
                           children: [
                             Icon(Icons.visibility, size: 20),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text('Ver detalles'),
                           ],
                         ),
@@ -460,29 +569,30 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                         child: Row(
                           children: [
                             Icon(Icons.edit, size: 20),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text('Editar'),
                           ],
                         ),
                       ),
-                      if (user.status == 'Activo')
+                      if (user.status == UserStatus.active)
                         PopupMenuItem(
                           value: 'suspend',
                           child: Row(
                             children: [
                               Icon(Icons.block, size: 20, color: Colors.orange),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text('Suspender'),
                             ],
                           ),
                         ),
-                      if (user.status == 'Suspendido')
+                      if (user.status == UserStatus.suspended)
                         PopupMenuItem(
                           value: 'activate',
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, size: 20, color: Colors.green),
-                              SizedBox(width: 8),
+                              Icon(Icons.check_circle,
+                                  size: 20, color: Colors.green),
+                              const SizedBox(width: 8),
                               Text('Activar'),
                             ],
                           ),
@@ -492,7 +602,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                         child: Row(
                           children: [
                             Icon(Icons.delete, size: 20, color: Colors.red),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text('Eliminar'),
                           ],
                         ),
@@ -508,27 +618,27 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     );
   }
 
-  Color _getUserTypeColor(String type) {
+  Color _getUserTypeColor(UserType type) {
     switch (type) {
-      case 'Conductor':
+      case UserType.driver:
         return ModernTheme.primaryBlue;
-      case 'Pasajero':
+      case UserType.passenger:
         return ModernTheme.primaryOrange;
-      default:
+      case UserType.admin:
         return ModernTheme.textSecondary;
     }
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(UserStatus status) {
     switch (status) {
-      case 'Activo':
+      case UserStatus.active:
         return ModernTheme.success;
-      case 'Suspendido':
+      case UserStatus.suspended:
         return ModernTheme.warning;
-      case 'Inactivo':
+      case UserStatus.inactive:
         return ModernTheme.textSecondary;
-      default:
-        return ModernTheme.textSecondary;
+      case UserStatus.pending:
+        return ModernTheme.info;
     }
   }
 
@@ -560,13 +670,16 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: _getUserTypeColor(user.type).withValues(alpha: 0.2),
+              backgroundColor:
+                  _getUserTypeColor(user.type).withValues(alpha: 0.2),
               child: Icon(
-                user.type == 'Conductor' ? Icons.directions_car : Icons.person,
+                user.type == UserType.driver
+                    ? Icons.directions_car
+                    : Icons.person,
                 color: _getUserTypeColor(user.type),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(user.name),
           ],
         ),
@@ -577,11 +690,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             children: [
               _buildDetailRow('Email', user.email, Icons.email),
               _buildDetailRow('Teléfono', user.phone, Icons.phone),
-              _buildDetailRow('Tipo', user.type, Icons.person),
-              _buildDetailRow('Estado', user.status, Icons.info),
-              _buildDetailRow('Registro', _formatDate(user.registrationDate), Icons.calendar_today),
-              _buildDetailRow('Último acceso', _formatDate(user.lastLogin), Icons.access_time),
-              _buildDetailRow('Viajes', user.trips.toString(), Icons.route),
+              _buildDetailRow('Tipo', user.typeString, Icons.person),
+              _buildDetailRow('Estado', user.statusString, Icons.info),
+              _buildDetailRow('Registro', _formatDate(user.registrationDate),
+                  Icons.calendar_today),
+              _buildDetailRow('Último acceso', _formatDate(user.lastActivity),
+                  Icons.access_time),
+              _buildDetailRow(
+                  'Viajes', user.totalTrips.toString(), Icons.route),
               _buildDetailRow('Calificación', '${user.rating} ⭐', Icons.star),
             ],
           ),
@@ -612,7 +728,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       child: Row(
         children: [
           Icon(icon, size: 20, color: ModernTheme.textSecondary),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -671,7 +787,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              
+
               // Actualizar en Firebase
               try {
                 await _firestore.collection('users').doc(user.id).update({
@@ -679,21 +795,23 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   'isSuspended': true,
                   'suspendedAt': FieldValue.serverTimestamp(),
                 });
-                
+
                 setState(() {
-                  user.status = 'Suspendido';
+                  user.status = UserStatus.suspended;
                 });
-                
+
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Usuario suspendido correctamente'),
                     backgroundColor: ModernTheme.warning,
                   ),
                 );
-                
+
                 // Recargar usuarios
                 _loadUsersFromFirebase();
               } catch (e) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Error al suspender usuario: $e'),
@@ -720,27 +838,31 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
         'isSuspended': false,
         'activatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       setState(() {
-        user.status = 'Activo';
+        user.status = UserStatus.active;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Usuario activado correctamente'),
-          backgroundColor: ModernTheme.success,
-        ),
-      );
-      
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Usuario activado correctamente'),
+            backgroundColor: ModernTheme.success,
+          ),
+        );
+      }
+
       // Recargar usuarios
       _loadUsersFromFirebase();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al activar usuario: $e'),
-          backgroundColor: ModernTheme.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al activar usuario: $e'),
+            backgroundColor: ModernTheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -749,7 +871,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Eliminar Usuario'),
-        content: Text('¿Está seguro de eliminar a ${user.name}? Esta acción no se puede deshacer.'),
+        content: Text(
+            '¿Está seguro de eliminar a ${user.name}? Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -758,31 +881,33 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              
+
               try {
                 // Eliminar de Firebase
                 await _firestore.collection('users').doc(user.id).delete();
-                
+
                 // También eliminar sus viajes asociados (opcional, depende de la lógica de negocio)
                 // final ridesSnapshot = await _firestore
                 //     .collection('rides')
                 //     .where(user.role == 'driver' ? 'driverId' : 'passengerId', isEqualTo: user.id)
                 //     .get();
-                // 
+                //
                 // for (var doc in ridesSnapshot.docs) {
                 //   await doc.reference.delete();
                 // }
-                
+
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Usuario eliminado correctamente'),
                     backgroundColor: ModernTheme.error,
                   ),
                 );
-                
+
                 // Recargar usuarios
                 _loadUsersFromFirebase();
               } catch (e) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Error al eliminar usuario: $e'),
@@ -804,7 +929,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inMinutes < 60) {
       return 'Hace ${difference.inMinutes} min';
     } else if (difference.inHours < 24) {
@@ -815,30 +940,4 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       return '${date.day}/${date.month}/${date.year}';
     }
   }
-}
-
-class User {
-  final String id;
-  final String name;
-  final String email;
-  final String phone;
-  final String type;
-  String status;
-  final DateTime registrationDate;
-  final DateTime lastLogin;
-  final int trips;
-  final double rating;
-
-  User({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.phone,
-    required this.type,
-    required this.status,
-    required this.registrationDate,
-    required this.lastLogin,
-    required this.trips,
-    required this.rating,
-  });
 }

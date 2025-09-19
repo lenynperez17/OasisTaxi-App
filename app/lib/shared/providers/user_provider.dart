@@ -1,15 +1,13 @@
-// ignore_for_file: avoid_print
-
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
 import '../../models/user_model.dart';
-import '../../utils/logger.dart';
+import '../../utils/app_logger.dart';
 
-class UserProvider extends ChangeNotifier {
+class UserProvider with ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _error;
@@ -23,14 +21,14 @@ class UserProvider extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  
+
   String? get userId => _currentUser?.id;
   String? get userType => _currentUser?.userType;
   String? get userName => _currentUser?.fullName;
   String? get userEmail => _currentUser?.email;
   String? get userPhone => _currentUser?.phone;
   String? get userPhoto => _currentUser?.profilePhotoUrl;
-  
+
   bool get isDriver => _currentUser?.userType == 'driver';
   bool get isPassenger => _currentUser?.userType == 'passenger';
   bool get isAdmin => _currentUser?.userType == 'admin';
@@ -48,21 +46,20 @@ class UserProvider extends ChangeNotifier {
   /// Cargar usuario completo desde Firestore
   Future<void> loadUserFromFirebase(String userId) async {
     if (_isLoading) return;
-    
+
     _setLoading(true);
     AppLogger.info('Cargando datos de usuario: $userId');
 
     try {
-      final docSnapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('users').doc(userId).get();
 
       if (docSnapshot.exists) {
         final data = docSnapshot.data()!;
         _currentUser = UserModel.fromFirestore(data, userId);
         _error = null;
-        AppLogger.info('Usuario cargado exitosamente: ${_currentUser?.fullName}');
+        AppLogger.info(
+            'Usuario cargado exitosamente: ${_currentUser?.fullName}');
       } else {
         // Crear usuario base desde Firebase Auth si no existe en Firestore
         await _createUserFromAuth(userId);
@@ -99,7 +96,7 @@ class UserProvider extends ChangeNotifier {
     };
 
     await _firestore.collection('users').doc(userId).set(userData);
-    
+
     // Recargar usuario
     await loadUserFromFirebase(userId);
   }
@@ -134,7 +131,8 @@ class UserProvider extends ChangeNotifier {
 
       if (fullName != null) updateData['fullName'] = fullName;
       if (phone != null) updateData['phone'] = phone;
-      if (profilePhotoUrl != null) updateData['profilePhotoUrl'] = profilePhotoUrl;
+      if (profilePhotoUrl != null)
+        updateData['profilePhotoUrl'] = profilePhotoUrl;
       if (additionalData != null) updateData.addAll(additionalData);
 
       await _firestore
@@ -154,7 +152,6 @@ class UserProvider extends ChangeNotifier {
       notifyListeners();
       AppLogger.info('Perfil actualizado exitosamente');
       return true;
-
     } catch (e, stackTrace) {
       _error = 'Error al actualizar perfil: $e';
       AppLogger.error('Error actualizando perfil', e, stackTrace);
@@ -175,9 +172,10 @@ class UserProvider extends ChangeNotifier {
     AppLogger.info('Subiendo foto de perfil');
 
     try {
-      final fileName = 'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName =
+          'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref().child('profile_photos').child(fileName);
-      
+
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
@@ -187,7 +185,6 @@ class UserProvider extends ChangeNotifier {
 
       AppLogger.info('Foto de perfil subida exitosamente');
       return downloadUrl;
-
     } catch (e, stackTrace) {
       _error = 'Error al subir foto: $e';
       AppLogger.error('Error subiendo foto de perfil', e, stackTrace);
@@ -208,13 +205,10 @@ class UserProvider extends ChangeNotifier {
     AppLogger.info('Cambiando tipo de usuario a: $newUserType');
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUser!.id)
-          .update({
-            'userType': newUserType,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'userType': newUserType,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       _currentUser = _currentUser!.copyWith(
         userType: newUserType,
@@ -225,7 +219,6 @@ class UserProvider extends ChangeNotifier {
       notifyListeners();
       AppLogger.info('Tipo de usuario actualizado a: $newUserType');
       return true;
-
     } catch (e, stackTrace) {
       _error = 'Error al cambiar tipo de usuario: $e';
       AppLogger.error('Error cambiando tipo de usuario', e, stackTrace);
@@ -240,13 +233,10 @@ class UserProvider extends ChangeNotifier {
     if (_currentUser == null) return false;
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUser!.id)
-          .update({
-            'emailVerified': isVerified,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'emailVerified': isVerified,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       _currentUser = _currentUser!.copyWith(
         emailVerified: isVerified,
@@ -267,13 +257,10 @@ class UserProvider extends ChangeNotifier {
     if (_currentUser == null) return false;
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUser!.id)
-          .update({
-            'phoneVerified': isVerified,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'phoneVerified': isVerified,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       _currentUser = _currentUser!.copyWith(
         phoneVerified: isVerified,
@@ -294,12 +281,9 @@ class UserProvider extends ChangeNotifier {
     if (_currentUser == null) return;
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(_currentUser!.id)
-          .update({
-            'lastLoginAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(_currentUser!.id).update({
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      });
 
       AppLogger.debug('Última conexión actualizada');
     } catch (e) {
@@ -312,10 +296,8 @@ class UserProvider extends ChangeNotifier {
     if (!isDriver || _currentUser == null) return null;
 
     try {
-      final docSnapshot = await _firestore
-          .collection('drivers')
-          .doc(_currentUser!.id)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('drivers').doc(_currentUser!.id).get();
 
       return docSnapshot.exists ? docSnapshot.data() : null;
     } catch (e) {
@@ -329,10 +311,8 @@ class UserProvider extends ChangeNotifier {
     if (_currentUser == null) return null;
 
     try {
-      final docSnapshot = await _firestore
-          .collection('user_stats')
-          .doc(_currentUser!.id)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('user_stats').doc(_currentUser!.id).get();
 
       return docSnapshot.exists ? docSnapshot.data() : null;
     } catch (e) {
@@ -381,10 +361,8 @@ class UserProvider extends ChangeNotifier {
   /// Verificar si el usuario existe en Firestore
   Future<bool> userExists(String userId) async {
     try {
-      final docSnapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('users').doc(userId).get();
       return docSnapshot.exists;
     } catch (e) {
       AppLogger.error('Error verificando existencia del usuario', e);
@@ -397,5 +375,4 @@ class UserProvider extends ChangeNotifier {
     _isLoading = loading;
     notifyListeners();
   }
-
 }

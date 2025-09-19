@@ -16,38 +16,48 @@ dependencies:
   provider: ^6.1.1
   
   # Maps & Location
-  google_maps_flutter: ^2.9.0
-  google_maps_flutter_web: ^0.5.9
+  google_maps_flutter: ^2.10.1
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   
   # UI & Design
   google_fonts: ^6.2.1
-  fl_chart: ^1.1.0
   flutter_rating_bar: ^4.0.1
-  percent_indicator: ^4.2.3
+  webview_flutter: ^4.9.0
   
-  # Storage
+  # Storage & Security
   shared_preferences: ^2.3.4
+  encrypt: ^5.0.3
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+  web_socket_channel: ^3.0.1
+  firebase_app_check: ^0.4.0+1
   
-  # Firebase
+  # Environment Variables
+  flutter_dotenv: ^6.0.0
+  
+  # Firebase - Últimas versiones 2025
   firebase_core: ^4.1.0
   firebase_auth: ^6.0.2
   cloud_firestore: ^6.0.1
   firebase_storage: ^13.0.1
   firebase_messaging: ^16.0.1
-  firebase_analytics: ^12.0.1  
+  firebase_analytics: ^12.0.1
   firebase_crashlytics: ^5.0.1
   firebase_database: ^12.0.1
+  firebase_remote_config: ^6.0.1
+  firebase_performance: ^0.11.0+1
+  cloud_functions: ^6.0.1
+  firebase_app_installations: ^0.4.0+1
   
   # OAuth y Autenticación Social
   google_sign_in: ^6.2.2
   flutter_facebook_auth: ^7.1.1
-  sign_in_with_apple: ^6.1.3
+  sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
   
   # Notifications
-  flutter_local_notifications: ^19.4.1
+  flutter_local_notifications: ^19.4.2
   timezone: ^0.10.1
   
   # QR Code
@@ -55,23 +65,19 @@ dependencies:
   
   # Emergency System Dependencies
   flutter_phone_direct_caller: ^2.1.1
-  # telephony: ^0.2.0  # DESHABILITADO TEMPORALMENTE PARA BUILD (namespace issue, discontinued)
-  # sms_advanced: ^1.0.4  # TAMBIÉN CON NAMESPACE ISSUE - SMS se maneja por backend
   flutter_sound: ^9.2.13
-  audio_session: ^0.1.20
-  # contacts_service: ^0.6.3  # DESHABILITADO TEMPORALMENTE PARA BUILD (namespace issue)
+  audio_session: ^0.2.2
   audioplayers: ^6.1.0
   
   # Utilities
-  intl: ^0.20.1
+  intl: ^0.20.2
   url_launcher: ^6.3.1
   uuid: ^4.5.1
   logger: ^2.5.0
+  dio: ^5.5.0
+  http_certificate_pinning: ^3.0.1
   http: ^1.2.2
-  
-  # FCM Real Implementation
-  googleapis_auth: ^1.6.0
-  dio: ^5.6.0
+  flutter_tts: ^4.1.0
   
   # OTP y Verificación
   pin_code_fields: ^8.0.1
@@ -85,24 +91,49 @@ dependencies:
   image_picker: ^1.1.2
   
   # File Handling
-  file_picker: ^8.1.4
-  device_info_plus: ^11.1.0
+  file_picker: ^10.3.2
+  device_info_plus: ^12.1.0
+  connectivity_plus: ^7.0.0
   cached_network_image: ^3.4.1
   path_provider: ^2.1.5
   
   # Socket.IO para tracking en tiempo real
-  socket_io_client: ^2.0.3+1
+  socket_io_client: ^3.1.2
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^6.0.0
+  package_info_plus: ^8.3.1
+
+  # Dependencias adicionales para servicios
+  path: ^1.9.0
+  image: ^4.3.0
+
+  # Cache manager
+  flutter_cache_manager: ^3.4.1
+
+  # Cloud KMS dependencies
+  googleapis: ^14.0.0
+  googleapis_auth: ^2.0.0
+
+# Production-only configuration
+# No dev_dependencies needed for production deployment
 
 flutter:
   uses-material-design: true
   
   assets:
+    - assets/map_style.json
     - assets/images/
-    - assets/icons/
-    - assets/animations/
-    - assets/oasis-taxi-peru-service-account.json
+    - .env
+
+# Configuración de iconos para producción - DESHABILITADO TEMPORALMENTE
+# Descomentar cuando se confirme que los assets existen
+# flutter_launcher_icons:
+#   android: "launcher_icon"
+#   ios: false
+#   image_path: "assets/images/logo_oasis_taxi.png"
+#   min_sdk_android: 21
+#   remove_alpha_ios: true
+#   android_12:
+#     image_path: "assets/images/logo_oasis_taxi.png"
+#     icon_background_color: "#00C800"
+#     image_path_android: "assets/images/logo_oasis_taxi.png"
+

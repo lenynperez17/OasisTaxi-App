@@ -1,5 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../core/theme/modern_theme.dart';
 import '../../services/chat_service.dart';
+import '../../services/firebase_ml_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/ride_provider.dart';
 
 /// ChatScreen - Chat profesional en tiempo real
 /// ✅ IMPLEMENTACIÓN COMPLETA con funcionalidad real
@@ -29,40 +30,41 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen>
-    with TickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ChatService _chatService = ChatService();
+  final FirebaseMLService _mlService = FirebaseMLService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
 
-  late AnimationController _typingAnimationController;
-  late Animation<double> _typingAnimation;
+  // late AnimationController _typingAnimationController; // No usado en UI actual
+  // late Animation<double> _typingAnimation; // No usado en UI actual
   late AnimationController _messageAnimationController;
 
   bool _isLoading = true;
-  final bool _isTyping = false;
+  // final bool _isTyping = false; // No usado actualmente
   bool _isOtherUserOnline = false;
   DateTime? _otherUserLastSeen;
   List<ChatMessage> _messages = [];
-  final int _unreadCount = 0;
+  // final int _unreadCount = 0; // No usado actualmente
 
   // Estados de UI
   bool _showQuickMessages = false;
-  final bool _isRecordingAudio = false;
-  final bool _showEmojiPicker = false;
+  // final bool _isRecordingAudio = false; // No usado actualmente
+  // final bool _showEmojiPicker = false; // No usado actualmente
 
   @override
   void initState() {
     super.initState();
-    
-    _typingAnimationController = AnimationController(
-      duration: Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _typingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _typingAnimationController, curve: Curves.easeInOut),
-    );
+    AppLogger.lifecycle('ChatScreen', 'initState - RideId: ${widget.rideId}');
+
+    // _typingAnimationController = AnimationController(
+    //   duration: Duration(milliseconds: 1500),
+    //   vsync: this,
+    // );
+    // _typingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    //   CurvedAnimation(parent: _typingAnimationController, curve: Curves.easeInOut),
+    // );
     _messageAnimationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
@@ -73,7 +75,7 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   void dispose() {
-    _typingAnimationController.dispose();
+    // _typingAnimationController.dispose();
     _messageAnimationController.dispose();
     _messageController.dispose();
     _scrollController.dispose();
@@ -86,9 +88,9 @@ class _ChatScreenState extends State<ChatScreen>
       if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
-        debugPrint('Usuario no autenticado');
+        AppLogger.debug('Usuario no autenticado');
         Navigator.pop(context);
         return;
       }
@@ -128,10 +130,9 @@ class _ChatScreenState extends State<ChatScreen>
         _isLoading = false;
       });
 
-      debugPrint('Chat inicializado para viaje ${widget.rideId}');
-
+      AppLogger.debug('Chat inicializado para viaje ${widget.rideId}');
     } catch (e) {
-      debugPrint('Error inicializando chat: $e');
+      AppLogger.debug('Error inicializando chat: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -163,19 +164,117 @@ class _ChatScreenState extends State<ChatScreen>
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) return;
 
-      // Limpiar el campo de texto
+      // Limpiar el campo de texto inmediatamente para mejor UX
       _messageController.clear();
       _messageFocusNode.unfocus();
 
-      // Enviar mensaje
+      // ============================================
+      // ANÁLISIS ML DE TOXICIDAD EN TIEMPO REAL
+      // ============================================
+
+      // Analizar el mensaje antes de enviarlo
+      try {
+        final toxicityResult = await _mlService.analyzeTextToxicity(
+          message,
+          messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: user.id,
+          language: 'es',
+        );
+
+        // Si el mensaje es altamente tóxico, advertir al usuario
+        if (toxicityResult.isToxic && toxicityResult.toxicityScore > 0.8) {
+          if (!mounted) return;
+
+          // Mostrar diálogo de advertencia
+          final shouldSend = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Mensaje detectado como inapropiado'),
+                  content: Text(
+                      'Nuestro sistema ha detectado que este mensaje podría ser ofensivo. '
+                      '¿Estás seguro de que quieres enviarlo? Recuerda mantener un ambiente respetuoso.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text('Cancelar'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text('Enviar de todos modos'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+
+          if (!shouldSend) {
+            // Restaurar el mensaje en el campo de texto
+            _messageController.text = message;
+            AppLogger.info('ChatScreen: Mensaje tóxico cancelado por usuario', {
+              'userId': user.id,
+              'toxicityScore': toxicityResult.toxicityScore,
+            });
+            return;
+          }
+        }
+
+        // Log del análisis ML
+        AppLogger.info('ChatScreen: Análisis ML completado', {
+          'toxicityScore': toxicityResult.toxicityScore,
+          'isToxic': toxicityResult.isToxic,
+          'detectedCategories': toxicityResult.detectedCategories,
+        });
+      } catch (mlError) {
+        AppLogger.warning(
+            'ChatScreen: Error en análisis ML, enviando mensaje sin análisis',
+            mlError);
+        // Continuar con el envío aunque falle el análisis ML
+      }
+
+      // ============================================
+      // TRADUCCIÓN AUTOMÁTICA INTELIGENTE
+      // ============================================
+
+      String finalMessage = message;
+
+      try {
+        final rideProvider = Provider.of<RideProvider>(context, listen: false);
+
+        // Detectar si el otro usuario podría necesitar traducción
+        // (Esto se puede mejorar con preferencias de usuario)
+        if (_shouldTranslateMessage(message)) {
+          final translatedMessage = await rideProvider.translateChatMessage(
+              message,
+              targetLanguage: 'qu' // Quechua como ejemplo para usuarios locales
+              );
+
+          if (translatedMessage != message) {
+            finalMessage = '$message\n🌐 $translatedMessage';
+
+            AppLogger.info('ChatScreen: Mensaje traducido automáticamente', {
+              'original': message,
+              'translated': translatedMessage,
+            });
+          }
+        }
+      } catch (translationError) {
+        AppLogger.warning(
+            'ChatScreen: Error en traducción automática', translationError);
+        // Usar mensaje original si falla la traducción
+      }
+
+      // ============================================
+      // ENVÍO DEL MENSAJE MEJORADO
+      // ============================================
+
       final success = await _chatService.sendTextMessage(
         rideId: widget.rideId,
         senderId: user.id,
         senderName: user.fullName,
-        message: message,
+        message: finalMessage,
         senderRole: user.userType,
       );
 
@@ -186,6 +285,12 @@ class _ChatScreenState extends State<ChatScreen>
         _messageAnimationController.forward().then((_) {
           _messageAnimationController.reset();
         });
+
+        AppLogger.info('ChatScreen: Mensaje enviado exitosamente con ML', {
+          'rideId': widget.rideId,
+          'messageLength': finalMessage.length,
+          'hasTranslation': finalMessage != message,
+        });
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -195,9 +300,8 @@ class _ChatScreenState extends State<ChatScreen>
           ),
         );
       }
-
     } catch (e) {
-      debugPrint('Error enviando mensaje: $e');
+      AppLogger.debug('Error enviando mensaje: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -212,7 +316,7 @@ class _ChatScreenState extends State<ChatScreen>
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) return;
 
       final success = await _chatService.sendQuickMessage(
@@ -229,9 +333,8 @@ class _ChatScreenState extends State<ChatScreen>
         });
         HapticFeedback.lightImpact();
       }
-
     } catch (e) {
-      debugPrint('Error enviando mensaje rápido: $e');
+      AppLogger.debug('Error enviando mensaje rápido: $e');
     }
   }
 
@@ -239,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen>
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) return;
 
       // Obtener ubicación actual (simulada)
@@ -259,9 +362,8 @@ class _ChatScreenState extends State<ChatScreen>
       if (success) {
         HapticFeedback.lightImpact();
       }
-
     } catch (e) {
-      debugPrint('Error compartiendo ubicación: $e');
+      AppLogger.debug('Error compartiendo ubicación: $e');
     }
   }
 
@@ -274,13 +376,14 @@ class _ChatScreenState extends State<ChatScreen>
 
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
+
+        if (!mounted) return;
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final user = authProvider.currentUser;
-        
+
         if (user == null) return;
 
         // Mostrar indicador de carga
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -290,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen>
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Text('Enviando archivo...'),
               ],
             ),
@@ -339,7 +442,7 @@ class _ChatScreenState extends State<ChatScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      debugPrint('Error enviando multimedia: $e');
+      AppLogger.debug('Error enviando multimedia: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -359,8 +462,10 @@ class _ChatScreenState extends State<ChatScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.otherUserName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            Text(_buildStatusText(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+            Text(widget.otherUserName,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(_buildStatusText(),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
           ],
         ),
         actions: [
@@ -379,7 +484,7 @@ class _ChatScreenState extends State<ChatScreen>
           ),
         ],
       ),
-      body: _isLoading 
+      body: _isLoading
           ? _buildLoadingState()
           : Column(
               children: [
@@ -399,7 +504,7 @@ class _ChatScreenState extends State<ChatScreen>
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Iniciando chat...',
             style: TextStyle(
@@ -418,7 +523,7 @@ class _ChatScreenState extends State<ChatScreen>
     } else if (_otherUserLastSeen != null) {
       final now = DateTime.now();
       final difference = now.difference(_otherUserLastSeen!);
-      
+
       if (difference.inMinutes < 1) {
         return 'Visto hace un momento';
       } else if (difference.inMinutes < 60) {
@@ -429,8 +534,9 @@ class _ChatScreenState extends State<ChatScreen>
         return 'Visto hace ${difference.inDays} días';
       }
     }
-    
-    final roleText = widget.otherUserRole == 'driver' ? 'Conductor' : 'Pasajero';
+
+    final roleText =
+        widget.otherUserRole == 'driver' ? 'Conductor' : 'Pasajero';
     return roleText;
   }
 
@@ -470,7 +576,7 @@ class _ChatScreenState extends State<ChatScreen>
               color: ModernTheme.oasisGreen,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             '¡Inicia la conversación!',
             style: TextStyle(
@@ -479,7 +585,7 @@ class _ChatScreenState extends State<ChatScreen>
               color: ModernTheme.textPrimary,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Mantente en contacto con tu ${widget.otherUserRole == 'driver' ? 'conductor' : 'pasajero'}',
             textAlign: TextAlign.center,
@@ -497,9 +603,8 @@ class _ChatScreenState extends State<ChatScreen>
     return Padding(
       padding: EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isMyMessage 
-            ? MainAxisAlignment.end 
-            : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMyMessage) ...[
@@ -507,8 +612,8 @@ class _ChatScreenState extends State<ChatScreen>
               radius: 16,
               backgroundColor: ModernTheme.oasisGreen.withValues(alpha: 0.2),
               child: Text(
-                message.senderName.isNotEmpty 
-                    ? message.senderName[0].toUpperCase() 
+                message.senderName.isNotEmpty
+                    ? message.senderName[0].toUpperCase()
                     : '?',
                 style: TextStyle(
                   fontSize: 12,
@@ -517,15 +622,13 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isMyMessage 
-                    ? ModernTheme.oasisGreen 
-                    : Colors.white,
+                color: isMyMessage ? ModernTheme.oasisGreen : Colors.white,
                 borderRadius: BorderRadius.circular(18).copyWith(
                   bottomLeft: Radius.circular(isMyMessage ? 18 : 4),
                   bottomRight: Radius.circular(isMyMessage ? 4 : 18),
@@ -541,15 +644,13 @@ class _ChatScreenState extends State<ChatScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (message.messageType == MessageType.location) 
+                  if (message.messageType == MessageType.location)
                     _buildLocationMessage(message, isMyMessage)
                   else if (message.messageType != MessageType.text)
                     _buildMediaMessage(message, isMyMessage)
                   else
                     _buildTextMessage(message, isMyMessage),
-                  
-                  SizedBox(height: 4),
-                  
+                  const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -557,18 +658,18 @@ class _ChatScreenState extends State<ChatScreen>
                         _formatMessageTime(message.timestamp),
                         style: TextStyle(
                           fontSize: 11,
-                          color: isMyMessage 
+                          color: isMyMessage
                               ? Colors.white.withValues(alpha: 0.7)
                               : ModernTheme.textSecondary,
                         ),
                       ),
                       if (isMyMessage) ...[
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Icon(
                           message.isRead ? Icons.done_all : Icons.done,
                           size: 14,
-                          color: message.isRead 
-                              ? Colors.blue 
+                          color: message.isRead
+                              ? Colors.blue
                               : Colors.white.withValues(alpha: 0.7),
                         ),
                       ],
@@ -578,8 +679,8 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
           ),
-          if (isMyMessage) SizedBox(width: 50),
-          if (!isMyMessage) SizedBox(width: 50),
+          if (isMyMessage) const SizedBox(width: 50),
+          if (!isMyMessage) const SizedBox(width: 50),
         ],
       ),
     );
@@ -599,7 +700,7 @@ class _ChatScreenState extends State<ChatScreen>
   Widget _buildMediaMessage(ChatMessage message, bool isMyMessage) {
     IconData icon;
     String label;
-    
+
     switch (message.messageType) {
       case MessageType.image:
         icon = Icons.image;
@@ -626,7 +727,7 @@ class _ChatScreenState extends State<ChatScreen>
           size: 20,
           color: isMyMessage ? Colors.white : ModernTheme.oasisGreen,
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,12 +741,12 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
               ),
               if (message.message.isNotEmpty) ...[
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   message.message,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isMyMessage 
+                    color: isMyMessage
                         ? Colors.white.withValues(alpha: 0.8)
                         : ModernTheme.textSecondary,
                   ),
@@ -667,7 +768,7 @@ class _ChatScreenState extends State<ChatScreen>
           size: 20,
           color: isMyMessage ? Colors.white : ModernTheme.error,
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             'Ubicación compartida',
@@ -700,7 +801,8 @@ class _ChatScreenState extends State<ChatScreen>
               child: ElevatedButton(
                 onPressed: () => _sendQuickMessage(type),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: ModernTheme.oasisGreen.withValues(alpha: 0.1),
+                  backgroundColor:
+                      ModernTheme.oasisGreen.withValues(alpha: 0.1),
                   foregroundColor: ModernTheme.oasisGreen,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -766,7 +868,7 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Row(
               children: [
                 IconButton(
@@ -873,7 +975,8 @@ class _ChatScreenState extends State<ChatScreen>
       builder: (context) {
         return AlertDialog(
           title: Text('Limpiar chat'),
-          content: Text('¿Estás seguro de que quieres limpiar toda la conversación?'),
+          content: Text(
+              '¿Estás seguro de que quieres limpiar toda la conversación?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -896,5 +999,44 @@ class _ChatScreenState extends State<ChatScreen>
         );
       },
     );
+  }
+
+  /// Determinar si un mensaje debería ser traducido automáticamente
+  bool _shouldTranslateMessage(String message) {
+    // Lógica simple: traducir si contiene palabras clave turísticas o locales
+    final touristKeywords = [
+      'donde',
+      'cómo llegar',
+      'hotel',
+      'aeropuerto',
+      'centro',
+      'plaza',
+      'cathedral',
+      'museum',
+      'restaurant',
+      'hospital',
+      'pharmacy',
+      'ayudar',
+      'help',
+      'please',
+      'gracias',
+      'thank you'
+    ];
+
+    final messageLower = message.toLowerCase();
+
+    // Traducir si contiene palabras turísticas
+    for (String keyword in touristKeywords) {
+      if (messageLower.contains(keyword)) {
+        return true;
+      }
+    }
+
+    // Traducir si el mensaje es largo (>50 caracteres) - posiblemente información importante
+    if (message.length > 50) {
+      return true;
+    }
+
+    return false;
   }
 }

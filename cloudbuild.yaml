@@ -1,0 +1,400 @@
+# 🚖 OASIS TAXI PERÚ - Google Cloud Build CI/CD Pipeline
+# Configuración completa para build automatizado, testing y deployment
+# Soporta Android APK/AAB, iOS, web deployment a Firebase Hosting
+
+# Variables de configuración
+substitutions:
+  _PROJECT_ID: 'oasis-taxi-peru-prod'
+  _REGION: 'us-central1'
+  _FLUTTER_VERSION: '3.24.4'
+  _JAVA_VERSION: '11'
+  _NODE_VERSION: '18'
+  _BUILD_TYPE: 'release'
+
+# Configuración de tiempo y recursos
+timeout: '3600s' # 1 hora para builds completos
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+  dynamicSubstitutions: true
+
+steps:
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 1: PREPARACIÓN DEL ENTORNO
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/cloud-builders/git'
+  id: 'clone-repo'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🔄 Clonando repositorio OasisTaxi Peru..."
+    git clone https://github.com/${_GITHUB_OWNER}/${_GITHUB_REPO}.git /workspace/oasistaxi
+    cd /workspace/oasistaxi
+    git checkout ${BRANCH_NAME}
+    echo "✅ Repositorio clonado correctamente"
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'setup-environment'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🔧 Configurando entorno para OasisTaxi Peru..."
+    
+    # Instalar dependencias del sistema
+    apt-get update
+    apt-get install -y curl unzip git openjdk-${_JAVA_VERSION}-jdk
+    
+    # Configurar Java
+    export JAVA_HOME=/usr/lib/jvm/java-${_JAVA_VERSION}-openjdk-amd64
+    echo "JAVA_HOME=${JAVA_HOME}" >> /workspace/env.txt
+    
+    # Instalar Flutter SDK
+    echo "📱 Instalando Flutter ${_FLUTTER_VERSION}..."
+    cd /tmp
+    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${_FLUTTER_VERSION}-stable.tar.xz
+    tar xf flutter_linux_${_FLUTTER_VERSION}-stable.tar.xz
+    export PATH="/tmp/flutter/bin:${PATH}"
+    echo "PATH=/tmp/flutter/bin:${PATH}" >> /workspace/env.txt
+    
+    # Verificar instalación Flutter
+    flutter --version
+    flutter doctor --android-licenses
+    
+    # Instalar Node.js para Cloud Functions
+    echo "📦 Instalando Node.js ${_NODE_VERSION}..."
+    curl -fsSL https://deb.nodesource.com/setup_${_NODE_VERSION}.x | bash -
+    apt-get install -y nodejs
+    
+    echo "✅ Entorno configurado correctamente"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 2: CONFIGURACIÓN DE SECRETOS Y VARIABLES
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: 'setup-secrets'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🔐 Configurando secretos de OasisTaxi Peru..."
+    
+    # Obtener variables de entorno desde Secret Manager
+    gcloud secrets versions access latest --secret="oasistaxi-env-vars" > .env
+    
+    # Configurar Firebase CLI
+    gcloud secrets versions access latest --secret="firebase-service-account" > firebase-key.json
+    export GOOGLE_APPLICATION_CREDENTIALS=/workspace/oasistaxi/app/firebase-key.json
+    
+    # Configurar Android signing
+    gcloud secrets versions access latest --secret="android-keystore" > android/app/keystore.jks
+    gcloud secrets versions access latest --secret="android-key-properties" > android/key.properties
+    
+    # Configurar OAuth credentials
+    gcloud secrets versions access latest --secret="google-services-android" > android/app/google-services.json
+    gcloud secrets versions access latest --secret="google-services-ios" > ios/Runner/GoogleService-Info.plist
+    
+    echo "✅ Secretos configurados correctamente"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 3: ANÁLISIS Y TESTING
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'flutter-analyze'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🔍 Ejecutando análisis de código Flutter..."
+    
+    # Obtener dependencias
+    flutter pub get
+    
+    # Ejecutar análisis estático
+    flutter analyze --no-pub
+    
+    # Verificar formato de código
+    dart format --output=none --set-exit-if-changed .
+    
+    echo "✅ Análisis de código completado"
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'flutter-test'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🧪 Ejecutando tests de OasisTaxi..."
+    
+    # Tests unitarios
+    flutter test --coverage --reporter=json > test_results.json
+    
+    # Generar reporte de cobertura
+    genhtml coverage/lcov.info -o coverage/html
+    
+    # Verificar cobertura mínima (80%)
+    COVERAGE=$(lcov --summary coverage/lcov.info 2>&1 | grep "lines" | awk '{print $2}' | sed 's/%//')
+    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+      echo "❌ Cobertura de tests insuficiente: $COVERAGE%. Mínimo requerido: 80%"
+      exit 1
+    fi
+    
+    echo "✅ Tests ejecutados correctamente. Cobertura: $COVERAGE%"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 4: BUILD ANDROID
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'build-android'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🤖 Building Android APK y AAB para OasisTaxi..."
+    
+    # Build APK de release
+    flutter build apk --release \
+      --target lib/main.dart \
+      --split-per-abi \
+      --obfuscate \
+      --split-debug-info=build/app/outputs/symbols
+    
+    # Build Android App Bundle (AAB) para Play Store
+    flutter build appbundle --release \
+      --target lib/main.dart \
+      --obfuscate \
+      --split-debug-info=build/app/outputs/symbols
+    
+    # Verificar outputs
+    ls -la build/app/outputs/flutter-apk/
+    ls -la build/app/outputs/bundle/release/
+    
+    echo "✅ Android builds completados"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 5: BUILD iOS (Solo en macOS runners)
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'prepare-ios'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🍎 Preparando configuración iOS para OasisTaxi..."
+    
+    # iOS build requires macOS, so we prepare the archive
+    cd /workspace/oasistaxi/app
+    
+    # Crear bundle para iOS build en macOS
+    tar -czf ios-source.tar.gz ios/ pubspec.yaml pubspec.lock lib/ assets/
+    
+    echo "✅ Configuración iOS preparada"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 6: BUILD WEB
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'build-web'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🌐 Building Web App para OasisTaxi..."
+    
+    # Build web optimizado para producción
+    flutter build web --release \
+      --target lib/main.dart \
+      --web-renderer html \
+      --base-href "/" \
+      --dart-define-from-file=web-config.json
+    
+    # Optimizar assets web
+    cd build/web
+    
+    # Comprimir archivos estáticos
+    find . -type f -name "*.js" -exec gzip -k {} \;
+    find . -type f -name "*.css" -exec gzip -k {} \;
+    find . -type f -name "*.html" -exec gzip -k {} \;
+    
+    echo "✅ Web build completado"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 7: BUILD Y DEPLOY CLOUD FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'build-functions'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    cd /workspace/oasistaxi/app/functions
+    
+    echo "⚡ Building Cloud Functions para OasisTaxi..."
+    
+    # Instalar dependencias
+    npm ci
+    
+    # Build TypeScript functions
+    npm run build
+    
+    # Deploy functions a Firebase
+    npx firebase deploy --only functions --project ${_PROJECT_ID}
+    
+    echo "✅ Cloud Functions deployed"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 8: DEPLOYMENT AUTOMÁTICO
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'deploy-web'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    cd /workspace/oasistaxi/app
+    
+    echo "🚀 Deploying a Firebase Hosting..."
+    
+    # Deploy web app a Firebase Hosting
+    npx firebase deploy --only hosting --project ${_PROJECT_ID}
+    
+    # Deploy Firestore rules y indexes
+    npx firebase deploy --only firestore --project ${_PROJECT_ID}
+    
+    # Deploy Storage rules
+    npx firebase deploy --only storage --project ${_PROJECT_ID}
+    
+    echo "✅ Web deployment completado"
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'upload-artifacts'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    cd /workspace/oasistaxi/app
+    
+    echo "📦 Subiendo artifacts a Cloud Storage..."
+    
+    # Crear bucket para artifacts si no existe
+    gsutil mb -p ${_PROJECT_ID} gs://${_PROJECT_ID}-artifacts || true
+    
+    # Subir APKs
+    gsutil -m cp build/app/outputs/flutter-apk/*.apk gs://${_PROJECT_ID}-artifacts/android/${BUILD_ID}/
+    
+    # Subir AAB
+    gsutil -m cp build/app/outputs/bundle/release/*.aab gs://${_PROJECT_ID}-artifacts/android/${BUILD_ID}/
+    
+    # Subir iOS source
+    gsutil cp ios-source.tar.gz gs://${_PROJECT_ID}-artifacts/ios/${BUILD_ID}/
+    
+    # Subir web build
+    gsutil -m cp -r build/web gs://${_PROJECT_ID}-artifacts/web/${BUILD_ID}/
+    
+    # Subir reports
+    gsutil -m cp -r coverage/ gs://${_PROJECT_ID}-artifacts/reports/${BUILD_ID}/coverage/
+    gsutil cp test_results.json gs://${_PROJECT_ID}-artifacts/reports/${BUILD_ID}/
+    
+    echo "✅ Artifacts subidos correctamente"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 9: NOTIFICACIONES Y LIMPIEZA
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'notifications'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "📢 Enviando notificaciones de build..."
+    
+    # Determinar estado del build
+    BUILD_STATUS="SUCCESS"
+    BUILD_URL="https://console.cloud.google.com/cloud-build/builds/${BUILD_ID}?project=${_PROJECT_ID}"
+    
+    # Enviar notificación a Slack (si está configurado)
+    if [ ! -z "${_SLACK_WEBHOOK}" ]; then
+      curl -X POST -H 'Content-type: application/json' \
+        --data "{\"text\":\"🚖 OasisTaxi Build ${BUILD_STATUS}: ${BUILD_URL}\"}" \
+        ${_SLACK_WEBHOOK}
+    fi
+    
+    # Enviar notificación FCM al equipo de desarrollo
+    gcloud functions call sendBuildNotification \
+      --data="{\"buildId\":\"${BUILD_ID}\",\"status\":\"${BUILD_STATUS}\",\"project\":\"${_PROJECT_ID}\"}"
+    
+    echo "✅ Notificaciones enviadas"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 CONFIGURACIÓN DE TRIGGERS AUTOMÁTICOS
+# ═══════════════════════════════════════════════════════════════════
+
+# Este archivo debe ser usado junto con triggers de Cloud Build:
+#
+# Trigger para desarrollo (push a develop):
+# gcloud builds triggers create github \
+#   --repo-name=oasistaxi-peru \
+#   --repo-owner=tu-organizacion \
+#   --branch-pattern="^develop$" \
+#   --build-config=cloudbuild.yaml \
+#   --description="OasisTaxi Development Build"
+#
+# Trigger para producción (push a main):
+# gcloud builds triggers create github \
+#   --repo-name=oasistaxi-peru \
+#   --repo-owner=tu-organizacion \
+#   --branch-pattern="^main$" \
+#   --build-config=cloudbuild.yaml \
+#   --description="OasisTaxi Production Build"
+#
+# Trigger para Pull Requests:
+# gcloud builds triggers create github \
+#   --repo-name=oasistaxi-peru \
+#   --repo-owner=tu-organizacion \
+#   --pull-request-pattern=".*" \
+#   --build-config=cloudbuild-pr.yaml \
+#   --description="OasisTaxi PR Validation"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 VARIABLES DE ENTORNO REQUERIDAS
+# ═══════════════════════════════════════════════════════════════════
+
+# Estas variables deben ser configuradas en Cloud Build:
+# - _GITHUB_OWNER: Propietario del repositorio GitHub
+# - _GITHUB_REPO: Nombre del repositorio
+# - _SLACK_WEBHOOK: Webhook de Slack para notificaciones (opcional)
+# - _ENVIRONMENT: dev, staging, prod
+# - _DEPLOYMENT_TARGET: android, ios, web, all
+
+# Secretos en Secret Manager:
+# - oasistaxi-env-vars: Variables de entorno (.env)
+# - firebase-service-account: Service account de Firebase
+# - android-keystore: Keystore para signing Android
+# - android-key-properties: Propiedades del keystore
+# - google-services-android: google-services.json
+# - google-services-ios: GoogleService-Info.plist

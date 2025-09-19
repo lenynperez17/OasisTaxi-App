@@ -1,15 +1,15 @@
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../services/payment_service.dart';
 import '../../services/firebase_service.dart';
 import '../../widgets/loading_overlay.dart';
+import '../../utils/app_logger.dart';
+import '../../utils/validation_patterns.dart';
 
 /// PANTALLA DE RETIRO DE GANANCIAS - CONDUCTORES OASIS TAXI
 /// ========================================================
-/// 
+///
 /// Funcionalidades implementadas:
 /// 💰 Vista de ganancias totales y disponibles para retiro
 /// 🏦 Retiros a cuenta bancaria (Interbancaria/BCP/BBVA)
@@ -27,32 +27,33 @@ class EarningsWithdrawalScreen extends StatefulWidget {
   });
 
   @override
-  State<EarningsWithdrawalScreen> createState() => _EarningsWithdrawalScreenState();
+  State<EarningsWithdrawalScreen> createState() =>
+      _EarningsWithdrawalScreenState();
 }
 
 class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
     with TickerProviderStateMixin {
   final PaymentService _paymentService = PaymentService();
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   late TabController _tabController;
   bool _isLoading = true;
-  
+
   // Información de ganancias
   double _totalEarnings = 0.0;
   double _availableForWithdrawal = 0.0;
   double _pendingWithdrawals = 0.0;
   double _totalWithdrawn = 0.0;
-  
+
   // Historial de ganancias
   List<EarningsPeriod> _earningsHistory = [];
   List<WithdrawalHistory> _withdrawalHistory = [];
-  
+
   // Formulario de retiro
   final _withdrawalAmountController = TextEditingController();
   final _accountNumberController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   String _selectedWithdrawalMethod = 'bank_transfer';
   String _selectedBank = 'interbank';
   double _withdrawalAmount = 0.0;
@@ -68,6 +69,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle(
+        'EarningsWithdrawalScreen', 'initState - DriverId: ${widget.driverId}');
     _tabController = TabController(length: 3, vsync: this);
     _initializeServices();
     _setupAmountListener();
@@ -134,7 +137,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
         final data = driverDoc.data() as Map<String, dynamic>;
         setState(() {
           _totalEarnings = (data['totalEarnings'] ?? 0.0).toDouble();
-          _availableForWithdrawal = (data['availableForWithdrawal'] ?? 0.0).toDouble();
+          _availableForWithdrawal =
+              (data['availableForWithdrawal'] ?? 0.0).toDouble();
           _pendingWithdrawals = (data['pendingWithdrawals'] ?? 0.0).toDouble();
           _totalWithdrawn = (data['totalWithdrawn'] ?? 0.0).toDouble();
         });
@@ -239,7 +243,6 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
       await _loadDriverEarnings();
       await _loadWithdrawalHistory();
       _clearForm();
-
     } catch (e) {
       _showErrorSnackBar('Error procesando retiro: $e');
     } finally {
@@ -250,9 +253,9 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   Future<void> _processBankTransfer() async {
     // Simular procesamiento de transferencia bancaria
     await Future.delayed(const Duration(seconds: 2));
-    
+
     // En producción, aquí se integraría con el sistema bancario
-    await _firebaseService.analytics.logEvent(
+    await _firebaseService.analytics?.logEvent(
       name: 'driver_withdrawal_bank_transfer',
       parameters: {
         'driver_id': widget.driverId,
@@ -266,8 +269,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   Future<void> _processYapeWithdrawal() async {
     // Simular procesamiento con Yape
     await Future.delayed(const Duration(seconds: 1));
-    
-    await _firebaseService.analytics.logEvent(
+
+    await _firebaseService.analytics?.logEvent(
       name: 'driver_withdrawal_yape',
       parameters: {
         'driver_id': widget.driverId,
@@ -280,8 +283,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   Future<void> _processPlinWithdrawal() async {
     // Simular procesamiento con Plin
     await Future.delayed(const Duration(seconds: 1));
-    
-    await _firebaseService.analytics.logEvent(
+
+    await _firebaseService.analytics?.logEvent(
       name: 'driver_withdrawal_plin',
       parameters: {
         'driver_id': widget.driverId,
@@ -307,7 +310,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
     }
 
     if (_withdrawalAmount > _maxDailyWithdrawal) {
-      _showErrorSnackBar('El monto máximo diario de retiro es S/$_maxDailyWithdrawal');
+      _showErrorSnackBar(
+          'El monto máximo diario de retiro es S/$_maxDailyWithdrawal');
       return false;
     }
 
@@ -320,9 +324,9 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
         break;
       case 'yape':
       case 'plin':
-        if (_phoneController.text.isEmpty || 
-            !RegExp(r'^9[0-9]{8}$').hasMatch(_phoneController.text)) {
-          _showErrorSnackBar('Ingresa un número de teléfono válido (9XXXXXXXX)');
+        final phone = _phoneController.text.trim();
+        if (!ValidationPatterns.isValidPeruMobile(phone)) {
+          _showErrorSnackBar(ValidationPatterns.getPhoneError());
           return false;
         }
         break;
@@ -337,87 +341,89 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
 
   Future<bool> _showWithdrawalConfirmation() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Retiro'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('¿Confirmas el retiro de S/${_withdrawalAmount.toStringAsFixed(2)}?'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Monto a retirar:'),
-                      Text('S/${_withdrawalAmount.toStringAsFixed(2)}'),
-                    ],
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirmar Retiro'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    '¿Confirmas el retiro de S/${_withdrawalAmount.toStringAsFixed(2)}?'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Comisión:'),
-                      Text('- S/${_withdrawalFee.toStringAsFixed(2)}'),
-                    ],
-                  ),
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Recibirás:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Monto a retirar:'),
+                          Text('S/${_withdrawalAmount.toStringAsFixed(2)}'),
+                        ],
                       ),
-                      Text(
-                        'S/${_netAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Comisión:'),
+                          Text('- S/${_withdrawalFee.toStringAsFixed(2)}'),
+                        ],
+                      ),
+                      const Divider(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Recibirás:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'S/${_netAmount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Método: ${_getMethodDisplayName(_selectedWithdrawalMethod)}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                if (_selectedWithdrawalMethod == 'bank_transfer')
+                  Text(
+                    'Destino: ${_getBankDisplayName(_selectedBank)} ${_accountNumberController.text}',
+                    style: const TextStyle(fontSize: 14),
+                  )
+                else
+                  Text(
+                    'Destino: ${_phoneController.text}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Método: ${_getMethodDisplayName(_selectedWithdrawalMethod)}',
-              style: const TextStyle(fontSize: 14),
-            ),
-            if (_selectedWithdrawalMethod == 'bank_transfer')
-              Text(
-                'Destino: ${_getBankDisplayName(_selectedBank)} ${_accountNumberController.text}',
-                style: const TextStyle(fontSize: 14),
-              )
-            else
-              Text(
-                'Destino: ${_phoneController.text}',
-                style: const TextStyle(fontSize: 14),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('CANCELAR'),
               ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('CANCELAR'),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('CONFIRMAR'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('CONFIRMAR'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showSuccessDialog() {
@@ -594,7 +600,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
           children: [
             const Row(
               children: [
-                Icon(Icons.account_balance_wallet, color: Colors.green, size: 28),
+                Icon(Icons.account_balance_wallet,
+                    color: Colors.green, size: 28),
                 SizedBox(width: 8),
                 Text(
                   'Resumen de Ganancias',
@@ -680,7 +687,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
     );
   }
 
-  Widget _buildSummaryItem(String title, String value, IconData icon, Color color) {
+  Widget _buildSummaryItem(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -737,7 +745,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
                     ),
                   ),
                   title: Text(period.period),
-                  subtitle: Text('${period.trips} viajes • ${period.hours} horas'),
+                  subtitle:
+                      Text('${period.trips} viajes • ${period.hours} horas'),
                   trailing: Text(
                     'S/${period.earnings.toStringAsFixed(2)}',
                     style: const TextStyle(
@@ -756,12 +765,12 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   }
 
   Widget _buildQuickStatsCard() {
-    final avgPerTrip = _earningsHistory.isNotEmpty 
-      ? _earningsHistory.first.earnings / _earningsHistory.first.trips
-      : 0.0;
+    final avgPerTrip = _earningsHistory.isNotEmpty
+        ? _earningsHistory.first.earnings / _earningsHistory.first.trips
+        : 0.0;
     final avgPerHour = _earningsHistory.isNotEmpty
-      ? _earningsHistory.first.earnings / _earningsHistory.first.hours
-      : 0.0;
+        ? _earningsHistory.first.earnings / _earningsHistory.first.hours
+        : 0.0;
 
     return Card(
       child: Padding(
@@ -800,7 +809,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -860,7 +870,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            Icon(Icons.account_balance_wallet, color: Colors.green.shade600, size: 48),
+            Icon(Icons.account_balance_wallet,
+                color: Colors.green.shade600, size: 48),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -908,62 +919,38 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
             const SizedBox(height: 12),
             Column(
               children: [
-                ListTile(
-                  leading: Radio<String>(
-                    value: 'bank_transfer',
-                    groupValue: _selectedWithdrawalMethod,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedWithdrawalMethod = value!;
-                        _calculateWithdrawalFee();
-                      });
-                    },
-                  ),
+                RadioListTile<String>(
+                  value: 'bank_transfer',
+                  groupValue: _selectedWithdrawalMethod,
                   title: const Text('🏦 Transferencia Bancaria'),
                   subtitle: const Text('Comisión: S/3.00 • 24-48 horas'),
-                  onTap: () {
+                  onChanged: (value) {
                     setState(() {
-                      _selectedWithdrawalMethod = 'bank_transfer';
+                      _selectedWithdrawalMethod = value!;
                       _calculateWithdrawalFee();
                     });
                   },
                 ),
-                ListTile(
-                  leading: Radio<String>(
-                    value: 'yape',
-                    groupValue: _selectedWithdrawalMethod,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedWithdrawalMethod = value!;
-                        _calculateWithdrawalFee();
-                      });
-                    },
-                  ),
+                RadioListTile<String>(
+                  value: 'yape',
+                  groupValue: _selectedWithdrawalMethod,
                   title: const Text('📱 Yape'),
                   subtitle: const Text('Comisión: S/1.00 • Instantáneo'),
-                  onTap: () {
+                  onChanged: (value) {
                     setState(() {
-                      _selectedWithdrawalMethod = 'yape';
+                      _selectedWithdrawalMethod = value!;
                       _calculateWithdrawalFee();
                     });
                   },
                 ),
-                ListTile(
-                  leading: Radio<String>(
-                    value: 'plin',
-                    groupValue: _selectedWithdrawalMethod,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedWithdrawalMethod = value!;
-                        _calculateWithdrawalFee();
-                      });
-                    },
-                  ),
+                RadioListTile<String>(
+                  value: 'plin',
+                  groupValue: _selectedWithdrawalMethod,
                   title: const Text('💸 Plin'),
                   subtitle: const Text('Comisión: S/1.00 • Instantáneo'),
-                  onTap: () {
+                  onChanged: (value) {
                     setState(() {
-                      _selectedWithdrawalMethod = 'plin';
+                      _selectedWithdrawalMethod = value!;
                       _calculateWithdrawalFee();
                     });
                   },
@@ -1044,7 +1031,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
                 Expanded(
                   child: TextButton(
                     onPressed: () {
-                      _withdrawalAmountController.text = _availableForWithdrawal.toString();
+                      _withdrawalAmountController.text =
+                          _availableForWithdrawal.toString();
                       setState(() {
                         _withdrawalAmount = _availableForWithdrawal;
                         _calculateWithdrawalFee();
@@ -1075,16 +1063,18 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
             const SizedBox(height: 12),
             if (_selectedWithdrawalMethod == 'bank_transfer') ...[
               DropdownButtonFormField<String>(
-                value: _selectedBank,
+                initialValue: _selectedBank,
                 decoration: const InputDecoration(
                   labelText: 'Banco',
                   border: OutlineInputBorder(),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'interbank', child: Text('Interbank')),
+                  DropdownMenuItem(
+                      value: 'interbank', child: Text('Interbank')),
                   DropdownMenuItem(value: 'bcp', child: Text('BCP')),
                   DropdownMenuItem(value: 'bbva', child: Text('BBVA')),
-                  DropdownMenuItem(value: 'scotiabank', child: Text('Scotiabank')),
+                  DropdownMenuItem(
+                      value: 'scotiabank', child: Text('Scotiabank')),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -1156,7 +1146,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Comisión (${_getMethodDisplayName(_selectedWithdrawalMethod)}):'),
+                Text(
+                    'Comisión (${_getMethodDisplayName(_selectedWithdrawalMethod)}):'),
                 Text('- S/${_withdrawalFee.toStringAsFixed(2)}'),
               ],
             ),
@@ -1195,9 +1186,9 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
   }
 
   Widget _buildProcessWithdrawalButton() {
-    final isEnabled = _withdrawalAmount >= _minWithdrawal && 
-                     _withdrawalAmount <= _availableForWithdrawal &&
-                     !_isLoading;
+    final isEnabled = _withdrawalAmount >= _minWithdrawal &&
+        _withdrawalAmount <= _availableForWithdrawal &&
+        !_isLoading;
 
     return SizedBox(
       width: double.infinity,
@@ -1245,7 +1236,7 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
               children: _withdrawalHistory.map((withdrawal) {
                 Color statusColor;
                 IconData statusIcon;
-                
+
                 switch (withdrawal.status) {
                   case 'Completado':
                     statusColor = Colors.green;
@@ -1275,7 +1266,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${withdrawal.method} • ${withdrawal.destination}'),
+                        Text(
+                            '${withdrawal.method} • ${withdrawal.destination}'),
                         Text(
                           'Recibido: S/${withdrawal.netAmount.toStringAsFixed(2)} • '
                           '${withdrawal.createdAt.day}/${withdrawal.createdAt.month}/${withdrawal.createdAt.year}',
@@ -1284,7 +1276,8 @@ class _EarningsWithdrawalScreenState extends State<EarningsWithdrawalScreen>
                       ],
                     ),
                     trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),

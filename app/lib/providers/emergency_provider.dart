@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 import '../services/firebase_service.dart';
+import '../services/emergency_service.dart'
+    show EmergencyType, EmergencyService;
 
 // Modelo para contacto de emergencia
 class EmergencyContact {
@@ -89,10 +91,8 @@ class EmergencyAlert {
       userId: map['userId'] ?? '',
       userName: map['userName'] ?? '',
       tripId: map['tripId'],
-      type: EmergencyType.values.firstWhere(
-        (e) => e.toString() == 'EmergencyType.${map['type']}',
-        orElse: () => EmergencyType.general,
-      ),
+      type: EmergencyProvider._getEmergencyTypeFromString(
+          map['type'] ?? 'general'),
       status: map['status'] ?? 'active',
       location: map['location'] ?? const GeoPoint(0, 0),
       address: map['address'],
@@ -109,7 +109,7 @@ class EmergencyAlert {
       'userId': userId,
       'userName': userName,
       'tripId': tripId,
-      'type': type.toString().split('.').last,
+      'type': type.id,
       'status': status,
       'location': location,
       'address': address,
@@ -122,19 +122,13 @@ class EmergencyAlert {
   }
 }
 
-enum EmergencyType { 
-  general, 
-  medical, 
-  security, 
-  accident, 
-  harassment, 
-  vehicleBreakdown 
-}
+// EmergencyType ahora se importa de emergency_service.dart
+// Eliminado enum para evitar conflictos
 
 class EmergencyProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseService().firestore;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   // Estado
   List<EmergencyContact> _contacts = [];
   EmergencyAlert? _activeAlert;
@@ -143,7 +137,7 @@ class EmergencyProvider extends ChangeNotifier {
   String? _error;
   bool _sosActive = false;
   Position? _currentLocation;
-  
+
   // Números de emergencia locales
   final Map<String, String> _emergencyNumbers = {
     'police': '105',
@@ -151,11 +145,11 @@ class EmergencyProvider extends ChangeNotifier {
     'fire': '116',
     'serenazgo': '101',
   };
-  
+
   // Streams
   Stream<QuerySnapshot>? _contactsStream;
   Stream<QuerySnapshot>? _alertsStream;
-  
+
   // Getters
   List<EmergencyContact> get contacts => _contacts;
   EmergencyAlert? get activeAlert => _activeAlert;
@@ -183,7 +177,8 @@ class EmergencyProvider extends ChangeNotifier {
 
       _contactsStream?.listen((snapshot) {
         _contacts = snapshot.docs
-            .map((doc) => EmergencyContact.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+            .map((doc) => EmergencyContact.fromMap(
+                doc.data() as Map<String, dynamic>, doc.id))
             .toList();
         notifyListeners();
       });
@@ -198,9 +193,10 @@ class EmergencyProvider extends ChangeNotifier {
 
       _alertsStream?.listen((snapshot) {
         _alertHistory = snapshot.docs
-            .map((doc) => EmergencyAlert.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+            .map((doc) => EmergencyAlert.fromMap(
+                doc.data() as Map<String, dynamic>, doc.id))
             .toList();
-        
+
         // Verificar si hay alerta activa
         _activeAlert = _alertHistory.firstWhere(
           (alert) => alert.status == 'active',
@@ -208,14 +204,14 @@ class EmergencyProvider extends ChangeNotifier {
             id: '',
             userId: '',
             userName: '',
-            type: EmergencyType.general,
+            type: _getDefaultEmergencyType(),
             status: 'resolved',
             location: const GeoPoint(0, 0),
             notifiedContacts: [],
             createdAt: DateTime.now(),
           ),
         );
-        
+
         _sosActive = _activeAlert?.status == 'active';
         notifyListeners();
       });
@@ -253,7 +249,8 @@ class EmergencyProvider extends ChangeNotifier {
         tripId: tripId,
         type: type,
         status: 'active',
-        location: GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
+        location:
+            GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
         address: await _getAddressFromLocation(_currentLocation!),
         description: description,
         notifiedContacts: [],
@@ -271,9 +268,8 @@ class EmergencyProvider extends ChangeNotifier {
       );
 
       // Guardar alerta
-      final docRef = await _firestore
-          .collection('emergencyAlerts')
-          .add(alert.toMap());
+      final docRef =
+          await _firestore.collection('emergencyAlerts').add(alert.toMap());
 
       _activeAlert = EmergencyAlert(
         id: docRef.id,
@@ -438,10 +434,7 @@ class EmergencyProvider extends ChangeNotifier {
       }
 
       // Actualizar lista de contactos notificados
-      await _firestore
-          .collection('emergencyAlerts')
-          .doc(alertId)
-          .update({
+      await _firestore.collection('emergencyAlerts').doc(alertId).update({
         'notifiedContacts': notifiedContacts,
         'notificationSentAt': FieldValue.serverTimestamp(),
       });
@@ -493,7 +486,10 @@ Ver detalles: https://oasistaxis.com/emergency/$alertId
       }
 
       _currentLocation = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high, // ignore: deprecated_member_use
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 100,
+        ),
       );
     } catch (e) {
       AppLogger.error('Error obteniendo ubicación', e);
@@ -522,17 +518,22 @@ Ver detalles: https://oasistaxis.com/emergency/$alertId
 
   // Obtener número de emergencia por tipo
   String _getEmergencyNumberByType(EmergencyType type) {
-    switch (type) {
-      case EmergencyType.medical:
-        return _emergencyNumbers['medical']!;
-      case EmergencyType.security:
-      case EmergencyType.harassment:
-        return _emergencyNumbers['police']!;
-      case EmergencyType.accident:
-        return _emergencyNumbers['medical']!;
-      default:
-        return _emergencyNumbers['police']!;
-    }
+    // Usar el número definido en el tipo, o fallback a números locales
+    return type.phoneNumber;
+  }
+
+  // Obtener EmergencyType desde string
+  static EmergencyType _getEmergencyTypeFromString(String typeId) {
+    final availableTypes = EmergencyService.getEmergencyTypes();
+    return availableTypes.firstWhere(
+      (type) => type.id == typeId,
+      orElse: () => availableTypes.first,
+    );
+  }
+
+  // Obtener tipo de emergencia por defecto
+  static EmergencyType _getDefaultEmergencyType() {
+    return EmergencyService.getEmergencyTypes().first;
   }
 
   // Iniciar tracking de ubicación
@@ -543,11 +544,9 @@ Ver detalles: https://oasistaxis.com/emergency/$alertId
 
       await _getCurrentLocation();
       if (_currentLocation != null) {
-        await _firestore
-            .collection('emergencyAlerts')
-            .doc(alertId)
-            .update({
-          'location': GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
+        await _firestore.collection('emergencyAlerts').doc(alertId).update({
+          'location':
+              GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
           'locationUpdatedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -571,7 +570,7 @@ Ver detalles: https://oasistaxis.com/emergency/$alertId
 
     final message = templates[template] ?? template;
     return await activateSOS(
-      type: EmergencyType.general,
+      type: _getDefaultEmergencyType(),
       description: message,
     );
   }
@@ -586,13 +585,13 @@ Ver detalles: https://oasistaxis.com/emergency/$alertId
       if (user == null) return '';
 
       // Crear enlace de compartir ubicación
-      final shareDoc = await _firestore
-          .collection('sharedLocations')
-          .add({
+      final shareDoc = await _firestore.collection('sharedLocations').add({
         'userId': user.uid,
-        'location': GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
+        'location':
+            GeoPoint(_currentLocation!.latitude, _currentLocation!.longitude),
         'createdAt': FieldValue.serverTimestamp(),
-        'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(hours: 2))),
+        'expiresAt':
+            Timestamp.fromDate(DateTime.now().add(const Duration(hours: 2))),
       });
 
       return 'https://oasistaxis.com/track/${shareDoc.id}';

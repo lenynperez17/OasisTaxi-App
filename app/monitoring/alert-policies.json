@@ -1,0 +1,186 @@
+[
+  {
+    "displayName": "High API Error Rate",
+    "conditions": [
+      {
+        "displayName": "Error rate exceeds 5%",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_function\" AND metric.type=\"cloudfunctions.googleapis.com/function/execution_count\" AND metric.label.status!=\"ok\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 0.05,
+          "duration": "300s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_RATE",
+              "crossSeriesReducer": "REDUCE_SUM"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "1800s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "The API error rate has exceeded 5%. Check the Cloud Functions logs for details.",
+      "mimeType": "text/markdown"
+    }
+  },
+  {
+    "displayName": "High API Latency",
+    "conditions": [
+      {
+        "displayName": "p95 latency exceeds 2000ms",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_function\" AND metric.type=\"cloudfunctions.googleapis.com/function/execution_times\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 2000,
+          "duration": "300s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_PERCENTILE_95",
+              "crossSeriesReducer": "REDUCE_MAX"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "3600s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "API latency (p95) has exceeded 2000ms. This may indicate performance issues.",
+      "mimeType": "text/markdown"
+    }
+  },
+  {
+    "displayName": "Firestore Read Rate High",
+    "conditions": [
+      {
+        "displayName": "Firestore reads exceed 50000/min",
+        "conditionThreshold": {
+          "filter": "resource.type=\"firestore_database\" AND metric.type=\"firestore.googleapis.com/document/read_count\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 50000,
+          "duration": "60s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_RATE",
+              "crossSeriesReducer": "REDUCE_SUM"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "1800s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "Firestore read rate is unusually high. This may result in increased costs.",
+      "mimeType": "text/markdown"
+    }
+  },
+  {
+    "displayName": "Cloud Function Memory Usage High",
+    "conditions": [
+      {
+        "displayName": "Memory usage exceeds 90%",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_function\" AND metric.type=\"cloudfunctions.googleapis.com/function/user_memory_bytes\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 0.9,
+          "duration": "300s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_MAX",
+              "crossSeriesReducer": "REDUCE_MAX"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "1800s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "Cloud Function memory usage is critically high. Consider increasing memory allocation.",
+      "mimeType": "text/markdown"
+    }
+  },
+  {
+    "displayName": "Firebase Authentication Failures",
+    "conditions": [
+      {
+        "displayName": "Auth failures exceed 10 per minute",
+        "conditionThreshold": {
+          "filter": "resource.type=\"identitytoolkit.googleapis.com/tenant\" AND metric.type=\"identitytoolkit.googleapis.com/user/auth_failures\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 10,
+          "duration": "60s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_RATE"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "1800s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "High rate of authentication failures detected. This could indicate a security issue.",
+      "mimeType": "text/markdown"
+    }
+  },
+  {
+    "displayName": "Storage Quota Approaching Limit",
+    "conditions": [
+      {
+        "displayName": "Storage usage exceeds 80%",
+        "conditionThreshold": {
+          "filter": "resource.type=\"gcs_bucket\" AND metric.type=\"storage.googleapis.com/storage/total_bytes\"",
+          "comparison": "COMPARISON_GT",
+          "thresholdValue": 0.8,
+          "duration": "300s",
+          "aggregations": [
+            {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_MAX"
+            }
+          ]
+        }
+      }
+    ],
+    "notificationChannels": [],
+    "alertStrategy": {
+      "autoClose": "86400s"
+    },
+    "combiner": "OR",
+    "enabled": true,
+    "documentation": {
+      "content": "Firebase Storage usage is approaching the limit. Consider cleaning up old files or increasing storage quota.",
+      "mimeType": "text/markdown"
+    }
+  }
+]

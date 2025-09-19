@@ -1,8 +1,7 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/services/places_service.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/modern_theme.dart';
 
 class AddressSearchWidget extends StatefulWidget {
   final String? initialText;
@@ -21,10 +20,10 @@ class AddressSearchWidget extends StatefulWidget {
   });
 
   @override
-  _AddressSearchWidgetState createState() => _AddressSearchWidgetState();
+  AddressSearchWidgetState createState() => AddressSearchWidgetState();
 }
 
-class _AddressSearchWidgetState extends State<AddressSearchWidget> {
+class AddressSearchWidgetState extends State<AddressSearchWidget> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   List<PlacesSuggestion> _suggestions = [];
@@ -39,9 +38,19 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
     if (widget.initialText != null) {
       _controller.text = widget.initialText!;
     }
-    
+
     _controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(AddressSearchWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Actualizar el texto cuando cambie initialText
+    if (widget.initialText != oldWidget.initialText &&
+        widget.initialText != null) {
+      _controller.text = widget.initialText!;
+    }
   }
 
   @override
@@ -58,9 +67,9 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
   void _onTextChanged() {
     final text = _controller.text;
     widget.onTextChanged?.call(text);
-    
+
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (text.isNotEmpty && text.length > 2) {
         _searchPlaces(text);
       } else {
@@ -109,10 +118,10 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
 
   void _showOverlay() {
     _removeOverlay();
-    
+
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        width: context.size?.width,
+        width: MediaQuery.of(context).size.width,
         child: CompositedTransformFollower(
           link: _layerLink,
           showWhenUnlinked: false,
@@ -154,7 +163,7 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
         padding: EdgeInsets.all(16),
         child: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+            valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.primaryColor),
           ),
         ),
       );
@@ -186,7 +195,7 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
     return ListTile(
       leading: const Icon(
         Icons.location_on,
-        color: AppTheme.primaryColor,
+        color: ModernTheme.primaryColor,
       ),
       title: Text(
         suggestion.mainText ?? suggestion.description,
@@ -211,14 +220,15 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
   Future<void> _onSuggestionSelected(PlacesSuggestion suggestion) async {
     _removeOverlay();
     _focusNode.unfocus();
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final placeDetails = await PlacesService.getPlaceDetails(suggestion.placeId);
-      
+      final placeDetails =
+          await PlacesService.getPlaceDetails(suggestion.placeId);
+
       if (placeDetails != null) {
         _controller.text = placeDetails.formattedAddress;
         widget.onPlaceSelected(placeDetails);
@@ -252,7 +262,7 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
           hintText: widget.hintText,
           prefixIcon: const Icon(
             Icons.search,
-            color: AppTheme.primaryColor,
+            color: ModernTheme.primaryColor,
           ),
           suffixIcon: _isLoading
               ? const Padding(
@@ -262,7 +272,8 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          ModernTheme.primaryColor),
                     ),
                   ),
                 )
@@ -295,7 +306,7 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(
-              color: AppTheme.primaryColor,
+              color: ModernTheme.primaryColor,
               width: 2,
             ),
           ),

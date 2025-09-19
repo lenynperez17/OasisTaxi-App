@@ -1,12 +1,18 @@
-import 'package:flutter/foundation.dart';
+import '../utils/app_logger.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'http_client.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_service.dart';
+import '../core/config/environment_config.dart';
+import 'transaction_security_service.dart';
+import '../utils/validation_patterns.dart';
 
 /// SERVICIO COMPLETO DE PAGOS OASIS TAXI - PERÚ
 /// ============================================
-/// 
+///
 /// Funcionalidades implementadas:
 /// ✅ MercadoPago (preferencias y webhooks)
 /// ✅ Yape (código QR y validación)
@@ -21,43 +27,39 @@ class PaymentService {
   PaymentService._internal();
 
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   bool _initialized = false;
   late String _apiBaseUrl;
   late String _mercadoPagoPublicKey;
-  
-  // URLs de la API backend - PERÚ
-  static const String _localApi = 'http://localhost:3000/api/v1';
-  static const String _productionApi = 'https://api.oasistaxi.com.pe/api/v1';
+  final TransactionSecurityService _securityService = TransactionSecurityService();
+
+  // All payment processing is done through Firebase Cloud Functions
+  // External API endpoints have been removed for security
 
   /// Inicializar el servicio de pagos
   Future<void> initialize({bool isProduction = false}) async {
     if (_initialized) return;
 
     try {
-      _apiBaseUrl = isProduction ? _productionApi : _localApi;
-      
-      // CONFIGURACIÓN MERCADOPAGO PERÚ - ESTAS KEYS SON DE EJEMPLO
-      // ⚠️ REEMPLAZAR CON CREDENCIALES REALES DE MERCADOPAGO PERÚ
-      // Ver: docs/MERCADOPAGO_SETUP_PERU.md para configuración completa
-      _mercadoPagoPublicKey = isProduction 
-        ? 'APP_USR-REEMPLAZAR-CON-KEY-REAL-PRODUCCION'  // 🚨 CONFIGURAR PRODUCCIÓN
-        : 'TEST-REEMPLAZAR-CON-KEY-REAL-SANDBOX';       // 🚨 CONFIGURAR SANDBOX
+      // API base URL - kept for backward compatibility with legacy consumers
+      // All actual payment processing is now done through Firebase Cloud Functions
+      _apiBaseUrl = EnvironmentConfig.apiBaseUrl;
+
+      // Usar credenciales de MercadoPago desde variables de entorno
+      _mercadoPagoPublicKey = EnvironmentConfig.mercadopagoPublicKey;
+      // Note: Access token removed for security - all server calls via Cloud Functions
 
       await _firebaseService.initialize();
-      
+
       _initialized = true;
-      debugPrint('💳 PaymentService: Inicializado - ${isProduction ? "PRODUCCIÓN" : "TEST"}');
-      
-      await _firebaseService.analytics.logEvent(
+      AppLogger.debug('💳 PaymentService: Inicializado');
+
+      await _firebaseService.analytics?.logEvent(
         name: 'payment_service_initialized',
-        parameters: {
-          'environment': isProduction ? 'production' : 'test'
-        },
+        parameters: {},
       );
-      
     } catch (e) {
-      debugPrint('💳 PaymentService: Error inicializando - $e');
+      AppLogger.debug('💳 PaymentService: Error inicializando - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       _initialized = true; // Continuar en modo desarrollo
     }
@@ -76,53 +78,54 @@ class PaymentService {
     String? description,
   }) async {
     try {
-      debugPrint('💳 PaymentService: Creando preferencia MercadoPago - S/$amount');
+      AppLogger.debug(
+          '💳 PaymentService: Creando preferencia MercadoPago - S/$amount');
 
-      final response = await http.post(
-        Uri.parse('$_apiBaseUrl/payments/create-preference'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'rideId': rideId,
-          'amount': amount,
-          'description': description ?? 'Viaje Oasis Taxi #$rideId',
-          'payerEmail': payerEmail,
-          'payerName': payerName,
-        }),
-      );
+      // Use Firebase Callable Function
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('processPayment');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final resultData = data['data'];
-          
-          await _firebaseService.analytics.logEvent(
-            name: 'mercadopago_preference_created',
-            parameters: {
-              'ride_id': rideId,
-              'amount': amount,
-              'preference_id': resultData['preferenceId'],
-            },
-          );
+      final response = await callable.call({
+        'tripId': rideId,
+        'amount': amount,
+        'description': description ?? 'Viaje Oasis Taxi #$rideId',
+        'paymentMethodId': 'mercadopago',
+      });
 
-          return PaymentPreferenceResult.success(
-            preferenceId: resultData['preferenceId'],
-            initPoint: resultData['initPoint'],
-            publicKey: resultData['publicKey'],
-            amount: amount,
-            platformCommission: resultData['platformCommission'],
-            driverEarnings: resultData['driverEarnings'],
-          );
-        } else {
-          return PaymentPreferenceResult.error(data['message'] ?? 'Error creando preferencia');
-        }
+      final data = response.data;
+
+      if (data['success'] == true) {
+        final payment = data['payment'];
+
+        // Get commission rate from config or use default
+        final commissionRate = await _getCommissionRate();
+        final platformCommission = amount * commissionRate;
+        final driverEarnings = amount - platformCommission;
+
+        await _firebaseService.analytics?.logEvent(
+          name: 'mercadopago_preference_created',
+          parameters: {
+            'ride_id': rideId,
+            'amount': amount,
+            'preference_id': payment['preferenceId'],
+          },
+        );
+
+        return PaymentPreferenceResult.success(
+          preferenceId: payment['preferenceId'],
+          initPoint: payment['init_point'],
+          publicKey: _mercadoPagoPublicKey,
+          amount: amount,
+          platformCommission: platformCommission,
+          driverEarnings: driverEarnings,
+        );
       } else {
-        return PaymentPreferenceResult.error('Error de conectividad: ${response.statusCode}');
+        return PaymentPreferenceResult.error(
+            data['message'] ?? 'Error creando preferencia');
       }
     } catch (e) {
-      debugPrint('💳 PaymentService: Error creando preferencia MercadoPago - $e');
+      AppLogger.debug(
+          '💳 PaymentService: Error creando preferencia MercadoPago - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return PaymentPreferenceResult.error('Error creando preferencia: $e');
     }
@@ -133,9 +136,10 @@ class PaymentService {
     try {
       final uri = Uri.parse(initPoint);
       if (await canLaunchUrl(uri)) {
-        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        
-        await _firebaseService.analytics.logEvent(
+        final launched =
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+        await _firebaseService.analytics?.logEvent(
           name: 'mercadopago_checkout_opened',
           parameters: {
             'init_point': initPoint,
@@ -148,7 +152,8 @@ class PaymentService {
         return false;
       }
     } catch (e) {
-      debugPrint('💳 PaymentService: Error abriendo checkout MercadoPago - $e');
+      AppLogger.debug(
+          '💳 PaymentService: Error abriendo checkout MercadoPago - $e');
       return false;
     }
   }
@@ -165,73 +170,74 @@ class PaymentService {
     String? transactionCode,
   }) async {
     try {
-      debugPrint('📱 PaymentService: Procesando pago con Yape - S/$amount');
+      AppLogger.debug(
+          '📱 PaymentService: Procesando pago con Yape - S/$amount');
 
-      // Validar número de teléfono peruano
-      if (!_validatePeruvianPhoneNumber(phoneNumber)) {
-        return YapePaymentResult.error('Número de teléfono inválido para Yape');
+      // Validar número de teléfono peruano usando ValidationPatterns
+      if (!ValidationPatterns.isValidPeruMobile(phoneNumber)) {
+        return YapePaymentResult.error(ValidationPatterns.getPhoneError());
       }
 
-      final response = await http.post(
-        Uri.parse('$_apiBaseUrl/payments/process-yape'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'rideId': rideId,
-          'amount': amount,
-          'phoneNumber': phoneNumber,
-          'transactionCode': transactionCode,
-        }),
-      );
+      // Use Firebase Callable Function
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('processYape');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final resultData = data['data'];
-          
-          await _firebaseService.analytics.logEvent(
-            name: 'yape_payment_initiated',
-            parameters: {
-              'ride_id': rideId,
-              'amount': amount,
-              'payment_id': resultData['paymentId'],
-            },
-          );
+      final response = await callable.call({
+        'tripId': rideId,
+        'amount': amount,
+        'phoneNumber': phoneNumber,
+        'transactionCode': transactionCode,
+      });
 
-          return YapePaymentResult.success(
-            paymentId: resultData['paymentId'],
-            qrUrl: resultData['yapeData']['qrUrl'],
-            phoneNumber: resultData['yapeData']['phoneNumber'],
-            amount: amount,
-            instructions: resultData['instructions'],
-            platformCommission: resultData['platformCommission'],
-            driverEarnings: resultData['driverEarnings'],
-          );
-        } else {
-          return YapePaymentResult.error(data['message'] ?? 'Error procesando pago con Yape');
-        }
+      final data = response.data;
+
+      if (data['success'] == true) {
+        // Get commission rate from config
+        final commissionRate = await _getCommissionRate();
+        final platformCommission = amount * commissionRate;
+        final driverEarnings = amount - platformCommission;
+
+        await _firebaseService.analytics?.logEvent(
+          name: 'yape_payment_initiated',
+          parameters: {
+            'ride_id': rideId,
+            'amount': amount,
+            'payment_id': data['paymentId'],
+          },
+        );
+
+        return YapePaymentResult.success(
+          paymentId: data['paymentId'],
+          qrUrl: data['qrUrl'],
+          phoneNumber: phoneNumber,
+          amount: amount,
+          instructions: data['instructions'] ?? 'Complete el pago en la app Yape',
+          platformCommission: platformCommission,
+          driverEarnings: driverEarnings,
+        );
       } else {
-        return YapePaymentResult.error('Error de conectividad: ${response.statusCode}');
+        return YapePaymentResult.error(
+            data['message'] ?? 'Error procesando pago con Yape');
       }
     } catch (e) {
-      debugPrint('📱 PaymentService: Error procesando pago con Yape - $e');
+      AppLogger.debug('📱 PaymentService: Error procesando pago con Yape - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return YapePaymentResult.error('Error procesando pago con Yape: $e');
     }
   }
 
   /// Abrir app de Yape con código QR
-  Future<bool> openYapeApp(String phoneNumber, double amount, String message) async {
+  Future<bool> openYapeApp(
+      String phoneNumber, double amount, String message) async {
     try {
-      final yapeUrl = 'yape://payment?amount=$amount&phone=$phoneNumber&message=${Uri.encodeComponent(message)}';
+      final yapeUrl =
+          'yape://payment?amount=$amount&phone=$phoneNumber&message=${Uri.encodeComponent(message)}';
       final uri = Uri.parse(yapeUrl);
-      
+
       if (await canLaunchUrl(uri)) {
         final launched = await launchUrl(uri);
-        
-        await _firebaseService.analytics.logEvent(
+
+        await _firebaseService.analytics?.logEvent(
           name: 'yape_app_opened',
           parameters: {
             'amount': amount,
@@ -243,11 +249,13 @@ class PaymentService {
         return launched;
       } else {
         // Fallback: abrir Play Store para descargar Yape
-        final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=com.bcp.yape');
-        return await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+        final playStoreUri = Uri.parse(
+            'https://play.google.com/store/apps/details?id=com.bcp.yape');
+        return await launchUrl(playStoreUri,
+            mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      debugPrint('📱 PaymentService: Error abriendo app Yape - $e');
+      AppLogger.debug('📱 PaymentService: Error abriendo app Yape - $e');
       return false;
     }
   }
@@ -263,72 +271,73 @@ class PaymentService {
     required String phoneNumber,
   }) async {
     try {
-      debugPrint('📱 PaymentService: Procesando pago con Plin - S/$amount');
+      AppLogger.debug(
+          '📱 PaymentService: Procesando pago con Plin - S/$amount');
 
-      // Validar número de teléfono peruano
-      if (!_validatePeruvianPhoneNumber(phoneNumber)) {
-        return PlinPaymentResult.error('Número de teléfono inválido para Plin');
+      // Validar número de teléfono peruano usando ValidationPatterns
+      if (!ValidationPatterns.isValidPeruMobile(phoneNumber)) {
+        return PlinPaymentResult.error(ValidationPatterns.getPhoneError());
       }
 
-      final response = await http.post(
-        Uri.parse('$_apiBaseUrl/payments/process-plin'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'rideId': rideId,
-          'amount': amount,
-          'phoneNumber': phoneNumber,
-        }),
-      );
+      // Use Firebase Callable Function
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('processPlin');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final resultData = data['data'];
-          
-          await _firebaseService.analytics.logEvent(
-            name: 'plin_payment_initiated',
-            parameters: {
-              'ride_id': rideId,
-              'amount': amount,
-              'payment_id': resultData['paymentId'],
-            },
-          );
+      final response = await callable.call({
+        'tripId': rideId,
+        'amount': amount,
+        'phoneNumber': phoneNumber,
+      });
 
-          return PlinPaymentResult.success(
-            paymentId: resultData['paymentId'],
-            qrUrl: resultData['plinData']['qrUrl'],
-            phoneNumber: resultData['plinData']['phoneNumber'],
-            amount: amount,
-            instructions: resultData['instructions'],
-            platformCommission: resultData['platformCommission'],
-            driverEarnings: resultData['driverEarnings'],
-          );
-        } else {
-          return PlinPaymentResult.error(data['message'] ?? 'Error procesando pago con Plin');
-        }
+      final data = response.data;
+
+      if (data['success'] == true) {
+        // Get commission rate from config
+        final commissionRate = await _getCommissionRate();
+        final platformCommission = amount * commissionRate;
+        final driverEarnings = amount - platformCommission;
+
+        await _firebaseService.analytics?.logEvent(
+          name: 'plin_payment_initiated',
+          parameters: {
+            'ride_id': rideId,
+            'amount': amount,
+            'payment_id': data['paymentId'],
+          },
+        );
+
+        return PlinPaymentResult.success(
+          paymentId: data['paymentId'],
+          qrUrl: data['qrUrl'],
+          phoneNumber: phoneNumber,
+          amount: amount,
+          instructions: data['instructions'] ?? 'Complete el pago en la app Plin',
+          platformCommission: platformCommission,
+          driverEarnings: driverEarnings,
+        );
       } else {
-        return PlinPaymentResult.error('Error de conectividad: ${response.statusCode}');
+        return PlinPaymentResult.error(
+            data['message'] ?? 'Error procesando pago con Plin');
       }
     } catch (e) {
-      debugPrint('📱 PaymentService: Error procesando pago con Plin - $e');
+      AppLogger.debug('📱 PaymentService: Error procesando pago con Plin - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return PlinPaymentResult.error('Error procesando pago con Plin: $e');
     }
   }
 
   /// Abrir app de Plin
-  Future<bool> openPlinApp(String phoneNumber, double amount, String message) async {
+  Future<bool> openPlinApp(
+      String phoneNumber, double amount, String message) async {
     try {
-      final plinUrl = 'plin://payment?amount=$amount&phone=$phoneNumber&message=${Uri.encodeComponent(message)}';
+      final plinUrl =
+          'plin://payment?amount=$amount&phone=$phoneNumber&message=${Uri.encodeComponent(message)}';
       final uri = Uri.parse(plinUrl);
-      
+
       if (await canLaunchUrl(uri)) {
         final launched = await launchUrl(uri);
-        
-        await _firebaseService.analytics.logEvent(
+
+        await _firebaseService.analytics?.logEvent(
           name: 'plin_app_opened',
           parameters: {
             'amount': amount,
@@ -340,11 +349,13 @@ class PaymentService {
         return launched;
       } else {
         // Fallback: abrir Play Store para descargar Plin
-        final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=pe.interbank.plin');
-        return await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+        final playStoreUri = Uri.parse(
+            'https://play.google.com/store/apps/details?id=pe.interbank.plin');
+        return await launchUrl(playStoreUri,
+            mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      debugPrint('📱 PaymentService: Error abriendo app Plin - $e');
+      AppLogger.debug('📱 PaymentService: Error abriendo app Plin - $e');
       return false;
     }
   }
@@ -356,83 +367,102 @@ class PaymentService {
   /// Verificar estado de pago
   Future<PaymentStatusResult> checkPaymentStatus(String paymentId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_apiBaseUrl/payments/status/$paymentId'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      );
+      // Verification Comment 1: Use Cloud Functions instead of REST
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('getPaymentStatus');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final paymentData = data['data'];
-          
-          return PaymentStatusResult.success(
-            id: paymentData['id'],
-            status: paymentData['status'],
-            amount: paymentData['amount'].toDouble(),
-            paymentMethod: paymentData['paymentMethod'],
-            platformCommission: paymentData['platformCommission'].toDouble(),
-            driverEarnings: paymentData['driverEarnings'].toDouble(),
-            createdAt: DateTime.parse(paymentData['createdAt']),
-            approvedAt: paymentData['approvedAt'] != null 
-              ? DateTime.parse(paymentData['approvedAt']) 
+      final response = await callable.call({
+        'paymentId': paymentId,
+      });
+
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        final paymentData = data['payment'] as Map<String, dynamic>;
+        final metadata = paymentData['metadata'] as Map<String, dynamic>? ?? {};
+
+        return PaymentStatusResult.success(
+          id: paymentData['id'] ?? paymentId,
+          status: paymentData['status'] ?? 'unknown',
+          amount: (paymentData['amount'] ?? 0.0).toDouble(),
+          paymentMethod: paymentData['paymentMethod'] ?? metadata['paymentMethod'] ?? 'unknown',
+          platformCommission: (metadata['commission'] ?? 0.0).toDouble(),
+          driverEarnings: (paymentData['amount'] ?? 0.0).toDouble() - (metadata['commission'] ?? 0.0).toDouble(),
+          createdAt: _parseTimestamp(paymentData['createdAt']),
+          approvedAt: paymentData['completedAt'] != null
+              ? _parseTimestamp(paymentData['completedAt'])
               : null,
-            refundedAt: paymentData['refundedAt'] != null 
-              ? DateTime.parse(paymentData['refundedAt']) 
+          refundedAt: paymentData['refundedAt'] != null
+              ? _parseTimestamp(paymentData['refundedAt'])
               : null,
-          );
-        } else {
-          return PaymentStatusResult.error(data['message'] ?? 'Error obteniendo estado del pago');
-        }
+        );
       } else {
-        return PaymentStatusResult.error('Error de conectividad: ${response.statusCode}');
+        return PaymentStatusResult.error(data['message'] ?? 'Error verificando estado');
       }
     } catch (e) {
-      debugPrint('💳 PaymentService: Error verificando estado - $e');
+      AppLogger.debug('💳 PaymentService: Error verificando estado - $e');
       return PaymentStatusResult.error('Error verificando estado: $e');
     }
   }
 
-  /// Obtener historial de pagos de usuario
-  Future<List<PaymentHistoryItem>> getUserPaymentHistory(String userId, String role) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_apiBaseUrl/payments/history/$userId?role=$role'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+  /// Helper method to parse timestamps from Firestore
+  DateTime _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return DateTime.now();
+    if (timestamp is Timestamp) return timestamp.toDate();
+    if (timestamp is String) return DateTime.parse(timestamp);
+    if (timestamp is Map && timestamp['_seconds'] != null) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        timestamp['_seconds'] * 1000 + (timestamp['_nanoseconds'] ?? 0) ~/ 1000000
       );
+    }
+    return DateTime.now();
+  }
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final List<dynamic> payments = data['data'];
-          
-          return payments.map((payment) => PaymentHistoryItem(
-            id: payment['id'],
-            rideId: payment['rideId'],
-            amount: payment['amount'].toDouble(),
-            paymentMethod: payment['paymentMethod'],
-            status: payment['status'],
-            createdAt: DateTime.parse(payment['createdAt']),
-            approvedAt: payment['approvedAt'] != null 
-              ? DateTime.parse(payment['approvedAt']) 
-              : null,
-            platformCommission: payment['platformCommission']?.toDouble() ?? 0.0,
-            driverEarnings: payment['driverEarnings']?.toDouble() ?? 0.0,
-          )).toList();
-        } else {
-          return [];
-        }
+  /// Obtener historial de pagos de usuario
+  Future<List<PaymentHistoryItem>> getUserPaymentHistory(
+      String userId, String role) async {
+    try {
+      // Verification Comment 1: Use Cloud Functions instead of REST
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('listUserPayments');
+
+      final response = await callable.call({
+        'role': role,
+        'limit': 50,
+      });
+
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        final List<dynamic> payments = data['payments'] ?? [];
+
+        return payments
+            .map((payment) {
+              final metadata = payment['metadata'] as Map<String, dynamic>? ?? {};
+
+              return PaymentHistoryItem(
+                id: payment['id'] ?? '',
+                rideId: payment['tripId'] ?? '',
+                amount: (payment['amount'] ?? 0.0).toDouble(),
+                paymentMethod: payment['paymentMethod'] ?? metadata['paymentMethod'] ?? 'unknown',
+                status: payment['status'] ?? 'unknown',
+                createdAt: _parseTimestamp(payment['createdAt']),
+                approvedAt: payment['completedAt'] != null
+                    ? _parseTimestamp(payment['completedAt'])
+                    : null,
+                platformCommission:
+                    (metadata['commission'] ?? 0.0).toDouble(),
+                driverEarnings:
+                    (payment['amount'] ?? 0.0).toDouble() - (metadata['commission'] ?? 0.0).toDouble(),
+              );
+            })
+            .toList();
       } else {
+        AppLogger.debug('💳 PaymentService: Error en listUserPayments - ${data['message']}');
         return [];
       }
     } catch (e) {
-      debugPrint('💳 PaymentService: Error obteniendo historial - $e');
+      AppLogger.debug('💳 PaymentService: Error obteniendo historial - $e');
       return [];
     }
   }
@@ -448,47 +478,163 @@ class PaymentService {
     required String reason,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_apiBaseUrl/payments/refund'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'paymentId': paymentId,
-          if (amount != null) 'amount': amount,
-          'reason': reason,
-        }),
-      );
+      // Verification Comment 1: Use Cloud Functions instead of REST
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('refundPayment');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success']) {
-          final resultData = data['data'];
-          
-          await _firebaseService.analytics.logEvent(
-            name: 'refund_processed',
-            parameters: {
-              'payment_id': paymentId,
-              'refund_amount': resultData['refundAmount'],
-              'reason': reason,
-            },
-          );
+      final response = await callable.call({
+        'paymentId': paymentId,
+        if (amount != null) 'amount': amount,
+        'reason': reason,
+      });
 
-          return RefundResult.success(
-            refundAmount: resultData['refundAmount'].toDouble(),
-            status: resultData['status'],
-          );
-        } else {
-          return RefundResult.error(data['message'] ?? 'Error procesando reembolso');
-        }
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        final refundId = data['refundId'] ?? '';
+        final status = data['status'] ?? 'pending';
+        final refundAmount = (data['amount'] ?? amount ?? 0.0).toDouble();
+
+        await _firebaseService.analytics?.logEvent(
+          name: 'refund_processed',
+          parameters: {
+            'payment_id': paymentId,
+            'refund_id': refundId,
+            'refund_amount': refundAmount,
+            'reason': reason,
+            'status': status,
+          },
+        );
+
+        return RefundResult.success(
+          refundAmount: refundAmount,
+          status: status,
+        );
       } else {
-        return RefundResult.error('Error de conectividad: ${response.statusCode}');
+        return RefundResult.error(
+            data['message'] ?? 'Error procesando reembolso');
       }
     } catch (e) {
-      debugPrint('💳 PaymentService: Error procesando reembolso - $e');
+      AppLogger.debug('💳 PaymentService: Error procesando reembolso - $e');
       await _firebaseService.crashlytics.recordError(e, null);
       return RefundResult.error('Error procesando reembolso: $e');
+    }
+  }
+
+  /// Solicitar retiro de ganancias
+  Future<WithdrawalResult> requestWithdrawal({
+    required double amount,
+    required Map<String, dynamic> bankAccount,
+    String? notes,
+  }) async {
+    try {
+      // Verification Comment 8: Get driverId from auth context
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      // Validate transaction with security service
+      final validation = await _securityService.validateTransaction(
+        userId: user.uid,
+        type: 'withdrawal',
+        amount: amount,
+        metadata: {'bankAccount': bankAccount},
+      );
+
+      if (!validation.isValid) {
+        return WithdrawalResult.error(validation.error ?? 'Transacción no válida');
+      }
+
+      // Use Firebase Callable Function
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('processWithdrawal');
+
+      final response = await callable.call({
+        // Verification Comment 8: Not sending driverId, server uses auth.uid
+        'amount': amount,
+        'bankAccount': bankAccount,
+        'notes': notes,
+      });
+
+      final data = response.data;
+
+      if (data['success'] == true) {
+        // Audit the transaction
+        await _securityService.auditTransaction(
+          transactionId: data['withdrawalId'],
+          userId: user.uid,
+          type: 'withdrawal',
+          amount: amount,
+          validation: validation,
+          metadata: {'bankAccount': bankAccount},
+        );
+
+        return WithdrawalResult.success(
+          withdrawalId: data['withdrawalId'],
+          status: data['status'] ?? 'pending',
+          estimatedProcessingTime: '24-48 horas',
+        );
+      }
+      return WithdrawalResult.error(data['message'] ?? 'Error procesando solicitud de retiro');
+    } catch (e) {
+      AppLogger.error('Error procesando retiro', e);
+      return WithdrawalResult.error('Error de conectividad: $e');
+    }
+  }
+
+  /// Transferir dinero entre conductores
+  Future<TransferResult> transferToDriver({
+    required String fromDriverId,
+    required String toDriverId,
+    required double amount,
+    required String concept,
+  }) async {
+    try {
+      // Validate transaction with security service
+      final validation = await _securityService.validateTransaction(
+        userId: fromDriverId,
+        type: 'transfer',
+        amount: amount,
+        metadata: {'toDriverId': toDriverId},
+      );
+
+      if (!validation.isValid) {
+        return TransferResult.error(validation.error ?? 'Transacción no válida');
+      }
+
+      // Use Firebase Callable Function
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('transferBetweenDrivers');
+
+      final response = await callable.call({
+        'toDriverId': toDriverId,
+        'amount': amount,
+        'concept': concept,
+      });
+
+      final data = response.data;
+
+      if (data['success'] == true) {
+        // Audit the transaction
+        await _securityService.auditTransaction(
+          transactionId: data['transferId'],
+          userId: fromDriverId,
+          type: 'transfer',
+          amount: amount,
+          validation: validation,
+          metadata: {'toDriverId': toDriverId, 'concept': concept},
+        );
+
+        return TransferResult.success(
+          transferId: data['transferId'],
+          status: data['status'] ?? 'completed',
+        );
+      }
+      return TransferResult.error(data['message'] ?? 'Error procesando transferencia');
+    } catch (e) {
+      AppLogger.error('Error procesando transferencia', e);
+      return TransferResult.error('Error de conectividad: $e');
     }
   }
 
@@ -507,36 +653,38 @@ class PaymentService {
     // 🇵🇪 TARIFAS COMPETITIVAS PARA LIMA, PERÚ (2024)
     // Basadas en tarifas de mercado actual (Uber, DiDi, InDrive)
     final baseFares = {
-      'standard': 3.50,    // Tarifa base competitiva S/3.50
-      'premium': 5.00,     // Premium (autos nuevos) S/5.00  
-      'van': 7.00,         // Van familiar (6-8 personas) S/7.00
+      'standard': 3.50, // Tarifa base competitiva S/3.50
+      'premium': 5.00, // Premium (autos nuevos) S/5.00
+      'van': 7.00, // Van familiar (6-8 personas) S/7.00
     };
 
     // Tarifas por kilómetro - Competitivas con el mercado
     final perKmRates = {
-      'standard': 1.20,    // S/1.20/km (competitivo)
-      'premium': 1.80,     // S/1.80/km (premium)
-      'van': 2.50,         // S/2.50/km (van familiar)
+      'standard': 1.20, // S/1.20/km (competitivo)
+      'premium': 1.80, // S/1.80/km (premium)
+      'van': 2.50, // S/2.50/km (van familiar)
     };
 
     // Tarifas por minuto - Tiempo de espera y tráfico
     final perMinuteRates = {
-      'standard': 0.25,    // S/0.25/min (tráfico Lima)
-      'premium': 0.40,     // S/0.40/min (premium)
-      'van': 0.60,         // S/0.60/min (van familiar)
+      'standard': 0.25, // S/0.25/min (tráfico Lima)
+      'premium': 0.40, // S/0.40/min (premium)
+      'van': 0.60, // S/0.60/min (van familiar)
     };
 
     final baseFare = baseFares[vehicleType] ?? baseFares['standard']!;
     final perKm = perKmRates[vehicleType] ?? perKmRates['standard']!;
-    final perMinute = perMinuteRates[vehicleType] ?? perMinuteRates['standard']!;
+    final perMinute =
+        perMinuteRates[vehicleType] ?? perMinuteRates['standard']!;
 
-    double fare = baseFare + (distanceKm * perKm) + (durationMinutes * perMinute);
-    
+    double fare =
+        baseFare + (distanceKm * perKm) + (durationMinutes * perMinute);
+
     // Aplicar pricing dinámico si está habilitado
     if (applyDynamicPricing) {
       fare *= dynamicMultiplier;
     }
-    
+
     // Tarifa mínima competitiva S/4.50 (ajustada para Perú)
     return fare < 4.5 ? 4.5 : double.parse(fare.toStringAsFixed(2));
   }
@@ -555,23 +703,7 @@ class PaymentService {
   // MÉTODOS AUXILIARES PRIVADOS
   // ============================================================================
 
-  /// Validar número de teléfono peruano
-  bool _validatePeruvianPhoneNumber(String phoneNumber) {
-    // Remover espacios y caracteres especiales
-    final cleaned = phoneNumber.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-    
-    // Formato peruano: 9XXXXXXXX (9 dígitos, empezando con 9)
-    if (cleaned.length == 9 && cleaned.startsWith('9')) {
-      return RegExp(r'^9[0-9]{8}$').hasMatch(cleaned);
-    }
-    
-    // Formato con código país: +519XXXXXXXX
-    if (cleaned.length == 12 && cleaned.startsWith('519')) {
-      return RegExp(r'^519[0-9]{8}$').hasMatch(cleaned);
-    }
-    
-    return false;
-  }
+  // Método _validatePeruvianPhoneNumber eliminado - ahora se usa ValidationPatterns.isValidPeruMobile
 
   /// Obtener métodos de pago disponibles para Perú
   List<PaymentMethodInfo> getAvailablePaymentMethods() {
@@ -585,7 +717,7 @@ class PaymentService {
         isEnabled: true,
         requiresPhoneNumber: false,
       ),
-      
+
       // Billeteras digitales populares en Perú
       PaymentMethodInfo(
         id: 'yape',
@@ -603,7 +735,7 @@ class PaymentService {
         isEnabled: true,
         requiresPhoneNumber: true,
       ),
-      
+
       // Métodos bancarios Perú (via MercadoPago)
       PaymentMethodInfo(
         id: 'pagoefectivo',
@@ -621,7 +753,7 @@ class PaymentService {
         isEnabled: true,
         requiresPhoneNumber: false,
       ),
-      
+
       // Efectivo - siempre disponible
       PaymentMethodInfo(
         id: 'cash',
@@ -632,6 +764,24 @@ class PaymentService {
         requiresPhoneNumber: false,
       ),
     ];
+  }
+
+  /// Get commission rate from Firestore config
+  Future<double> _getCommissionRate() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc('commission')
+          .get();
+
+      if (doc.exists) {
+        return (doc.data()?['rate'] ?? 0.20).toDouble();
+      }
+      return 0.20; // Default 20% commission
+    } catch (e) {
+      AppLogger.debug('Using default commission rate: $e');
+      return 0.20;
+    }
   }
 
   // Getters
@@ -662,9 +812,10 @@ class PaymentPreferenceResult {
     required this.amount,
     required this.platformCommission,
     required this.driverEarnings,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
-  PaymentPreferenceResult.error(this.error) 
+  PaymentPreferenceResult.error(this.error)
       : success = false,
         preferenceId = null,
         initPoint = null,
@@ -694,7 +845,8 @@ class YapePaymentResult {
     required this.instructions,
     required this.platformCommission,
     required this.driverEarnings,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
   YapePaymentResult.error(this.error)
       : success = false,
@@ -727,7 +879,8 @@ class PlinPaymentResult {
     required this.instructions,
     required this.platformCommission,
     required this.driverEarnings,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
   PlinPaymentResult.error(this.error)
       : success = false,
@@ -764,7 +917,8 @@ class PaymentStatusResult {
     required this.createdAt,
     this.approvedAt,
     this.refundedAt,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
   PaymentStatusResult.error(this.error)
       : success = false,
@@ -814,11 +968,51 @@ class RefundResult {
   RefundResult.success({
     required this.refundAmount,
     required this.status,
-  }) : success = true, error = null;
+  })  : success = true,
+        error = null;
 
   RefundResult.error(this.error)
       : success = false,
         refundAmount = null,
+        status = null;
+}
+
+/// Resultado de solicitud de retiro
+class WithdrawalResult {
+  final bool success;
+  final String? withdrawalId;
+  final String? status;
+  final String? estimatedProcessingTime;
+  final String? error;
+
+  WithdrawalResult.success({
+    required this.withdrawalId,
+    required this.status,
+    required this.estimatedProcessingTime,
+  }) : success = true, error = null;
+
+  WithdrawalResult.error(this.error)
+      : success = false,
+        withdrawalId = null,
+        status = null,
+        estimatedProcessingTime = null;
+}
+
+/// Resultado de transferencia entre conductores
+class TransferResult {
+  final bool success;
+  final String? transferId;
+  final String? status;
+  final String? error;
+
+  TransferResult.success({
+    required this.transferId,
+    required this.status,
+  }) : success = true, error = null;
+
+  TransferResult.error(this.error)
+      : success = false,
+        transferId = null,
         status = null;
 }
 
@@ -844,7 +1038,7 @@ class PaymentMethodInfo {
 /// Estados de pago
 enum PaymentStatus {
   pending,
-  processing, 
+  processing,
   approved,
   rejected,
   refunded,

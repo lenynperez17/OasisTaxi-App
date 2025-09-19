@@ -1,10 +1,13 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Modelo de Viaje
 class TripModel {
   final String id;
   final String userId;
+  String get passengerId => userId; // Getter para compatibilidad
   final String? driverId;
+  DateTime get createdAt => requestedAt; // Timestamp de creación
   final LatLng pickupLocation;
   final LatLng destinationLocation;
   final String pickupAddress;
@@ -87,7 +90,7 @@ class TripModel {
       driverRating: json['driverRating']?.toDouble(),
       driverComment: json['driverComment'],
       vehicleInfo: json['vehicleInfo'],
-      route: json['route'] != null 
+      route: json['route'] != null
           ? (json['route'] as List)
               .map((point) => LatLng(
                     point['lat'].toDouble(),
@@ -100,14 +103,77 @@ class TripModel {
     );
   }
 
-  /// Parsear fecha
+  /// Crear desde DocumentSnapshot de Firestore
+  factory TripModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return TripModel(
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      driverId: data['driverId'],
+      pickupLocation: LatLng(
+        (data['pickupLocation']['lat'] ?? 0.0).toDouble(),
+        (data['pickupLocation']['lng'] ?? 0.0).toDouble(),
+      ),
+      destinationLocation: LatLng(
+        (data['destinationLocation']['lat'] ?? 0.0).toDouble(),
+        (data['destinationLocation']['lng'] ?? 0.0).toDouble(),
+      ),
+      pickupAddress: data['pickupAddress'] ?? '',
+      destinationAddress: data['destinationAddress'] ?? '',
+      status: data['status'] ?? 'requested',
+      requestedAt: _parseDateTime(data['requestedAt']),
+      acceptedAt: _parseTimestamp(data['acceptedAt']),
+      startedAt: _parseTimestamp(data['startedAt']),
+      completedAt: _parseTimestamp(data['completedAt']),
+      cancelledAt: _parseTimestamp(data['cancelledAt']),
+      cancelledBy: data['cancelledBy'],
+      estimatedDistance: (data['estimatedDistance'] ?? 0.0).toDouble(),
+      estimatedFare: (data['estimatedFare'] ?? 0.0).toDouble(),
+      finalFare: data['finalFare']?.toDouble(),
+      passengerRating: data['passengerRating']?.toDouble(),
+      passengerComment: data['passengerComment'],
+      driverRating: data['driverRating']?.toDouble(),
+      driverComment: data['driverComment'],
+      vehicleInfo: data['vehicleInfo'],
+      route: data['route'] != null
+          ? (data['route'] as List)
+              .map((point) => LatLng(
+                    point['lat'].toDouble(),
+                    point['lng'].toDouble(),
+                  ))
+              .toList()
+          : null,
+      verificationCode: data['verificationCode'],
+      isVerificationCodeUsed: data['isVerificationCodeUsed'] ?? false,
+    );
+  }
+
+  /// Parsear fecha desde diferentes formatos
   static DateTime _parseDateTime(dynamic dateTime) {
     if (dateTime == null) return DateTime.now();
     if (dateTime is DateTime) return dateTime;
     if (dateTime is String) {
       return DateTime.tryParse(dateTime) ?? DateTime.now();
     }
+    if (dateTime is Timestamp) {
+      return dateTime.toDate();
+    }
     return DateTime.now();
+  }
+
+  /// Parsear Timestamp de Firestore (puede ser null)
+  static DateTime? _parseTimestamp(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is Timestamp) {
+      return timestamp.toDate();
+    }
+    if (timestamp is DateTime) {
+      return timestamp;
+    }
+    if (timestamp is String) {
+      return DateTime.tryParse(timestamp);
+    }
+    return null;
   }
 
   /// Convertir a JSON
@@ -141,10 +207,12 @@ class TripModel {
       'driverRating': driverRating,
       'driverComment': driverComment,
       'vehicleInfo': vehicleInfo,
-      'route': route?.map((point) => {
-        'lat': point.latitude,
-        'lng': point.longitude,
-      }).toList(),
+      'route': route
+          ?.map((point) => {
+                'lat': point.latitude,
+                'lng': point.longitude,
+              })
+          .toList(),
       'verificationCode': verificationCode,
       'isVerificationCodeUsed': isVerificationCodeUsed,
     };
@@ -203,16 +271,17 @@ class TripModel {
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
       route: route ?? this.route,
       verificationCode: verificationCode ?? this.verificationCode,
-      isVerificationCodeUsed: isVerificationCodeUsed ?? this.isVerificationCodeUsed,
+      isVerificationCodeUsed:
+          isVerificationCodeUsed ?? this.isVerificationCodeUsed,
     );
   }
 
   /// Verificar si el viaje está activo
   bool get isActive {
-    return status == 'requested' || 
-           status == 'accepted' || 
-           status == 'driver_arriving' || 
-           status == 'in_progress';
+    return status == 'requested' ||
+        status == 'accepted' ||
+        status == 'driver_arriving' ||
+        status == 'in_progress';
   }
 
   /// Verificar si el viaje está completado

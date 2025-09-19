@@ -1,0 +1,162 @@
+# 🚖 OASIS TAXI PERÚ - Cloud Build para Pull Requests
+# Pipeline ligero para validación de PRs: análisis, tests y build básico
+
+substitutions:
+  _PROJECT_ID: 'oasis-taxi-peru-prod'
+  _FLUTTER_VERSION: '3.24.4'
+  _JAVA_VERSION: '11'
+
+timeout: '1800s' # 30 minutos para PRs
+options:
+  machineType: 'E2_HIGHCPU_4'
+  diskSizeGb: 50
+
+steps:
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 1: SETUP RÁPIDO PARA PR
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'setup-flutter-pr'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🔄 Setup Flutter para validación de PR..."
+    
+    # Instalar dependencias básicas
+    apt-get update && apt-get install -y curl unzip openjdk-${_JAVA_VERSION}-jdk
+    
+    # Configurar Java
+    export JAVA_HOME=/usr/lib/jvm/java-${_JAVA_VERSION}-openjdk-amd64
+    
+    # Instalar Flutter
+    cd /tmp
+    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${_FLUTTER_VERSION}-stable.tar.xz
+    tar xf flutter_linux_${_FLUTTER_VERSION}-stable.tar.xz
+    export PATH="/tmp/flutter/bin:${PATH}"
+    
+    # Configurar entorno
+    echo "JAVA_HOME=${JAVA_HOME}" > /workspace/env.txt
+    echo "PATH=/tmp/flutter/bin:${PATH}" >> /workspace/env.txt
+    
+    flutter --version
+    echo "✅ Flutter configurado para PR"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 2: ANÁLISIS ESTÁTICO
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'analyze-pr'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🔍 Analizando código del PR..."
+    
+    # Obtener dependencias
+    flutter pub get
+    
+    # Análisis estático
+    flutter analyze --no-pub --fatal-infos
+    
+    # Verificar formato
+    dart format --output=none --set-exit-if-changed .
+    
+    # Verificar que no hay TODOs/FIXMEs críticos
+    echo "🔎 Verificando TODOs críticos..."
+    if grep -r "TODO.*CRITICAL\|FIXME.*URGENT" lib/; then
+      echo "❌ Se encontraron TODOs/FIXMEs críticos que deben resolverse"
+      exit 1
+    fi
+    
+    echo "✅ Análisis de código aprobado"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 3: TESTS UNITARIOS
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'test-pr'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🧪 Ejecutando tests del PR..."
+    
+    # Tests unitarios rápidos
+    flutter test --reporter=json > test_results.json
+    
+    # Verificar que no fallan tests
+    if [ $? -ne 0 ]; then
+      echo "❌ Tests fallando en el PR"
+      exit 1
+    fi
+    
+    echo "✅ Todos los tests pasan"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 4: BUILD BÁSICO DE VALIDACIÓN
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'build-validation'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    source /workspace/env.txt
+    cd /workspace/oasistaxi/app
+    
+    echo "🔨 Build de validación para PR..."
+    
+    # Build debug para validar que compila
+    flutter build apk --debug --target lib/main.dart
+    
+    # Build web para validar
+    flutter build web --debug --target lib/main.dart
+    
+    echo "✅ Build de validación exitoso"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 FASE 5: REPORTE DE PR
+# ═══════════════════════════════════════════════════════════════════
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'pr-report'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "📊 Generando reporte de PR..."
+    
+    # Crear reporte de validación
+    cat > pr-report.md << EOF
+    # 🚖 OasisTaxi PR Validation Report
+    
+    ## ✅ Validaciones Completadas
+    - [x] Análisis estático de código
+    - [x] Formato de código correcto  
+    - [x] Tests unitarios pasan
+    - [x] Build de validación exitoso
+    - [x] No hay TODOs/FIXMEs críticos
+    
+    ## 📊 Estadísticas
+    - Build ID: ${BUILD_ID}
+    - Branch: ${BRANCH_NAME}
+    - Commit: ${SHORT_SHA}
+    
+    ## 🚀 Estado: APROBADO ✅
+    
+    El PR está listo para revisión manual.
+    EOF
+    
+    echo "✅ Reporte de PR generado"
+    cat pr-report.md

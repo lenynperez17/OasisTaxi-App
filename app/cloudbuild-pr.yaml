@@ -1,0 +1,267 @@
+# 🔍 CLOUD BUILD CONFIGURATION - PULL REQUESTS
+# Configuración específica para PRs de OasisTaxi
+# Ejecuta validaciones sin deployment
+# Versión: PR Validation 1.0
+
+steps:
+  # ============================================
+  # STEP 1: SETUP BÁSICO
+  # ============================================
+  - name: 'gcr.io/cloud-builders/git'
+    id: 'clone-and-setup'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔄 Configurando entorno para PR..."
+        echo "📋 PR Number: ${_PR_NUMBER}"
+        echo "🌿 Source Branch: ${_HEAD_BRANCH}"
+        echo "🎯 Target Branch: ${_BASE_BRANCH}"
+
+  # ============================================
+  # STEP 2: FLUTTER SETUP
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'flutter-setup'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Configurando Flutter para PR validation..."
+        cd app
+        flutter doctor -v
+        flutter pub get
+
+  # ============================================
+  # STEP 3: ANÁLISIS DE CÓDIGO
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'code-analysis'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔍 Análisis de código..."
+        cd app
+        # PR VALIDATION: Fail on warnings (--fatal-warnings)
+        flutter analyze --no-pub --fatal-warnings > analysis_report.txt 2>&1
+        ANALYZE_EXIT_CODE=$?
+
+        # Mostrar resultados
+        cat analysis_report.txt
+
+        # Verificar resultado
+        if [ $ANALYZE_EXIT_CODE -ne 0 ]; then
+          echo "❌ Se encontraron errores o warnings en el análisis"
+          echo "Los PRs deben pasar sin warnings para mantener la calidad del código"
+          exit 1
+        else
+          echo "✅ Análisis de código completado sin errores ni warnings"
+        fi
+
+  # ============================================
+  # STEP 4: TESTS UNITARIOS
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'unit-tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🧪 Ejecutando tests unitarios..."
+        cd app
+        flutter test --coverage --reporter json > test_results.json 2>&1
+        flutter test --coverage
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Todos los tests unitarios pasaron"
+          
+          # Calcular cobertura
+          if [ -f "coverage/lcov.info" ]; then
+            echo "📊 Generando reporte de cobertura..."
+            # Aquí podrías agregar herramientas para calcular % de cobertura
+          fi
+        else
+          echo "❌ Algunos tests unitarios fallaron"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 5: FORMATTING CHECK
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'format-check'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📝 Verificando formato del código..."
+        cd app
+        flutter format --dry-run --set-exit-if-changed lib/
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Formato del código es correcto"
+        else
+          echo "❌ Código no está formateado correctamente"
+          echo "💡 Ejecuta: flutter format lib/"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 6: BUILD VERIFICATION (SIN RELEASE)
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'build-verification'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔨 Verificando que el proyecto compila..."
+        cd app
+        
+        # Build debug para verificar compilación
+        flutter build apk --debug --dart-define=ENVIRONMENT=development
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Proyecto compila correctamente"
+        else
+          echo "❌ Error en la compilación"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 7: DEPENDENCY CHECK
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'dependency-check'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📦 Verificando dependencias..."
+        cd app
+        
+        # Verificar dependencias obsoletas
+        flutter pub deps --json > deps.json
+        flutter pub outdated --json > outdated.json 2>/dev/null || true
+        
+        echo "✅ Verificación de dependencias completada"
+
+  # ============================================
+  # STEP 8: SECURITY SCAN (BÁSICO)
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'security-scan'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔒 Escaneo básico de seguridad..."
+        cd app
+        
+        # Buscar hardcoded secrets (básico)
+        echo "Verificando secrets hardcodeados..."
+        if grep -r "password\s*=\s*['\"][^'\"]*['\"]" lib/ --exclude-dir=test || \
+           grep -r "api_key\s*=\s*['\"][^'\"]*['\"]" lib/ --exclude-dir=test || \
+           grep -r "secret\s*=\s*['\"][^'\"]*['\"]" lib/ --exclude-dir=test; then
+          echo "⚠️ Posibles secrets hardcodeados encontrados"
+          echo "💡 Por favor revisa y usa variables de entorno"
+        else
+          echo "✅ No se encontraron secrets hardcodeados obvios"
+        fi
+
+  # ============================================
+  # STEP 9: GENERAR REPORTE DE PR
+  # ============================================
+  - name: 'gcr.io/cloud-builders/curl'
+    id: 'generate-report'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📄 Generando reporte de PR..."
+        
+        # Crear reporte
+        cat > pr_report.md << EOF
+        # 📋 Reporte de PR #${_PR_NUMBER}
+        
+        ## ✅ Validaciones Completadas
+        
+        - ✅ **Análisis de código**: Sin errores críticos
+        - ✅ **Tests unitarios**: Todos los tests pasaron
+        - ✅ **Formato**: Código correctamente formateado
+        - ✅ **Compilación**: Proyecto compila sin errores
+        - ✅ **Dependencias**: Verificadas
+        - ✅ **Seguridad**: Escaneo básico completado
+        
+        ## 📊 Estadísticas
+        
+        - **Branch origen**: ${_HEAD_BRANCH}
+        - **Branch destino**: ${_BASE_BRANCH}
+        - **Commit**: ${SHORT_SHA}
+        - **Fecha**: $(date)
+        - **Duración build**: Completado
+        
+        ## 🚀 Estado
+        
+        ✅ **PR listo para revisión**
+        
+        Todas las validaciones automáticas han pasado exitosamente.
+        El código está listo para revisión manual por el equipo.
+        EOF
+        
+        echo "Reporte generado:"
+        cat pr_report.md
+
+# ============================================
+# CONFIGURACIÓN ESPECÍFICA PARA PRs
+# ============================================
+options:
+  # Máquina más pequeña para PRs (más económico)
+  machineType: 'E2_STANDARD_2'
+  
+  # Timeout menor para PRs (15 minutos)
+  timeout: '900s'
+  
+  # Disk size menor
+  diskSizeGb: 50
+  
+  # Logging
+  logging: GCS_ONLY
+  logsBucket: 'gs://${_LOGS_BUCKET}'
+
+# ============================================
+# VARIABLES ESPECÍFICAS PARA PRs
+# ============================================
+substitutions:
+  # Información del PR
+  _PR_NUMBER: ''
+  _HEAD_BRANCH: ''
+  _BASE_BRANCH: 'main'
+  
+  # Buckets (mismos que producción)
+  _LOGS_BUCKET: 'oasis-taxi-build-logs'
+  
+  # Configuración
+  _ENVIRONMENT: 'development'
+
+# ============================================
+# TAGS PARA PRs
+# ============================================
+tags:
+  - 'oasistaxi'
+  - 'flutter'
+  - 'pr-validation'
+  - 'development'
+
+# ============================================
+# ARTIFACTS PARA PRs (MÍNIMOS)
+# ============================================
+artifacts:
+  objects:
+    location: 'gs://${_LOGS_BUCKET}/pr-artifacts'
+    paths:
+      - 'app/analysis_report.txt'
+      - 'app/test_results.json'
+      - 'app/coverage/lcov.info'
+      - 'pr_report.md'

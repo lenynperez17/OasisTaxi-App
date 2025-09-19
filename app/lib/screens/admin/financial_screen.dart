@@ -1,10 +1,10 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../utils/app_logger.dart';
 
 enum TransactionType { trip, withdrawal, commission, refund }
+
 enum PaymentStatus { completed, pending, failed, processing }
 
 class Transaction {
@@ -41,175 +41,113 @@ class FinancialScreen extends StatefulWidget {
   const FinancialScreen({super.key});
 
   @override
-  _FinancialScreenState createState() => _FinancialScreenState();
+  FinancialScreenState createState() => FinancialScreenState();
 }
 
-class _FinancialScreenState extends State<FinancialScreen>
+class FinancialScreenState extends State<FinancialScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _chartAnimationController;
   late AnimationController _statsAnimationController;
-  
+
   final TextEditingController _searchController = TextEditingController();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // final FirebaseFirestore _firestore = FirebaseFirestore.instance; // No usado actualmente
   String _selectedPeriod = 'today';
   String _searchQuery = '';
   double _currentCommissionRate = 20.0; // 20% commission
-  bool _isLoading = true;
-  
+  // final bool _isLoading = true; // No usado actualmente
+
   // Datos financieros desde Firebase
-  Map<String, double> _financialStats = {
-    'totalRevenue': 45678.90,
-    'totalCommissions': 9135.78,
-    'pendingPayouts': 3456.50,
-    'completedPayouts': 32086.62,
-    'avgTripValue': 18.75,
-    'dailyAverage': 1522.63,
+  final Map<String, double> _financialStats = {
+    'totalRevenue': 0.0,
+    'totalCommissions': 0.0,
+    'pendingPayouts': 0.0,
+    'completedPayouts': 0.0,
+    'avgTripValue': 0.0,
+    'dailyAverage': 0.0,
   };
-  
-  final List<Transaction> _transactions = [
-    Transaction(
-      id: 'TRX001',
-      type: TransactionType.trip,
-      amount: 25.50,
-      date: DateTime.now().subtract(Duration(hours: 1)),
-      status: PaymentStatus.completed,
-      description: 'Viaje #V001',
-      driverId: 'D001',
-      driverName: 'Juan Pérez',
-      passengerId: 'P001',
-      passengerName: 'María García',
-      commission: 5.10,
-    ),
-    Transaction(
-      id: 'TRX002',
-      type: TransactionType.withdrawal,
-      amount: 250.00,
-      date: DateTime.now().subtract(Duration(hours: 3)),
-      status: PaymentStatus.processing,
-      description: 'Retiro conductor',
-      driverId: 'D002',
-      driverName: 'Carlos López',
-    ),
-    Transaction(
-      id: 'TRX003',
-      type: TransactionType.commission,
-      amount: 4.80,
-      date: DateTime.now().subtract(Duration(hours: 5)),
-      status: PaymentStatus.completed,
-      description: 'Comisión viaje #V002',
-      driverId: 'D003',
-      driverName: 'Ana Martínez',
-    ),
-    Transaction(
-      id: 'TRX004',
-      type: TransactionType.refund,
-      amount: 15.00,
-      date: DateTime.now().subtract(Duration(days: 1)),
-      status: PaymentStatus.completed,
-      description: 'Reembolso viaje cancelado',
-      passengerId: 'P002',
-      passengerName: 'Luis Torres',
-    ),
-    Transaction(
-      id: 'TRX005',
-      type: TransactionType.trip,
-      amount: 32.75,
-      date: DateTime.now().subtract(Duration(days: 1)),
-      status: PaymentStatus.completed,
-      description: 'Viaje #V003',
-      driverId: 'D001',
-      driverName: 'Juan Pérez',
-      passengerId: 'P003',
-      passengerName: 'Sofia Mendez',
-      commission: 6.55,
-    ),
-  ];
-  
-  final List<Map<String, dynamic>> _pendingPayouts = [
-    {
-      'driverId': 'D001',
-      'driverName': 'Juan Pérez',
-      'amount': 456.80,
-      'trips': 24,
-      'requestDate': DateTime.now().subtract(Duration(days: 2)),
-      'accountNumber': '**** 1234',
-      'bank': 'BCP',
-    },
-    {
-      'driverId': 'D002',
-      'driverName': 'Carlos López',
-      'amount': 678.50,
-      'trips': 35,
-      'requestDate': DateTime.now().subtract(Duration(days: 1)),
-      'accountNumber': '**** 5678',
-      'bank': 'Interbank',
-    },
-    {
-      'driverId': 'D003',
-      'driverName': 'Ana Martínez',
-      'amount': 234.25,
-      'trips': 15,
-      'requestDate': DateTime.now(),
-      'accountNumber': '**** 9012',
-      'bank': 'BBVA',
-    },
-  ];
-  
+
+  final List<Transaction> _transactions = [];
+
+  final List<Map<String, dynamic>> _pendingPayouts = [];
+
   List<Transaction> get _filteredTransactions {
     var filtered = _transactions.where((transaction) {
       if (_searchQuery.isEmpty) return true;
-      
-      return transaction.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             transaction.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             (transaction.driverName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
-             (transaction.passengerName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
-             (transaction.invoiceNumber?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+
+      return transaction.id
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
+          transaction.description
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
+          (transaction.driverName
+                  ?.toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ??
+              false) ||
+          (transaction.passengerName
+                  ?.toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ??
+              false) ||
+          (transaction.invoiceNumber
+                  ?.toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ??
+              false);
     }).toList();
-    
+
     // Apply tab filter
     switch (_tabController.index) {
       case 1: // Income
-        filtered = filtered.where((t) => 
-          t.type == TransactionType.trip || t.type == TransactionType.commission).toList();
+        filtered = filtered
+            .where((t) =>
+                t.type == TransactionType.trip ||
+                t.type == TransactionType.commission)
+            .toList();
         break;
       case 2: // Payouts
-        filtered = filtered.where((t) => t.type == TransactionType.withdrawal).toList();
+        filtered = filtered
+            .where((t) => t.type == TransactionType.withdrawal)
+            .toList();
         break;
       case 3: // Refunds
-        filtered = filtered.where((t) => t.type == TransactionType.refund).toList();
+        filtered =
+            filtered.where((t) => t.type == TransactionType.refund).toList();
         break;
     }
-    
+
     // Apply period filter
     final now = DateTime.now();
     switch (_selectedPeriod) {
       case 'today':
-        filtered = filtered.where((t) => 
-          t.date.year == now.year && 
-          t.date.month == now.month && 
-          t.date.day == now.day).toList();
+        filtered = filtered
+            .where((t) =>
+                t.date.year == now.year &&
+                t.date.month == now.month &&
+                t.date.day == now.day)
+            .toList();
         break;
       case 'week':
         final weekAgo = now.subtract(Duration(days: 7));
         filtered = filtered.where((t) => t.date.isAfter(weekAgo)).toList();
         break;
       case 'month':
-        filtered = filtered.where((t) => 
-          t.date.year == now.year && t.date.month == now.month).toList();
+        filtered = filtered
+            .where((t) => t.date.year == now.year && t.date.month == now.month)
+            .toList();
         break;
     }
-    
+
     // Sort by date descending
     filtered.sort((a, b) => b.date.compareTo(a.date));
-    
+
     return filtered;
   }
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('FinancialScreen', 'initState');
+
     _tabController = TabController(length: 4, vsync: this);
     _chartAnimationController = AnimationController(
       duration: Duration(milliseconds: 1500),
@@ -219,14 +157,14 @@ class _FinancialScreenState extends State<FinancialScreen>
       duration: Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    
+
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         _statsAnimationController.forward(from: 0);
       }
     });
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -235,7 +173,7 @@ class _FinancialScreenState extends State<FinancialScreen>
     _searchController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -288,7 +226,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildGeneralTab() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(20),
@@ -297,9 +235,9 @@ class _FinancialScreenState extends State<FinancialScreen>
         children: [
           // Period selector
           _buildPeriodSelector(),
-          
-          SizedBox(height: 20),
-          
+
+          const SizedBox(height: 20),
+
           // Financial stats cards
           AnimatedBuilder(
             animation: _statsAnimationController,
@@ -313,26 +251,26 @@ class _FinancialScreenState extends State<FinancialScreen>
               );
             },
           ),
-          
-          SizedBox(height: 24),
-          
+
+          const SizedBox(height: 24),
+
           // Revenue chart
           _buildRevenueChart(),
-          
-          SizedBox(height: 24),
-          
+
+          const SizedBox(height: 24),
+
           // Commission breakdown
           _buildCommissionBreakdown(),
-          
-          SizedBox(height: 24),
-          
+
+          const SizedBox(height: 24),
+
           // Recent transactions
           _buildRecentTransactions(),
         ],
       ),
     );
   }
-  
+
   Widget _buildIncomeTab() {
     return Column(
       children: [
@@ -351,21 +289,25 @@ class _FinancialScreenState extends State<FinancialScreen>
               hintStyle: TextStyle(color: ModernTheme.textSecondary),
               prefixIcon: Icon(Icons.search, color: ModernTheme.oasisGreen),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             onChanged: (value) {
               setState(() => _searchQuery = value);
             },
           ),
         ),
-        
+
         // Income summary
         Container(
           margin: EdgeInsets.symmetric(horizontal: 16),
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [ModernTheme.success, ModernTheme.success.withValues(alpha: 0.8)],
+              colors: [
+                ModernTheme.success,
+                ModernTheme.success.withValues(alpha: 0.8)
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -374,26 +316,35 @@ class _FinancialScreenState extends State<FinancialScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildIncomeStat('Total Ingresos', 'S/ ${_financialStats['totalRevenue']!.toStringAsFixed(2)}'),
+              _buildIncomeStat('Total Ingresos',
+                  'S/ ${_financialStats['totalRevenue']!.toStringAsFixed(2)}'),
               Container(width: 1, height: 40, color: Colors.grey.shade300),
-              _buildIncomeStat('Comisiones', 'S/ ${_financialStats['totalCommissions']!.toStringAsFixed(2)}'),
+              _buildIncomeStat('Comisiones',
+                  'S/ ${_financialStats['totalCommissions']!.toStringAsFixed(2)}'),
               Container(width: 1, height: 40, color: Colors.grey.shade300),
-              _buildIncomeStat('Promedio', 'S/ ${_financialStats['avgTripValue']!.toStringAsFixed(2)}'),
+              _buildIncomeStat('Promedio',
+                  'S/ ${_financialStats['avgTripValue']!.toStringAsFixed(2)}'),
             ],
           ),
         ),
-        
-        SizedBox(height: 16),
-        
+
+        const SizedBox(height: 16),
+
         // Transactions list
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _filteredTransactions.where((t) => 
-              t.type == TransactionType.trip || t.type == TransactionType.commission).length,
+            itemCount: _filteredTransactions
+                .where((t) =>
+                    t.type == TransactionType.trip ||
+                    t.type == TransactionType.commission)
+                .length,
             itemBuilder: (context, index) {
-              final incomeTransactions = _filteredTransactions.where((t) => 
-                t.type == TransactionType.trip || t.type == TransactionType.commission).toList();
+              final incomeTransactions = _filteredTransactions
+                  .where((t) =>
+                      t.type == TransactionType.trip ||
+                      t.type == TransactionType.commission)
+                  .toList();
               final transaction = incomeTransactions[index];
               return _buildTransactionCard(transaction);
             },
@@ -402,7 +353,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ],
     );
   }
-  
+
   Widget _buildPayoutsTab() {
     return Column(
       children: [
@@ -413,12 +364,13 @@ class _FinancialScreenState extends State<FinancialScreen>
           decoration: BoxDecoration(
             color: ModernTheme.warning.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ModernTheme.warning.withValues(alpha: 0.5)),
+            border:
+                Border.all(color: ModernTheme.warning.withValues(alpha: 0.5)),
           ),
           child: Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: ModernTheme.warning),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,7 +385,8 @@ class _FinancialScreenState extends State<FinancialScreen>
                     ),
                     Text(
                       'S/ ${_financialStats['pendingPayouts']!.toStringAsFixed(2)} en ${_pendingPayouts.length} solicitudes',
-                      style: TextStyle(color: ModernTheme.textSecondary, fontSize: 14),
+                      style: TextStyle(
+                          color: ModernTheme.textSecondary, fontSize: 14),
                     ),
                   ],
                 ),
@@ -451,7 +404,7 @@ class _FinancialScreenState extends State<FinancialScreen>
             ],
           ),
         ),
-        
+
         // Pending payouts list
         Expanded(
           child: ListView.builder(
@@ -466,7 +419,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ],
     );
   }
-  
+
   Widget _buildRefundsTab() {
     return Column(
       children: [
@@ -482,14 +435,15 @@ class _FinancialScreenState extends State<FinancialScreen>
           child: Row(
             children: [
               Icon(Icons.replay, color: ModernTheme.error, size: 32),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Total Reembolsos',
-                      style: TextStyle(color: ModernTheme.textSecondary, fontSize: 14),
+                      style: TextStyle(
+                          color: ModernTheme.textSecondary, fontSize: 14),
                     ),
                     Text(
                       'S/ 234.50',
@@ -501,7 +455,10 @@ class _FinancialScreenState extends State<FinancialScreen>
                     ),
                     Text(
                       '8 reembolsos este mes',
-                      style: TextStyle(color: ModernTheme.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                      style: TextStyle(
+                          color:
+                              ModernTheme.textSecondary.withValues(alpha: 0.7),
+                          fontSize: 12),
                     ),
                   ],
                 ),
@@ -509,16 +466,18 @@ class _FinancialScreenState extends State<FinancialScreen>
             ],
           ),
         ),
-        
+
         // Refunds list
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _filteredTransactions.where((t) => 
-              t.type == TransactionType.refund).length,
+            itemCount: _filteredTransactions
+                .where((t) => t.type == TransactionType.refund)
+                .length,
             itemBuilder: (context, index) {
-              final refundTransactions = _filteredTransactions.where((t) => 
-                t.type == TransactionType.refund).toList();
+              final refundTransactions = _filteredTransactions
+                  .where((t) => t.type == TransactionType.refund)
+                  .toList();
               final transaction = refundTransactions[index];
               return _buildTransactionCard(transaction);
             },
@@ -527,7 +486,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ],
     );
   }
-  
+
   Widget _buildPeriodSelector() {
     return SizedBox(
       height: 40,
@@ -543,10 +502,10 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildPeriodChip(String label, String value) {
     final isSelected = _selectedPeriod == value;
-    
+
     return Container(
       margin: EdgeInsets.only(right: 8),
       child: ChoiceChip(
@@ -568,7 +527,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildFinancialStats() {
     return GridView.count(
       crossAxisCount: 3,
@@ -623,8 +582,9 @@ class _FinancialScreenState extends State<FinancialScreen>
       ],
     );
   }
-  
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, String extra) {
+
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color, String extra) {
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -681,7 +641,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildRevenueChart() {
     return Container(
       height: 250,
@@ -701,7 +661,7 @@ class _FinancialScreenState extends State<FinancialScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Expanded(
             child: AnimatedBuilder(
               animation: _chartAnimationController,
@@ -711,20 +671,29 @@ class _FinancialScreenState extends State<FinancialScreen>
                   painter: RevenueChartPainter(
                     progress: _chartAnimationController.value,
                     data: [
-                      1200, 1500, 1300, 1800, 2100, 1900, 2300,
+                      1200,
+                      1500,
+                      1300,
+                      1800,
+                      2100,
+                      1900,
+                      2300,
                     ],
                   ),
                 );
               },
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: ['L', 'M', 'M', 'J', 'V', 'S', 'D']
                 .map((day) => Text(
                       day,
-                      style: TextStyle(color: ModernTheme.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                      style: TextStyle(
+                          color:
+                              ModernTheme.textSecondary.withValues(alpha: 0.7),
+                          fontSize: 12),
                     ))
                 .toList(),
           ),
@@ -732,7 +701,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildCommissionBreakdown() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -764,14 +733,11 @@ class _FinancialScreenState extends State<FinancialScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
-          
+          const SizedBox(height: 20),
           _buildCommissionRow('Viajes Estándar', 18.0, 3456.78),
           _buildCommissionRow('Viajes Premium', 22.0, 2134.56),
           _buildCommissionRow('Viajes Corporativos', 15.0, 3544.44),
-          
           Divider(color: Colors.grey.shade300, height: 32),
-          
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -797,7 +763,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildCommissionRow(String type, double rate, double amount) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
@@ -809,7 +775,8 @@ class _FinancialScreenState extends State<FinancialScreen>
               children: [
                 Text(
                   type,
-                  style: TextStyle(color: ModernTheme.textPrimary, fontSize: 14),
+                  style:
+                      TextStyle(color: ModernTheme.textPrimary, fontSize: 14),
                 ),
                 Text(
                   '${rate.toStringAsFixed(0)}% de comisión',
@@ -829,7 +796,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildRecentTransactions() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -862,19 +829,19 @@ class _FinancialScreenState extends State<FinancialScreen>
               ),
             ],
           ),
-          SizedBox(height: 16),
-          
-          ..._transactions.take(5).map((transaction) => 
-            _buildTransactionRow(transaction)),
+          const SizedBox(height: 16),
+          ..._transactions
+              .take(5)
+              .map((transaction) => _buildTransactionRow(transaction)),
         ],
       ),
     );
   }
-  
+
   Widget _buildTransactionRow(Transaction transaction) {
     final icon = _getTransactionIcon(transaction.type);
     final color = _getTransactionColor(transaction.type);
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.all(12),
@@ -892,7 +859,7 @@ class _FinancialScreenState extends State<FinancialScreen>
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -906,7 +873,9 @@ class _FinancialScreenState extends State<FinancialScreen>
                   ),
                 ),
                 Text(
-                  transaction.driverName ?? transaction.passengerName ?? 'Sistema',
+                  transaction.driverName ??
+                      transaction.passengerName ??
+                      'Sistema',
                   style: TextStyle(
                     color: ModernTheme.textSecondary.withValues(alpha: 0.7),
                     fontSize: 12,
@@ -921,10 +890,10 @@ class _FinancialScreenState extends State<FinancialScreen>
               Text(
                 '${transaction.type == TransactionType.withdrawal || transaction.type == TransactionType.refund ? '-' : '+'} S/ ${transaction.amount.toStringAsFixed(2)}',
                 style: TextStyle(
-                  color: transaction.type == TransactionType.withdrawal || 
-                         transaction.type == TransactionType.refund 
-                    ? ModernTheme.error 
-                    : ModernTheme.success,
+                  color: transaction.type == TransactionType.withdrawal ||
+                          transaction.type == TransactionType.refund
+                      ? ModernTheme.error
+                      : ModernTheme.success,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -942,11 +911,11 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildTransactionCard(Transaction transaction) {
     final icon = _getTransactionIcon(transaction.type);
     final color = _getTransactionColor(transaction.type);
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -973,7 +942,7 @@ class _FinancialScreenState extends State<FinancialScreen>
                     ),
                     child: Icon(icon, color: color, size: 24),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -986,11 +955,12 @@ class _FinancialScreenState extends State<FinancialScreen>
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           transaction.id,
                           style: TextStyle(
-                            color: ModernTheme.textSecondary.withValues(alpha: 0.7),
+                            color: ModernTheme.textSecondary
+                                .withValues(alpha: 0.7),
                             fontSize: 12,
                           ),
                         ),
@@ -1009,9 +979,11 @@ class _FinancialScreenState extends State<FinancialScreen>
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(transaction.status).withValues(alpha: 0.2),
+                          color: _getStatusColor(transaction.status)
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1027,39 +999,45 @@ class _FinancialScreenState extends State<FinancialScreen>
                   ),
                 ],
               ),
-              
-              if (transaction.driverName != null || transaction.passengerName != null) ...[
-                SizedBox(height: 12),
+              if (transaction.driverName != null ||
+                  transaction.passengerName != null) ...[
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     if (transaction.driverName != null) ...[
-                      Icon(Icons.directions_car, size: 14, color: ModernTheme.textSecondary),
-                      SizedBox(width: 4),
+                      Icon(Icons.directions_car,
+                          size: 14, color: ModernTheme.textSecondary),
+                      const SizedBox(width: 4),
                       Text(
                         transaction.driverName!,
-                        style: TextStyle(color: ModernTheme.textSecondary, fontSize: 13),
+                        style: TextStyle(
+                            color: ModernTheme.textSecondary, fontSize: 13),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                     ],
                     if (transaction.passengerName != null) ...[
-                      Icon(Icons.person, size: 14, color: ModernTheme.textSecondary),
-                      SizedBox(width: 4),
+                      Icon(Icons.person,
+                          size: 14, color: ModernTheme.textSecondary),
+                      const SizedBox(width: 4),
                       Text(
                         transaction.passengerName!,
-                        style: TextStyle(color: ModernTheme.textSecondary, fontSize: 13),
+                        style: TextStyle(
+                            color: ModernTheme.textSecondary, fontSize: 13),
                       ),
                     ],
                     Spacer(),
                     Text(
                       _formatDateTime(transaction.date),
-                      style: TextStyle(color: ModernTheme.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                      style: TextStyle(
+                          color:
+                              ModernTheme.textSecondary.withValues(alpha: 0.7),
+                          fontSize: 12),
                     ),
                   ],
                 ),
               ],
-              
               if (transaction.commission != null) ...[
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -1068,8 +1046,9 @@ class _FinancialScreenState extends State<FinancialScreen>
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.percent, size: 14, color: ModernTheme.primaryBlue),
-                      SizedBox(width: 4),
+                      Icon(Icons.percent,
+                          size: 14, color: ModernTheme.primaryBlue),
+                      const SizedBox(width: 4),
                       Text(
                         'Comisión: S/ ${transaction.commission!.toStringAsFixed(2)}',
                         style: TextStyle(
@@ -1087,7 +1066,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildPayoutCard(Map<String, dynamic> payout) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -1103,10 +1082,11 @@ class _FinancialScreenState extends State<FinancialScreen>
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: ModernTheme.oasisGreen.withValues(alpha: 0.2),
+                  backgroundColor:
+                      ModernTheme.oasisGreen.withValues(alpha: 0.2),
                   child: Icon(Icons.person, color: ModernTheme.oasisGreen),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1102,8 @@ class _FinancialScreenState extends State<FinancialScreen>
                       Text(
                         '${payout['trips']} viajes completados',
                         style: TextStyle(
-                          color: ModernTheme.textSecondary.withValues(alpha: 0.7),
+                          color:
+                              ModernTheme.textSecondary.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -1139,9 +1120,7 @@ class _FinancialScreenState extends State<FinancialScreen>
                 ),
               ],
             ),
-            
-            SizedBox(height: 12),
-            
+            const SizedBox(height: 12),
             Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -1151,7 +1130,7 @@ class _FinancialScreenState extends State<FinancialScreen>
               child: Row(
                 children: [
                   Icon(Icons.account_balance, size: 16, color: Colors.white54),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     '${payout['bank']} - ${payout['accountNumber']}',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
@@ -1164,9 +1143,7 @@ class _FinancialScreenState extends State<FinancialScreen>
                 ],
               ),
             ),
-            
-            SizedBox(height: 12),
-            
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -1180,7 +1157,7 @@ class _FinancialScreenState extends State<FinancialScreen>
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _approvePayout(payout),
@@ -1198,7 +1175,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildIncomeStat(String label, String value) {
     return Column(
       children: [
@@ -1220,7 +1197,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ],
     );
   }
-  
+
   IconData _getTransactionIcon(TransactionType type) {
     switch (type) {
       case TransactionType.trip:
@@ -1233,7 +1210,7 @@ class _FinancialScreenState extends State<FinancialScreen>
         return Icons.replay;
     }
   }
-  
+
   Color _getTransactionColor(TransactionType type) {
     switch (type) {
       case TransactionType.trip:
@@ -1246,7 +1223,7 @@ class _FinancialScreenState extends State<FinancialScreen>
         return ModernTheme.error;
     }
   }
-  
+
   Color _getStatusColor(PaymentStatus status) {
     switch (status) {
       case PaymentStatus.completed:
@@ -1259,7 +1236,7 @@ class _FinancialScreenState extends State<FinancialScreen>
         return ModernTheme.primaryBlue;
     }
   }
-  
+
   String _getStatusText(PaymentStatus status) {
     switch (status) {
       case PaymentStatus.completed:
@@ -1272,19 +1249,19 @@ class _FinancialScreenState extends State<FinancialScreen>
         return 'PROCESANDO';
     }
   }
-  
+
   String _formatTime(DateTime date) {
     return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
-  
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}';
   }
-  
+
   String _formatDateTime(DateTime date) {
     return '${date.day}/${date.month} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
-  
+
   void _showTransactionDetails(Transaction transaction) {
     showModalBottomSheet(
       context: context,
@@ -1309,7 +1286,6 @@ class _FinancialScreenState extends State<FinancialScreen>
                 ),
               ),
             ),
-            
             Text(
               'Detalles de Transacción',
               style: TextStyle(
@@ -1318,26 +1294,23 @@ class _FinancialScreenState extends State<FinancialScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            
-            SizedBox(height: 20),
-            
+            const SizedBox(height: 20),
             _buildDetailRow('ID Transacción', transaction.id),
             _buildDetailRow('Tipo', _getTransactionTypeName(transaction.type)),
-            _buildDetailRow('Monto', 'S/ ${transaction.amount.toStringAsFixed(2)}'),
+            _buildDetailRow(
+                'Monto', 'S/ ${transaction.amount.toStringAsFixed(2)}'),
             _buildDetailRow('Estado', _getStatusText(transaction.status)),
             _buildDetailRow('Fecha', _formatDateTime(transaction.date)),
-            
             if (transaction.driverName != null)
               _buildDetailRow('Conductor', transaction.driverName!),
             if (transaction.passengerName != null)
               _buildDetailRow('Pasajero', transaction.passengerName!),
             if (transaction.commission != null)
-              _buildDetailRow('Comisión', 'S/ ${transaction.commission!.toStringAsFixed(2)}'),
+              _buildDetailRow('Comisión',
+                  'S/ ${transaction.commission!.toStringAsFixed(2)}'),
             if (transaction.invoiceNumber != null)
               _buildDetailRow('Nº Factura', transaction.invoiceNumber!),
-            
-            SizedBox(height: 20),
-            
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
@@ -1354,7 +1327,7 @@ class _FinancialScreenState extends State<FinancialScreen>
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -1376,7 +1349,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6),
@@ -1389,13 +1362,16 @@ class _FinancialScreenState extends State<FinancialScreen>
           ),
           Text(
             value,
-            style: TextStyle(color: ModernTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                color: ModernTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
-  
+
   String _getTransactionTypeName(TransactionType type) {
     switch (type) {
       case TransactionType.trip:
@@ -1408,7 +1384,7 @@ class _FinancialScreenState extends State<FinancialScreen>
         return 'Reembolso';
     }
   }
-  
+
   void _showCommissionSettings() {
     showDialog(
       context: context,
@@ -1426,7 +1402,7 @@ class _FinancialScreenState extends State<FinancialScreen>
               'Tasa de comisión actual',
               style: TextStyle(color: Colors.white70),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -1435,7 +1411,6 @@ class _FinancialScreenState extends State<FinancialScreen>
                     min: 10,
                     max: 30,
                     divisions: 20,
-                    activeColor: ModernTheme.oasisGreen,
                     onChanged: (value) {
                       setState(() => _currentCommissionRate = value);
                       Navigator.pop(context);
@@ -1453,12 +1428,12 @@ class _FinancialScreenState extends State<FinancialScreen>
                 ),
               ],
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Text(
               'Comisiones por tipo de viaje',
               style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             _buildCommissionSetting('Viajes Estándar', 18),
             _buildCommissionSetting('Viajes Premium', 22),
             _buildCommissionSetting('Viajes Corporativos', 15),
@@ -1488,7 +1463,7 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   Widget _buildCommissionSetting(String type, int rate) {
     return Container(
       margin: EdgeInsets.only(bottom: 8),
@@ -1500,13 +1475,15 @@ class _FinancialScreenState extends State<FinancialScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(type, style: TextStyle(color: ModernTheme.textPrimary, fontSize: 14)),
-          Text('$rate%', style: TextStyle(color: ModernTheme.oasisGreen, fontSize: 14)),
+          Text(type,
+              style: TextStyle(color: ModernTheme.textPrimary, fontSize: 14)),
+          Text('$rate%',
+              style: TextStyle(color: ModernTheme.oasisGreen, fontSize: 14)),
         ],
       ),
     );
   }
-  
+
   void _showDateRangePicker() async {
     final picked = await showDateRangePicker(
       context: context,
@@ -1524,19 +1501,20 @@ class _FinancialScreenState extends State<FinancialScreen>
         );
       },
     );
-    
+
     if (picked != null) {
       // Handle date range selection
     }
   }
-  
+
   void _processAllPayouts() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: ModernTheme.cardDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Procesar Todos los Pagos', style: TextStyle(color: Colors.white)),
+        title: Text('Procesar Todos los Pagos',
+            style: TextStyle(color: Colors.white)),
         content: Text(
           '¿Estás seguro de procesar ${_pendingPayouts.length} pagos por un total de S/ ${_financialStats['pendingPayouts']!.toStringAsFixed(2)}?',
           style: TextStyle(color: Colors.white70),
@@ -1551,7 +1529,8 @@ class _FinancialScreenState extends State<FinancialScreen>
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Procesando ${_pendingPayouts.length} pagos...'),
+                  content:
+                      Text('Procesando ${_pendingPayouts.length} pagos...'),
                   backgroundColor: ModernTheme.warning,
                 ),
               );
@@ -1565,17 +1544,20 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   void _approvePayout(Map<String, dynamic> payout) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Pago aprobado: S/ ${payout['amount'].toStringAsFixed(2)} a ${payout['driverName']}'),
+        content: Text(
+            'Pago aprobado: S/ ${payout['amount'].toStringAsFixed(2)} a ${payout['driverName']}'),
         backgroundColor: ModernTheme.success,
       ),
     );
   }
-  
+
   void _rejectPayout(Map<String, dynamic> payout) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pago rechazado'),
@@ -1583,8 +1565,9 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   void _exportFinancialReport() {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Exportando reporte financiero...'),
@@ -1592,8 +1575,9 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   void _exportTransaction(Transaction transaction) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Exportando transacción ${transaction.id}...'),
@@ -1601,8 +1585,9 @@ class _FinancialScreenState extends State<FinancialScreen>
       ),
     );
   }
-  
+
   void _generateInvoice(Transaction transaction) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Generando factura...'),
@@ -1616,16 +1601,17 @@ class _FinancialScreenState extends State<FinancialScreen>
 class RevenueChartPainter extends CustomPainter {
   final double progress;
   final List<double> data;
-  
-  const RevenueChartPainter({super.repaint, required this.progress, required this.data});
-  
+
+  const RevenueChartPainter(
+      {super.repaint, required this.progress, required this.data});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
-    
+
     final fillPaint = Paint()
       ..style = PaintingStyle.fill
       ..shader = LinearGradient(
@@ -1636,17 +1622,18 @@ class RevenueChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    
+
     final path = Path();
     final fillPath = Path();
-    
+
     final maxValue = data.reduce(math.max);
     final stepX = size.width / (data.length - 1);
-    
+
     for (int i = 0; i < data.length; i++) {
       final x = i * stepX;
-      final y = size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
-      
+      final y =
+          size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
+
       if (i == 0) {
         path.moveTo(x, y);
         fillPath.moveTo(x, y);
@@ -1655,28 +1642,29 @@ class RevenueChartPainter extends CustomPainter {
         fillPath.lineTo(x, y);
       }
     }
-    
+
     // Complete fill path
     fillPath.lineTo(size.width, size.height);
     fillPath.lineTo(0, size.height);
     fillPath.close();
-    
+
     // Draw fill
     canvas.drawPath(fillPath, fillPaint);
-    
+
     // Draw line
     paint.color = ModernTheme.oasisGreen;
     canvas.drawPath(path, paint);
-    
+
     // Draw points
     final pointPaint = Paint()
       ..style = PaintingStyle.fill
       ..color = ModernTheme.oasisGreen;
-    
+
     for (int i = 0; i < data.length; i++) {
       final x = i * stepX;
-      final y = size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
-      
+      final y =
+          size.height - (data[i] / maxValue) * size.height * 0.8 * progress;
+
       canvas.drawCircle(Offset(x, y), 4, pointPaint);
       canvas.drawCircle(
         Offset(x, y),
@@ -1688,7 +1676,7 @@ class RevenueChartPainter extends CustomPainter {
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

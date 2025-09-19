@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Función helper para verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Función helper para verificar si es el propio usuario
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Función helper para verificar si es admin
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+    }
+
+    // Función helper para verificar si es conductor
+    function isDriver() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'driver';
+    }
+
+    // Función helper para verificar si es pasajero
+    function isPassenger() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'passenger';
+    }
+
+    // Reglas para la colección de usuarios
+    match /users/{userId} {
+      // Los usuarios pueden leer su propio perfil
+      // Los admins pueden leer cualquier perfil
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Los usuarios pueden actualizar su propio perfil (excepto userType y isActive)
+      allow update: if isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userType', 'isActive']);
+
+      // Solo los admins pueden crear usuarios o cambiar userType/isActive
+      allow create: if isAdmin() ||
+        (isAuthenticated() && request.auth.uid == userId);
+
+      // Solo admins pueden eliminar usuarios
+      allow delete: if isAdmin();
+    }
+
+    // Reglas para la colección de viajes
+    match /trips/{tripId} {
+      // Los usuarios pueden leer sus propios viajes
+      allow read: if isAuthenticated() &&
+        (resource.data.passengerId == request.auth.uid ||
+         resource.data.driverId == request.auth.uid ||
+         isAdmin());
+
+      // Pasajeros pueden crear viajes
+      allow create: if isPassenger() &&
+        request.resource.data.passengerId == request.auth.uid;
+
+      // Conductores y pasajeros pueden actualizar el viaje según el estado
+      allow update: if isAuthenticated() &&
+        (resource.data.passengerId == request.auth.uid ||
+         resource.data.driverId == request.auth.uid);
+
+      // Solo admins pueden eliminar viajes
+      allow delete: if isAdmin();
+    }
+
+    // Reglas para la colección de vehículos
+    match /vehicles/{vehicleId} {
+      // Los conductores pueden leer sus propios vehículos, admins todos
+      allow read: if isDriver() && resource.data.driverId == request.auth.uid || isAdmin();
+
+      // Los conductores pueden crear sus propios vehículos
+      allow create: if isDriver() &&
+        request.resource.data.driverId == request.auth.uid;
+
+      // Los conductores pueden actualizar sus propios vehículos
+      allow update: if isDriver() &&
+        resource.data.driverId == request.auth.uid;
+
+      // Solo admins pueden eliminar vehículos
+      allow delete: if isAdmin();
+    }
+
+    // Reglas para la colección de negociaciones de precio
+    match /price_negotiations/{negotiationId} {
+      // Participantes pueden leer
+      allow read: if isAuthenticated() &&
+        (resource.data.passengerId == request.auth.uid ||
+         resource.data.driverId == request.auth.uid ||
+         isAdmin());
+
+      // Pasajeros y conductores pueden crear
+      allow create: if isAuthenticated() &&
+        (isPassenger() || isDriver());
+
+      // Participantes pueden actualizar
+      allow update: if isAuthenticated() &&
+        (resource.data.passengerId == request.auth.uid ||
+         resource.data.driverId == request.auth.uid);
+
+      // Solo admins pueden eliminar
+      allow delete: if isAdmin();
+    }
+
+    // Reglas para la colección de notificaciones
+    match /notifications/{notificationId} {
+      // Los usuarios pueden leer sus propias notificaciones
+      allow read: if isOwner(resource.data.userId);
+
+      // Sistema puede crear notificaciones (a través de Cloud Functions)
+      allow create: if isAuthenticated();
+
+      // Los usuarios pueden marcar sus notificaciones como leídas
+      allow update: if isOwner(resource.data.userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+
+      // Los usuarios pueden eliminar sus propias notificaciones
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Reglas para la colección de configuraciones
+    match /settings/{document=**} {
+      // Todos pueden leer configuraciones públicas
+      allow read: if true;
+
+      // Solo admins pueden modificar configuraciones
+      allow write: if isAdmin();
+    }
+
+    // Reglas para documentos de verificación de conductores
+    match /driver_documents/{documentId} {
+      // El conductor puede ver sus documentos, admin puede ver todos
+      allow read: if isOwner(resource.data.driverId) || isAdmin();
+
+      // Conductores pueden subir documentos
+      allow create: if isDriver() &&
+        request.resource.data.driverId == request.auth.uid;
+
+      // Solo admin puede aprobar/rechazar documentos
+      allow update: if isAdmin() ||
+        (isOwner(resource.data.driverId) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'verifiedBy', 'verifiedAt']));
+
+      // Nadie puede eliminar documentos
+      allow delete: if false;
+    }
+
+    // Reglas para chats
+    match /chats/{chatId} {
+      // Participantes pueden leer el chat
+      allow read: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
+
+      // Participantes pueden crear mensajes
+      allow create: if isAuthenticated() &&
+        request.auth.uid in request.resource.data.participants;
+
+      // Participantes pueden actualizar (marcar como leído)
+      allow update: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
+
+      // Nadie puede eliminar chats
+      allow delete: if false;
+
+      // Subcolección de mensajes
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+
+        allow create: if isAuthenticated() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+          request.resource.data.senderId == request.auth.uid;
+
+        // No se pueden editar ni eliminar mensajes
+        allow update, delete: if false;
+      }
+    }
+
+    // Reglas para calificaciones
+    match /ratings/{ratingId} {
+      // Los usuarios pueden leer calificaciones públicas
+      allow read: if true;
+
+      // Solo se puede crear una calificación si eres parte del viaje
+      allow create: if isAuthenticated() &&
+        exists(/databases/$(database)/documents/trips/$(request.resource.data.tripId)) &&
+        (get(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.passengerId == request.auth.uid ||
+         get(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.driverId == request.auth.uid);
+
+      // No se pueden editar calificaciones
+      allow update, delete: if false;
+    }
+
+    // Reglas para transacciones/pagos
+    match /transactions/{transactionId} {
+      // Los usuarios pueden ver sus propias transacciones
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.driverId == request.auth.uid ||
+         isAdmin());
+
+      // Las transacciones se crean desde el servidor
+      allow create: if false;
+
+      // No se pueden modificar transacciones
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 
 class NavigationHelper {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   // Navegar a solicitud de viaje (para conductores)
   static void navigateToRideRequest() {
@@ -61,7 +62,8 @@ class NavigationHelper {
     try {
       final context = navigatorKey.currentContext;
       if (context != null) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/home', (route) => false);
         AppLogger.info('Navegando a inicio');
       }
     } catch (e) {

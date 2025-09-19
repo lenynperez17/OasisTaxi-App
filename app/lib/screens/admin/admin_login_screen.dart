@@ -1,48 +1,56 @@
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import '../../core/theme/modern_theme.dart';
+import '../../utils/app_logger.dart';
 import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../providers/auth_provider.dart' as oasis_auth;
+import '../../services/security_integration_service.dart';
+import '../../core/config/environment_config.dart';
+import '../../services/firestore_database_service.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 
   @override
-  State<AdminLoginScreen> createState() => _AdminLoginScreenState();
+  State<AdminLoginScreen> createState() => AdminLoginScreenState();
 }
 
-class _AdminLoginScreenState extends State<AdminLoginScreen>
+class AdminLoginScreenState extends State<AdminLoginScreen>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
-  
+
   late AnimationController _backgroundController;
   late AnimationController _formController;
   late AnimationController _iconController;
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _showTwoFactor = false;
-  
+  // String? _verificationId; // No usado actualmente
+  FirestoreDatabaseService? _firestoreService;
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('AdminLoginScreen', 'initState');
+
+    // Inicializar Firestore service
+    _firestoreService = FirestoreDatabaseService();
+
     _backgroundController = AnimationController(
       duration: const Duration(seconds: 15),
       vsync: this,
     )..repeat();
-    
+
     _formController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     )..forward();
-    
+
     _iconController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
@@ -63,112 +71,169 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
-      // Simular verificación de credenciales
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Verificar credenciales de admin
-      if (_emailController.text == 'admin@oasistaxiadmin.com' &&
-          _passwordController.text == 'admin123') {
-        
-        // Mostrar pantalla de 2FA
-        if (mounted) {
+
+      try {
+        final authProvider =
+            Provider.of<oasis_auth.AuthProvider>(context, listen: false);
+
+        // Verificar que es un admin autorizado (usando configuración segura)
+        if (!(await _isAuthorizedAdmin(_emailController.text.toLowerCase()))) {
+          _showSnackBar('Solo administradores autorizados pueden acceder',
+              ModernTheme.error);
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        // Intentar login con Firebase Auth (con soporte 2FA)
+        final success = await authProvider.signInWithEmailAndPassword(
+          _emailController.text,
+          _passwordController.text,
+        );
+
+        if (success) {
+          // Login exitoso sin 2FA o con 2FA auto-resuelto
+          // Verificar que el usuario es admin
+          if (authProvider.currentUser?.userType == 'admin') {
+            if (!mounted) return;
+            Navigator.pushReplacementNamed(context, '/admin/dashboard');
+          } else {
+            _showSnackBar(
+                'Usuario no autorizado como administrador', ModernTheme.error);
+            await authProvider.logout();
+            setState(() => _isLoading = false);
+          }
+        } else if (authProvider.errorMessage == '2FA_REQUIRED') {
+          // El usuario tiene 2FA habilitado, mostrar pantalla de código
           setState(() {
             _showTwoFactor = true;
             _isLoading = false;
           });
-        }
-      } else {
-        // Error de credenciales
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Credenciales de administrador inválidas'),
-            backgroundColor: ModernTheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-        if (mounted) {
+        } else {
+          // Error de credenciales u otro error
+          _showSnackBar(authProvider.errorMessage ?? 'Credenciales inválidas',
+              ModernTheme.error);
           setState(() => _isLoading = false);
         }
+      } catch (e) {
+        AppLogger.debug('Error en login admin: $e');
+        _showSnackBar(
+            'Error de autenticación: ${e.toString()}', ModernTheme.error);
+        setState(() => _isLoading = false);
       }
     }
   }
-  
-  /// Verificación 2FA real con Firebase Admin Verification
+
+  /// Verificación 2FA real con Firebase MFA
   Future<void> _verify2FA() async {
     final code = _codeController.text.trim();
-    
-    if (code.isEmpty) {
-      _showSnackBar('Ingrese el código de verificación', ModernTheme.error);
+
+    if (code.isEmpty || code.length != 6) {
+      _showSnackBar('Ingrese el código de 6 dígitos', ModernTheme.error);
       return;
     }
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
-      // Verificar código 2FA con Firebase Functions
-      final response = await http.post(
-        Uri.parse('https://us-central1-oasistaxiperu.cloudfunctions.net/verifyAdminCode'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${await FirebaseAuth.instance.currentUser?.getIdToken()}',
-        },
-        body: json.encode({
-          'code': code,
-          'email': _emailController.text,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        }),
-      );
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['valid'] == true) {
-          // Establecer custom claims de admin
-          await _setAdminClaims();
-          
+      final authProvider =
+          Provider.of<oasis_auth.AuthProvider>(context, listen: false);
+
+      // Verificar segundo factor usando Firebase MFA
+      final success = await authProvider.verifySecondFactor(code);
+
+      if (success) {
+        // Verificación 2FA exitosa
+        // Verificar que el usuario autenticado es admin
+        if (authProvider.currentUser?.userType == 'admin') {
           if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/admin/dashboard');
         } else {
-          _showSnackBar('Código de verificación inválido o expirado', ModernTheme.error);
+          _showSnackBar(
+              'Usuario no autorizado como administrador', ModernTheme.error);
+          await authProvider.logout();
         }
       } else {
-        _showSnackBar('Error del servidor. Inténtelo nuevamente.', ModernTheme.error);
+        _showSnackBar(
+            authProvider.errorMessage ?? 'Código de verificación inválido',
+            ModernTheme.error);
       }
-      
     } catch (e) {
-      debugPrint('Error verificando 2FA: $e');
-      _showSnackBar('Error de conexión. Verifique su internet.', ModernTheme.error);
+      AppLogger.debug('Error verificando 2FA: $e');
+      _showSnackBar(
+          'Error de verificación: ${e.toString()}', ModernTheme.error);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
-  
-  /// Establecer custom claims de administrador
-  Future<void> _setAdminClaims() async {
+
+  /// Método removido - no se necesitan custom claims para esta implementación
+
+  /// Verificar si es un administrador autorizado usando Firestore
+  Future<bool> _isAuthorizedAdmin(String email) async {
     try {
-      await http.post(
-        Uri.parse('https://us-central1-oasistaxiperu.cloudfunctions.net/setAdminClaims'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${await FirebaseAuth.instance.currentUser?.getIdToken()}',
-        },
-        body: json.encode({
-          'uid': FirebaseAuth.instance.currentUser?.uid,
-          'email': _emailController.text,
-        }),
+      if (_firestoreService == null) {
+        AppLogger.error('Firestore service no inicializado');
+        return false;
+      }
+
+      // Consultar la colección de administradores autorizados
+      final adminDoc = await _firestoreService!.getDocument(
+        collection: EnvironmentConfig.adminFirestoreCollection,
+        documentId: email.toLowerCase(),
       );
-    } catch (e) {
-      debugPrint('Error estableciendo claims: $e');
+
+      if (adminDoc.exists) {
+        final adminData = adminDoc.data() as Map<String, dynamic>?;
+
+        // Verificar que el admin esté activo
+        final isActive = adminData?['isActive'] ?? false;
+        final role = adminData?['role'] ?? '';
+
+        if (isActive && (role == 'admin' || role == 'super_admin')) {
+          AppLogger.info('Admin autorizado encontrado: $email');
+          return true;
+        } else {
+          AppLogger.warning('Admin inactivo o sin permisos: $email');
+          return false;
+        }
+      } else {
+        AppLogger.warning('Admin no encontrado en Firestore: $email');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('Error verificando admin en Firestore', e, stackTrace);
+      return false;
     }
   }
-  
+
+  /// Estructura de documento de admin para referencia:
+  /// {
+  ///   "email": "admin@oasistaxiperu.com",
+  ///   "role": "admin", // admin, super_admin
+  ///   "isActive": true,
+  ///   "createdAt": Timestamp,
+  ///   "lastLogin": Timestamp,
+  ///   "permissions": [
+  ///     "dashboard_access",
+  ///     "user_management",
+  ///     "financial_reports",
+  ///     "driver_management"
+  ///   ],
+  ///   "createdBy": "system",
+  ///   "department": "operations"
+  /// }
+  void _logAdminDocumentStructure() {
+    AppLogger.info('Estructura de documento admin requerida en Firestore');
+  }
+
+  // /// Validar formato de email
+  // bool _isValidEmail(String email) {
+  //   return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+  //       .hasMatch(email);
+  // }
+
   /// Helper para mostrar SnackBar
   void _showSnackBar(String message, Color backgroundColor) {
     if (!mounted) return;
@@ -211,13 +276,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               );
             },
           ),
-          
+
           // Patrón de seguridad
           ...List.generate(3, (index) {
             return AnimatedBuilder(
               animation: _backgroundController,
               builder: (context, child) {
-                final progress = (_backgroundController.value + index * 0.33) % 1;
+                final progress =
+                    (_backgroundController.value + index * 0.33) % 1;
                 return Positioned(
                   left: MediaQuery.of(context).size.width * progress,
                   top: MediaQuery.of(context).size.height * 0.2 * (index + 1),
@@ -233,7 +299,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               },
             );
           }),
-          
+
           // Contenido principal
           SafeArea(
             child: Center(
@@ -252,13 +318,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: ModernTheme.oasisGreen.withValues(alpha: 0.3),
+                              color:
+                                  ModernTheme.oasisGreen.withValues(alpha: 0.3),
                               blurRadius: 30,
                               spreadRadius: 5,
                             ),
                           ],
                         ),
-                        child: _showTwoFactor ? _build2FAForm() : _buildLoginForm(),
+                        child: _showTwoFactor
+                            ? _build2FAForm()
+                            : _buildLoginForm(),
                       ),
                     );
                   },
@@ -270,7 +339,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       ),
     );
   }
-  
+
   Widget _buildLoginForm() {
     return Form(
       key: _formKey,
@@ -307,9 +376,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               );
             },
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           const Text(
             'ADMIN PANEL',
             style: TextStyle(
@@ -319,7 +388,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               letterSpacing: 2,
             ),
           ),
-          
+
           const Text(
             'Acceso Restringido',
             style: TextStyle(
@@ -327,78 +396,41 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               fontSize: 14,
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Campo de email
-          TextFormField(
+          SecurityIntegrationService.buildSecureTextField(
+            context: context,
             controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: ModernTheme.oasisBlack),
-            decoration: InputDecoration(
-              labelText: 'Correo Administrativo',
-              prefixIcon: const Icon(Icons.email, color: ModernTheme.oasisGreen),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: ModernTheme.oasisGreen, width: 2),
-              ),
-              filled: true,
-              fillColor: Colors.grey.shade50,
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Ingresa el correo administrativo';
-              }
-              if (!value.contains('@')) {
-                return 'Correo inválido';
-              }
-              return null;
-            },
+            label: 'Correo Administrativo',
+            fieldType: 'email',
+            hintText: 'admin@oasistaxiperu.com',
+            prefixIcon: const Icon(Icons.email, color: ModernTheme.oasisGreen),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Campo de contraseña
-          TextFormField(
+          SecurityIntegrationService.buildSecureTextField(
+            context: context,
             controller: _passwordController,
+            label: 'Contraseña',
+            fieldType: 'password',
             obscureText: _obscurePassword,
-            style: const TextStyle(color: ModernTheme.oasisBlack),
-            decoration: InputDecoration(
-              labelText: 'Contraseña',
-              prefixIcon: const Icon(Icons.lock, color: ModernTheme.oasisGreen),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                  color: ModernTheme.textSecondary,
-                ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            prefixIcon: const Icon(Icons.lock, color: ModernTheme.oasisGreen),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                color: ModernTheme.textSecondary,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: ModernTheme.oasisGreen, width: 2),
-              ),
-              filled: true,
-              fillColor: Colors.grey.shade50,
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Ingresa la contraseña';
-              }
-              if (value.length < 6) {
-                return 'Contraseña muy corta';
-              }
-              return null;
-            },
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Botón de login
           AnimatedPulseButton(
             text: 'ACCEDER AL PANEL',
@@ -407,9 +439,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
             onPressed: _login,
             color: ModernTheme.oasisGreen,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Información de seguridad
           Container(
             padding: const EdgeInsets.all(12),
@@ -434,9 +466,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Volver al login normal
           TextButton(
             onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
@@ -449,7 +481,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       ),
     );
   }
-  
+
   Widget _build2FAForm() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -459,9 +491,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           size: 60,
           color: ModernTheme.oasisGreen,
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         const Text(
           'Verificación de 2 Factores',
           style: TextStyle(
@@ -470,46 +502,31 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
             color: ModernTheme.oasisBlack,
           ),
         ),
-        
+
         const SizedBox(height: 8),
-        
+
         const Text(
           'Ingresa el código de 6 dígitos',
           style: TextStyle(
             color: ModernTheme.textSecondary,
           ),
         ),
-        
+
         const SizedBox(height: 32),
-        
+
         // Campo de código
-        TextFormField(
+        SecurityIntegrationService.buildSecureTextField(
+          context: context,
           controller: _codeController,
+          label: '',
+          fieldType: 'otpcode',
+          hintText: '000000',
           keyboardType: TextInputType.number,
           maxLength: 6,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 24,
-            letterSpacing: 8,
-            fontWeight: FontWeight.bold,
-          ),
-          decoration: InputDecoration(
-            hintText: '000000',
-            counterText: '',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: ModernTheme.oasisGreen, width: 2),
-            ),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-          ),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         AnimatedPulseButton(
           text: 'VERIFICAR',
           icon: Icons.check,
@@ -517,9 +534,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           onPressed: _verify2FA,
           color: ModernTheme.oasisGreen,
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         TextButton(
           onPressed: () {
             setState(() {
@@ -532,11 +549,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
             style: TextStyle(color: ModernTheme.textSecondary),
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         const Text(
-          'Se enviará un código de verificación a su email registrado.',
+          'Se enviará un código de verificación por SMS a tu teléfono registrado.',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey,

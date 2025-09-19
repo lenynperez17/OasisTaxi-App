@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../utils/logger.dart';
+import '../utils/app_logger.dart';
 import '../services/firebase_service.dart';
 
 // Modelo para billetera
@@ -40,7 +40,8 @@ class Wallet {
       totalWithdrawals: (map['totalWithdrawals'] ?? 0).toDouble(),
       currency: map['currency'] ?? 'PEN',
       isActive: map['isActive'] ?? true,
-      lastActivityDate: (map['lastActivityDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastActivityDate:
+          (map['lastActivityDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       bankAccount: map['bankAccount'],
     );
   }
@@ -65,11 +66,13 @@ class Wallet {
 class WalletTransaction {
   final String id;
   final String walletId;
-  final String type; // 'earning', 'withdrawal', 'commission', 'bonus', 'penalty'
+  final String
+      type; // 'earning', 'withdrawal', 'commission', 'bonus', 'penalty'
   final double amount;
   final double balanceBefore;
   final double balanceAfter;
-  final String status; // 'pending', 'processing', 'completed', 'failed', 'cancelled'
+  final String
+      status; // 'pending', 'processing', 'completed', 'failed', 'cancelled'
   final String? tripId;
   final String? description;
   final Map<String, dynamic>? metadata;
@@ -120,7 +123,8 @@ class WalletTransaction {
       'description': description,
       'metadata': metadata,
       'createdAt': Timestamp.fromDate(createdAt),
-      'processedAt': processedAt != null ? Timestamp.fromDate(processedAt!) : null,
+      'processedAt':
+          processedAt != null ? Timestamp.fromDate(processedAt!) : null,
     };
   }
 }
@@ -130,7 +134,8 @@ class WithdrawalRequest {
   final String id;
   final String walletId;
   final double amount;
-  final String status; // 'pending', 'approved', 'processing', 'completed', 'rejected'
+  final String
+      status; // 'pending', 'approved', 'processing', 'completed', 'rejected'
   final String? bankAccountId;
   final Map<String, dynamic>? bankDetails;
   final String? rejectionReason;
@@ -160,7 +165,8 @@ class WithdrawalRequest {
       bankAccountId: map['bankAccountId'],
       bankDetails: map['bankDetails'],
       rejectionReason: map['rejectionReason'],
-      requestedAt: (map['requestedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      requestedAt:
+          (map['requestedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       approvedAt: (map['approvedAt'] as Timestamp?)?.toDate(),
       completedAt: (map['completedAt'] as Timestamp?)?.toDate(),
     );
@@ -170,7 +176,7 @@ class WithdrawalRequest {
 class WalletProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseService().firestore;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   // Estado
   Wallet? _wallet;
   List<WalletTransaction> _transactions = [];
@@ -183,12 +189,10 @@ class WalletProvider extends ChangeNotifier {
   };
   bool _isLoading = false;
   String? _error;
-  
-  // Campos adicionales para retiros
-  List<Map<String, dynamic>> _withdrawalHistory = [];
-  final double _totalWithdrawn = 0.0;
+
+  // Campo para retiros pendientes
   double _pendingWithdrawals = 0.0;
-  
+
   // Streams
   Stream<DocumentSnapshot>? _walletStream;
   Stream<QuerySnapshot>? _transactionsStream;
@@ -201,7 +205,8 @@ class WalletProvider extends ChangeNotifier {
   Map<String, double> get earnings => _earnings;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  double get availableBalance => (_wallet?.balance ?? 0.0) - (_wallet?.pendingBalance ?? 0.0);
+  double get availableBalance =>
+      (_wallet?.balance ?? 0.0) - (_wallet?.pendingBalance ?? 0.0);
 
   WalletProvider() {
     _initializeWallet();
@@ -213,19 +218,17 @@ class WalletProvider extends ChangeNotifier {
     if (user == null) return;
 
     // Stream de billetera
-    _walletStream = _firestore
-        .collection('wallets')
-        .doc(user.uid)
-        .snapshots();
+    _walletStream = _firestore.collection('wallets').doc(user.uid).snapshots();
 
     _walletStream?.listen((snapshot) async {
       if (snapshot.exists) {
-        _wallet = Wallet.fromMap(snapshot.data() as Map<String, dynamic>, snapshot.id);
+        _wallet = Wallet.fromMap(
+            snapshot.data() as Map<String, dynamic>, snapshot.id);
       } else {
         // Crear billetera si no existe
         await _createWallet();
       }
-      
+
       await _calculateEarnings();
       notifyListeners();
     });
@@ -240,7 +243,8 @@ class WalletProvider extends ChangeNotifier {
 
     _transactionsStream?.listen((snapshot) {
       _transactions = snapshot.docs
-          .map((doc) => WalletTransaction.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .map((doc) => WalletTransaction.fromMap(
+              doc.data() as Map<String, dynamic>, doc.id))
           .toList();
       notifyListeners();
     });
@@ -255,7 +259,8 @@ class WalletProvider extends ChangeNotifier {
 
     _withdrawalsStream?.listen((snapshot) {
       _withdrawalRequests = snapshot.docs
-          .map((doc) => WithdrawalRequest.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+          .map((doc) => WithdrawalRequest.fromMap(
+              doc.data() as Map<String, dynamic>, doc.id))
           .toList();
       notifyListeners();
     });
@@ -279,10 +284,7 @@ class WalletProvider extends ChangeNotifier {
         lastActivityDate: DateTime.now(),
       );
 
-      await _firestore
-          .collection('wallets')
-          .doc(user.uid)
-          .set({
+      await _firestore.collection('wallets').doc(user.uid).set({
         ...wallet.toMap(),
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -305,10 +307,10 @@ class WalletProvider extends ChangeNotifier {
 
       // Ganancias de hoy
       final todayEarnings = await _getEarningsByPeriod(todayStart, now);
-      
+
       // Ganancias de la semana
       final weekEarnings = await _getEarningsByPeriod(weekStart, now);
-      
+
       // Ganancias del mes
       final monthEarnings = await _getEarningsByPeriod(monthStart, now);
 
@@ -398,10 +400,7 @@ class WalletProvider extends ChangeNotifier {
           .add(transaction.toMap());
 
       // Actualizar billetera
-      await _firestore
-          .collection('wallets')
-          .doc(user.uid)
-          .update({
+      await _firestore.collection('wallets').doc(user.uid).update({
         'balance': FieldValue.increment(netEarning),
         'totalEarnings': FieldValue.increment(netEarning),
         'lastActivityDate': FieldValue.serverTimestamp(),
@@ -450,15 +449,11 @@ class WalletProvider extends ChangeNotifier {
         },
       };
 
-      final docRef = await _firestore
-          .collection('withdrawalRequests')
-          .add(withdrawal);
+      final docRef =
+          await _firestore.collection('withdrawalRequests').add(withdrawal);
 
       // Actualizar balance pendiente
-      await _firestore
-          .collection('wallets')
-          .doc(user.uid)
-          .update({
+      await _firestore.collection('wallets').doc(user.uid).update({
         'pendingBalance': FieldValue.increment(amount),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -510,7 +505,8 @@ class WalletProvider extends ChangeNotifier {
         throw Exception('Solicitud no encontrada');
       }
 
-      final withdrawal = WithdrawalRequest.fromMap(withdrawalDoc.data()!, withdrawalId);
+      final withdrawal =
+          WithdrawalRequest.fromMap(withdrawalDoc.data()!, withdrawalId);
 
       if (withdrawal.status != 'pending') {
         throw Exception('Solo se pueden cancelar solicitudes pendientes');
@@ -526,10 +522,7 @@ class WalletProvider extends ChangeNotifier {
       });
 
       // Liberar balance pendiente
-      await _firestore
-          .collection('wallets')
-          .doc(user.uid)
-          .update({
+      await _firestore.collection('wallets').doc(user.uid).update({
         'pendingBalance': FieldValue.increment(-withdrawal.amount),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -550,10 +543,7 @@ class WalletProvider extends ChangeNotifier {
       final user = _auth.currentUser;
       if (user == null) throw Exception('Usuario no autenticado');
 
-      await _firestore
-          .collection('wallets')
-          .doc(user.uid)
-          .update({
+      await _firestore.collection('wallets').doc(user.uid).update({
         'bankAccount': bankAccount,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -580,7 +570,8 @@ class WalletProvider extends ChangeNotifier {
       final query = await _firestore
           .collection('walletTransactions')
           .where('walletId', isEqualTo: user.uid)
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(lastMonth))
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(lastMonth))
           .get();
 
       int totalTrips = 0;
@@ -634,36 +625,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cargar historial de retiros
-  Future<void> loadWithdrawalHistory(String userId) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-      
-      final snapshot = await FirebaseFirestore.instance
-          .collection('withdrawals')
-          .where('userId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .get();
-      
-      _withdrawalHistory = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          ...data,
-        };
-      }).toList();
-      
-    } catch (e) {
-      AppLogger.error('Error cargando historial de retiros', e);
-      _error = 'Error al cargar historial';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
   /// Procesar retiro
   Future<bool> processWithdrawal({
     required String userId,
@@ -674,12 +635,12 @@ class WalletProvider extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // Verificar saldo disponible
       if (amount > availableBalance) {
         throw Exception('Saldo insuficiente');
       }
-      
+
       // Crear documento de retiro
       await FirebaseFirestore.instance.collection('withdrawals').add({
         'userId': userId,
@@ -689,10 +650,10 @@ class WalletProvider extends ChangeNotifier {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
-      
+
       // Actualizar saldo pendiente de retiro
       _pendingWithdrawals += amount;
-      
+
       // Actualizar en Firestore
       await FirebaseFirestore.instance
           .collection('wallets')
@@ -701,7 +662,7 @@ class WalletProvider extends ChangeNotifier {
         'pendingBalance': FieldValue.increment(amount),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       return true;
     } catch (e) {
       AppLogger.error('Error procesando retiro', e);
@@ -713,9 +674,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  /// Getters adicionales
-  List<Map<String, dynamic>> get withdrawalHistory => _withdrawalHistory;
-  double get totalWithdrawn => _totalWithdrawn;
+  /// Getter adicional
   double get pendingWithdrawals => _pendingWithdrawals;
-
 }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- 
+    Configuración de respaldo segura para OasisTaxi
+    Solo permite respaldo de preferencias básicas de Flutter
+    Excluye todos los datos sensibles por seguridad
+    -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <!-- Solo incluir preferencias básicas de Flutter -->
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml"/>
+        <!-- Excluir todo lo demás por seguridad -->
+        <exclude domain="database"/>
+        <exclude domain="file"/>
+        <exclude domain="root"/>
+    </cloud-backup>
+    
+    <device-transfer>
+        <!-- Solo incluir preferencias básicas de Flutter -->
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml"/>
+        <!-- Excluir todo lo demás por seguridad -->
+        <exclude domain="database"/>
+        <exclude domain="file"/>
+        <exclude domain="root"/>
+    </device-transfer>
+</data-extraction-rules>

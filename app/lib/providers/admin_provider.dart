@@ -35,10 +35,12 @@ class AdminProvider extends ChangeNotifier {
 
     try {
       final snapshot = await _firestore.collection('users').get();
-      _users = snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data(),
-      }).toList();
+      _users = snapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                ...doc.data(),
+              })
+          .toList();
     } catch (e) {
       _error = 'Error al cargar usuarios: $e';
     }
@@ -58,11 +60,13 @@ class AdminProvider extends ChangeNotifier {
           .collection('users')
           .where('role', isEqualTo: 'driver')
           .get();
-      
-      _drivers = snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data(),
-      }).toList();
+
+      _drivers = snapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                ...doc.data(),
+              })
+          .toList();
     } catch (e) {
       _error = 'Error al cargar conductores: $e';
     }
@@ -81,27 +85,32 @@ class AdminProvider extends ChangeNotifier {
       // Cargar estadísticas generales
       final usersSnapshot = await _firestore.collection('users').get();
       final tripsSnapshot = await _firestore.collection('trips').get();
-      
+
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1);
-      
+
       final monthlyTrips = await _firestore
           .collection('trips')
           .where('createdAt', isGreaterThanOrEqualTo: startOfMonth)
           .get();
 
       _statistics = {
-        'totalUsers': usersSnapshot.docs.where((doc) => 
-            doc.data()['role'] == 'passenger').length,
-        'totalDrivers': usersSnapshot.docs.where((doc) => 
-            doc.data()['role'] == 'driver').length,
-        'activeDrivers': usersSnapshot.docs.where((doc) => 
-            doc.data()['role'] == 'driver' && 
-            doc.data()['isOnline'] == true).length,
+        'totalUsers': usersSnapshot.docs
+            .where((doc) => doc.data()['role'] == 'passenger')
+            .length,
+        'totalDrivers': usersSnapshot.docs
+            .where((doc) => doc.data()['role'] == 'driver')
+            .length,
+        'activeDrivers': usersSnapshot.docs
+            .where((doc) =>
+                doc.data()['role'] == 'driver' &&
+                doc.data()['isOnline'] == true)
+            .length,
         'totalTrips': tripsSnapshot.docs.length,
         'monthlyTrips': monthlyTrips.docs.length,
-        'completedTrips': tripsSnapshot.docs.where((doc) => 
-            doc.data()['status'] == 'completed').length,
+        'completedTrips': tripsSnapshot.docs
+            .where((doc) => doc.data()['status'] == 'completed')
+            .length,
       };
     } catch (e) {
       _error = 'Error al cargar estadísticas: $e';
@@ -131,7 +140,7 @@ class AdminProvider extends ChangeNotifier {
         final data = doc.data();
         final fare = (data['fare'] ?? 0).toDouble();
         final commission = fare * 0.20; // 20% de comisión
-        
+
         totalRevenue += fare;
         totalCommission += commission;
         totalDriverEarnings += (fare - commission);
@@ -141,8 +150,8 @@ class AdminProvider extends ChangeNotifier {
         'totalRevenue': totalRevenue,
         'totalCommission': totalCommission,
         'totalDriverEarnings': totalDriverEarnings,
-        'averageTripValue': tripsSnapshot.docs.isNotEmpty 
-            ? totalRevenue / tripsSnapshot.docs.length 
+        'averageTripValue': tripsSnapshot.docs.isNotEmpty
+            ? totalRevenue / tripsSnapshot.docs.length
             : 0,
       };
     } catch (e) {
@@ -166,10 +175,12 @@ class AdminProvider extends ChangeNotifier {
           .limit(100)
           .get();
 
-      _transactions = snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data(),
-      }).toList();
+      _transactions = snapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                ...doc.data(),
+              })
+          .toList();
     } catch (e) {
       _error = 'Error al cargar transacciones: $e';
     }
@@ -185,7 +196,7 @@ class AdminProvider extends ChangeNotifier {
         'isVerified': true,
         'verifiedAt': FieldValue.serverTimestamp(),
       });
-      
+
       await loadDrivers();
       return true;
     } catch (e) {
@@ -203,7 +214,7 @@ class AdminProvider extends ChangeNotifier {
         'suspendedAt': FieldValue.serverTimestamp(),
         'suspensionReason': reason,
       });
-      
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -221,7 +232,7 @@ class AdminProvider extends ChangeNotifier {
         'suspendedAt': null,
         'suspensionReason': null,
       });
-      
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -239,7 +250,7 @@ class AdminProvider extends ChangeNotifier {
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       await loadDrivers();
       return true;
     } catch (e) {
@@ -269,7 +280,7 @@ class AdminProvider extends ChangeNotifier {
         'isActive': isActive,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -299,7 +310,7 @@ class AdminProvider extends ChangeNotifier {
           .collection('settings')
           .doc('admin')
           .set(settings, SetOptions(merge: true));
-      
+
       _settings = settings;
       notifyListeners();
       return true;
@@ -313,11 +324,8 @@ class AdminProvider extends ChangeNotifier {
   // Cargar configuración
   Future<void> loadSettings() async {
     try {
-      final doc = await _firestore
-          .collection('settings')
-          .doc('admin')
-          .get();
-      
+      final doc = await _firestore.collection('settings').doc('admin').get();
+
       if (doc.exists) {
         _settings = doc.data();
       } else {
@@ -349,12 +357,12 @@ class AdminProvider extends ChangeNotifier {
       final name = (user['name'] ?? '').toString().toLowerCase();
       final email = (user['email'] ?? '').toString().toLowerCase();
       final phone = (user['phone'] ?? '').toString().toLowerCase();
-      
+
       return name.contains(lowerQuery) ||
-             email.contains(lowerQuery) ||
-             phone.contains(lowerQuery);
+          email.contains(lowerQuery) ||
+          phone.contains(lowerQuery);
     }).toList();
-    
+
     notifyListeners();
   }
 
@@ -371,13 +379,13 @@ class AdminProvider extends ChangeNotifier {
       final email = (driver['email'] ?? '').toString().toLowerCase();
       final phone = (driver['phone'] ?? '').toString().toLowerCase();
       final vehicle = (driver['vehiclePlate'] ?? '').toString().toLowerCase();
-      
+
       return name.contains(lowerQuery) ||
-             email.contains(lowerQuery) ||
-             phone.contains(lowerQuery) ||
-             vehicle.contains(lowerQuery);
+          email.contains(lowerQuery) ||
+          phone.contains(lowerQuery) ||
+          vehicle.contains(lowerQuery);
     }).toList();
-    
+
     notifyListeners();
   }
 

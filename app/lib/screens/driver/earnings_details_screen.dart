@@ -1,81 +1,284 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';  // Para kDebugMode
 import 'dart:math' as math;
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../utils/app_logger.dart';
+import '../../providers/auth_provider.dart';
 
 class EarningsDetailsScreen extends StatefulWidget {
   const EarningsDetailsScreen({super.key});
 
   @override
-  _EarningsDetailsScreenState createState() => _EarningsDetailsScreenState();
+  EarningsDetailsScreenState createState() => EarningsDetailsScreenState();
 }
 
-class _EarningsDetailsScreenState extends State<EarningsDetailsScreen> 
+class EarningsDetailsScreenState extends State<EarningsDetailsScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _chartController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _chartAnimation;
-  
+
   // Selected period
   String _selectedPeriod = 'week';
-  
+
   // Earnings data
   EarningsData? _earningsData;
   bool _isLoading = true;
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('EarningsDetailsScreen', 'initState');
+
     _fadeController = AnimationController(
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _chartController = AnimationController(
       duration: Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeIn,
     );
-    
+
     _chartAnimation = CurvedAnimation(
       parent: _chartController,
       curve: Curves.easeOut,
     );
-    
+
     _loadEarningsData();
   }
-  
+
   @override
   void dispose() {
     _fadeController.dispose();
     _chartController.dispose();
     super.dispose();
   }
-  
+
   void _loadEarningsData() async {
-    setState(() => _isLoading = true);
-    
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
     // Simulate data loading
     await Future.delayed(Duration(seconds: 1));
-    
-    setState(() {
-      _earningsData = _generateMockData(_selectedPeriod);
-      _isLoading = false;
-    });
-    
-    _fadeController.forward();
-    _chartController.forward();
+
+    if (mounted) {
+      final data = await _fetchEarningsData(_selectedPeriod);
+      setState(() {
+        _earningsData = data;
+        _isLoading = false;
+      });
+
+      _fadeController.forward();
+      _chartController.forward();
+    }
   }
-  
+
+  Future<EarningsData> _fetchEarningsData(String period) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.user?.uid;
+
+      if (userId == null) {
+        AppLogger.warning('Usuario no autenticado');
+        assert(kDebugMode, 'Mock data should only be used in debug mode');
+        if (kDebugMode) {
+          return _generateMockData(period);
+        }
+        throw Exception('Usuario no autenticado');
+      }
+
+      // Llamar a la Cloud Function para obtener análisis de ganancias
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('getEarningsAnalysis');
+
+      final response = await callable.call({
+        'driverId': userId,
+        'period': period,
+      });
+
+      final data = response.data as Map<String, dynamic>;
+
+      // Verification Comment 11: Align with actual function response structure
+      // Convertir respuesta a EarningsData
+      final summary = data['summary'] as Map<String, dynamic>? ?? {};
+      final dailyBreakdown = (data['dailyBreakdown'] as List<dynamic>?) ?? [];
+      final hourlyDistribution = (data['hourlyDistribution'] as List<dynamic>?) ?? [];
+      final insights = (data['insights'] as Map<String, dynamic>?) ?? {};
+      final goals = (data['goals'] as Map<String, dynamic>?) ?? {};
+
+      // Calcular días del período
+      int daysCount = 7;
+      switch (period) {
+        case 'day':
+          daysCount = 1;
+          break;
+        case 'week':
+          daysCount = 7;
+          break;
+        case 'month':
+          daysCount = 30;
+          break;
+      }
+
+      // Preparar datos de gráfico diario
+      final List<DailyEarnings> dailyEarnings = [];
+      for (var item in dailyBreakdown) {
+        final dayData = item as Map<String, dynamic>;
+        dailyEarnings.add(DailyEarnings(
+          date: DateTime.parse(dayData['date'] as String? ?? DateTime.now().toIso8601String()),
+          earnings: (dayData['earnings'] ?? 0.0).toDouble(),
+          trips: dayData['trips'] ?? 0,
+          hours: dayData['hours'] ?? 0.0,
+          online: true,
+        ));
+      }
+
+      // Rellenar días faltantes con 0
+      while (dailyEarnings.length < daysCount) {
+        dailyEarnings.add(DailyEarnings(
+          date: DateTime.now().subtract(Duration(days: daysCount - dailyEarnings.length)),
+          earnings: 0.0,
+          trips: 0,
+          hours: 0.0,
+          online: false,
+        ));
+      }
+
+      // Calcular horas trabajadas aproximadas (basado en viajes)
+      final totalTrips = summary['totalTrips'] ?? 0;
+      final avgTripDuration = 0.5; // 30 minutos promedio por viaje
+      final totalHours = totalTrips * avgTripDuration;
+
+      return EarningsData(
+        period: _getPeriodLabel(period),
+        totalEarnings: (summary['totalEarnings'] ?? 0.0).toDouble(),
+        totalTrips: totalTrips,
+        avgPerTrip: totalTrips > 0
+          ? (summary['totalEarnings'] ?? 0.0) / totalTrips
+          : 0.0,
+        totalHours: totalHours,
+        avgPerHour: totalHours > 0
+          ? (summary['totalEarnings'] ?? 0.0) / totalHours
+          : 0.0,
+        onlineHours: totalHours * 1.2, // Estimación de tiempo online
+        // Verification Comment 11: Use 'totalCommission' field name from function
+        commission: (summary['totalCommission'] ?? 0.0).toDouble(),
+        netEarnings: (summary['totalEarnings'] ?? 0.0) - (summary['totalCommission'] ?? 0.0),
+        dailyData: dailyEarnings,
+        hourlyData: _convertToHourlyEarnings(hourlyDistribution),
+        breakdown: EarningsBreakdown(
+          baseFares: (summary['baseFares'] ?? 0.0).toDouble(),
+          distanceFares: (summary['distanceFares'] ?? 0.0).toDouble(),
+          timeFares: (summary['timeFares'] ?? 0.0).toDouble(),
+          tips: (summary['tips'] ?? 0.0).toDouble(),
+          bonuses: (summary['bonuses'] ?? 0.0).toDouble(),
+          surgeEarnings: (summary['surgeEarnings'] ?? 0.0).toDouble(),
+        ),
+        goals: WeeklyGoals(
+          earningsGoal: (goals['weekly'] ?? 500.0).toDouble(),
+          tripsGoal: (goals['trips'] ?? 30),
+          hoursGoal: (goals['hours'] ?? 35.0).toDouble(),
+          achievedEarnings: (summary['totalEarnings'] ?? 0.0).toDouble(),
+          achievedTrips: totalTrips,
+          achievedHours: totalHours,
+        ),
+      );
+
+    } catch (e) {
+      AppLogger.error('Error obteniendo datos de ganancias', e);
+      assert(kDebugMode, 'Mock data should only be used in debug mode');
+      if (kDebugMode) {
+        return _generateMockData(period);
+      }
+      throw Exception('Error al obtener datos de ganancias');
+    }
+  }
+
+  String _getPeriodLabel(String period) {
+    switch (period) {
+      case 'day':
+        return 'Hoy';
+      case 'week':
+        return 'Esta Semana';
+      case 'month':
+        return 'Este Mes';
+      default:
+        return 'Período';
+    }
+  }
+
+  String _formatDayLabel(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final weekdays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      return weekdays[date.weekday % 7];
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  List<HourlyEarnings> _convertToHourlyEarnings(List<dynamic> hourlyDistribution) {
+    final List<HourlyEarnings> result = [];
+    for (int i = 0; i < 24; i++) {
+      if (i < hourlyDistribution.length) {
+        result.add(HourlyEarnings(
+          hour: i,
+          earnings: (hourlyDistribution[i] ?? 0.0).toDouble(),
+          trips: 0, // No trip data available per hour from function
+        ));
+      } else {
+        result.add(HourlyEarnings(
+          hour: i,
+          earnings: 0.0,
+          trips: 0,
+        ));
+      }
+    }
+    return result;
+  }
+
+  List<String> _identifyPeakHours(List<dynamic> hourlyDistribution) {
+    final List<String> peakHours = [];
+
+    // Encontrar las 3 horas con más ganancias
+    final hoursWithEarnings = <int, double>{};
+    for (int i = 0; i < hourlyDistribution.length; i++) {
+      final earnings = (hourlyDistribution[i] ?? 0.0).toDouble();
+      if (earnings > 0) {
+        hoursWithEarnings[i] = earnings;
+      }
+    }
+
+    // Ordenar por ganancias y tomar las top 3
+    final sortedHours = hoursWithEarnings.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    for (int i = 0; i < math.min(3, sortedHours.length); i++) {
+      final hour = sortedHours[i].key;
+      peakHours.add('${hour.toString().padLeft(2, '0')}:00');
+    }
+
+    // Si no hay datos, devolver horas pico típicas
+    if (peakHours.isEmpty) {
+      return ['08:00', '13:00', '19:00'];
+    }
+
+    return peakHours;
+  }
+
   EarningsData _generateMockData(String period) {
     final random = math.Random();
-    
+
     switch (period) {
       case 'week':
         return EarningsData(
@@ -98,7 +301,9 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             );
           }),
           hourlyData: List.generate(24, (index) {
-            final baseEarning = index >= 6 && index <= 22 ? 15 + random.nextDouble() * 25 : random.nextDouble() * 8;
+            final baseEarning = index >= 6 && index <= 22
+                ? 15 + random.nextDouble() * 25
+                : random.nextDouble() * 8;
             return HourlyEarnings(
               hour: index,
               earnings: baseEarning,
@@ -122,7 +327,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             achievedHours: 28.5,
           ),
         );
-      
+
       case 'month':
         return EarningsData(
           period: 'Este Mes',
@@ -140,15 +345,19 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               earnings: 30 + random.nextDouble() * 100,
               trips: 3 + random.nextInt(8),
               hours: 4 + random.nextDouble() * 8,
-              online: random.nextBool() || index % 7 != 0, // Most days online except some Sundays
+              online: random.nextBool() ||
+                  index % 7 != 0, // Most days online except some Sundays
             );
           }),
           hourlyData: List.generate(24, (index) {
-            final baseEarning = index >= 6 && index <= 22 ? 20 + random.nextDouble() * 40 : random.nextDouble() * 15;
+            final baseEarning = index >= 6 && index <= 22
+                ? 20 + random.nextDouble() * 40
+                : random.nextDouble() * 15;
             return HourlyEarnings(
               hour: index,
               earnings: baseEarning,
-              trips: baseEarning > 15 ? 2 + random.nextInt(5) : random.nextInt(2),
+              trips:
+                  baseEarning > 15 ? 2 + random.nextInt(5) : random.nextInt(2),
             );
           }),
           breakdown: EarningsBreakdown(
@@ -168,7 +377,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             achievedHours: 156.5,
           ),
         );
-      
+
       default: // year
         return EarningsData(
           period: 'Este Año',
@@ -182,7 +391,9 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           netEarnings: 14587.60,
           dailyData: [], // Too much data for daily view
           hourlyData: List.generate(24, (index) {
-            final baseEarning = index >= 6 && index <= 22 ? 150 + random.nextDouble() * 300 : random.nextDouble() * 100;
+            final baseEarning = index >= 6 && index <= 22
+                ? 150 + random.nextDouble() * 300
+                : random.nextDouble() * 100;
             return HourlyEarnings(
               hour: index,
               earnings: baseEarning,
@@ -208,7 +419,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
         );
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -237,7 +448,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       body: _isLoading ? _buildLoadingState() : _buildEarningsDetails(),
     );
   }
-  
+
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -246,7 +457,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(ModernTheme.oasisGreen),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Analizando tus ganancias...',
             style: TextStyle(
@@ -257,7 +468,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   Widget _buildEarningsDetails() {
     return AnimatedBuilder(
       animation: _fadeAnimation,
@@ -268,7 +479,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             children: [
               // Period selector
               _buildPeriodSelector(),
-              
+
               // Main content
               Expanded(
                 child: SingleChildScrollView(
@@ -276,23 +487,23 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
                     children: [
                       // Summary cards
                       _buildSummaryCards(),
-                      
+
                       // Goals progress
                       _buildGoalsSection(),
-                      
+
                       // Earnings chart
                       _buildEarningsChart(),
-                      
+
                       // Hourly analysis
                       _buildHourlyAnalysis(),
-                      
+
                       // Breakdown
                       _buildEarningsBreakdown(),
-                      
+
                       // Performance insights
                       _buildInsights(),
-                      
-                      SizedBox(height: 24),
+
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -303,7 +514,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       },
     );
   }
-  
+
   Widget _buildPeriodSelector() {
     return Container(
       margin: EdgeInsets.all(16),
@@ -331,15 +542,18 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               child: Container(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? ModernTheme.oasisGreen : Colors.transparent,
+                  color:
+                      isSelected ? ModernTheme.oasisGreen : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _getPeriodLabel(period),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : ModernTheme.textSecondary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color:
+                        isSelected ? Colors.white : ModernTheme.textSecondary,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -349,20 +563,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
-  String _getPeriodLabel(String period) {
-    switch (period) {
-      case 'week':
-        return 'Semana';
-      case 'month':
-        return 'Mes';
-      case 'year':
-        return 'Año';
-      default:
-        return period;
-    }
-  }
-  
+
   Widget _buildSummaryCards() {
     return SizedBox(
       height: 200,
@@ -402,8 +603,9 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
-  Widget _buildSummaryCard(String title, String value, IconData icon, Color color, String subtitle) {
+
+  Widget _buildSummaryCard(
+      String title, String value, IconData icon, Color color, String subtitle) {
     return Container(
       width: 160,
       margin: EdgeInsets.only(right: 12),
@@ -439,7 +641,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               color: color,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             title,
             style: TextStyle(
@@ -447,7 +649,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               color: ModernTheme.textSecondary,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             subtitle,
             style: TextStyle(
@@ -459,10 +661,10 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   Widget _buildGoalsSection() {
     final goals = _earningsData!.goals;
-    
+
     return Container(
       margin: EdgeInsets.all(16),
       padding: EdgeInsets.all(20),
@@ -483,7 +685,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           Row(
             children: [
               Icon(Icons.flag, color: ModernTheme.oasisGreen),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Progreso de Metas',
                 style: TextStyle(
@@ -493,7 +695,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           _buildGoalProgress(
             'Ganancias',
             goals.achievedEarnings,
@@ -501,7 +703,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             'S/',
             ModernTheme.success,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildGoalProgress(
             'Viajes',
             goals.achievedTrips.toDouble(),
@@ -509,7 +711,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             '',
             ModernTheme.primaryBlue,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildGoalProgress(
             'Horas',
             goals.achievedHours,
@@ -521,10 +723,11 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
-  Widget _buildGoalProgress(String label, double achieved, double goal, String unit, Color color) {
+
+  Widget _buildGoalProgress(
+      String label, double achieved, double goal, String unit, Color color) {
     final progress = (achieved / goal).clamp(0.0, 1.0);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -546,13 +749,13 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             ),
           ],
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         LinearProgressIndicator(
           value: progress,
           backgroundColor: color.withValues(alpha: 0.1),
           valueColor: AlwaysStoppedAnimation<Color>(color),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           '${(progress * 100).toStringAsFixed(1)}% completado',
           style: TextStyle(
@@ -564,7 +767,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ],
     );
   }
-  
+
   Widget _buildEarningsChart() {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16),
@@ -586,7 +789,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           Row(
             children: [
               Icon(Icons.trending_up, color: ModernTheme.primaryBlue),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Tendencia de Ganancias',
                 style: TextStyle(
@@ -596,7 +799,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           SizedBox(
             height: 200,
             child: AnimatedBuilder(
@@ -616,7 +819,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   Widget _buildHourlyAnalysis() {
     return Container(
       margin: EdgeInsets.all(16),
@@ -638,7 +841,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           Row(
             children: [
               Icon(Icons.access_time, color: Colors.purple),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Análisis por Horas',
                 style: TextStyle(
@@ -648,7 +851,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           SizedBox(
             height: 120,
             child: CustomPaint(
@@ -658,17 +861,17 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               size: Size.infinite,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildHourlyInsights(),
         ],
       ),
     );
   }
-  
+
   Widget _buildHourlyInsights() {
     final bestHour = _earningsData!.hourlyData
         .reduce((a, b) => a.earnings > b.earnings ? a : b);
-    
+
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -678,7 +881,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       child: Row(
         children: [
           Icon(Icons.lightbulb, color: Colors.amber, size: 20),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Tu mejor hora: ${bestHour.hour}:00 - ${bestHour.hour + 1}:00 (S/ ${bestHour.earnings.toStringAsFixed(2)})',
@@ -692,10 +895,10 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   Widget _buildEarningsBreakdown() {
     final breakdown = _earningsData!.breakdown;
-    
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16),
       padding: EdgeInsets.all(20),
@@ -716,7 +919,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           Row(
             children: [
               Icon(Icons.pie_chart, color: Colors.orange),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Desglose de Ingresos',
                 style: TextStyle(
@@ -726,32 +929,43 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: 20),
-          _buildBreakdownItem('Tarifas base', breakdown.baseFares, Icons.monetization_on, ModernTheme.primaryBlue),
-          _buildBreakdownItem('Por distancia', breakdown.distanceFares, Icons.straighten, ModernTheme.success),
-          _buildBreakdownItem('Por tiempo', breakdown.timeFares, Icons.schedule, ModernTheme.warning),
+          const SizedBox(height: 20),
+          _buildBreakdownItem('Tarifas base', breakdown.baseFares,
+              Icons.monetization_on, ModernTheme.primaryBlue),
+          _buildBreakdownItem('Por distancia', breakdown.distanceFares,
+              Icons.straighten, ModernTheme.success),
+          _buildBreakdownItem('Por tiempo', breakdown.timeFares, Icons.schedule,
+              ModernTheme.warning),
           if (breakdown.tips > 0)
-            _buildBreakdownItem('Propinas', breakdown.tips, Icons.star, Colors.amber),
+            _buildBreakdownItem(
+                'Propinas', breakdown.tips, Icons.star, Colors.amber),
           if (breakdown.bonuses > 0)
-            _buildBreakdownItem('Bonos', breakdown.bonuses, Icons.card_giftcard, ModernTheme.oasisGreen),
+            _buildBreakdownItem('Bonos', breakdown.bonuses, Icons.card_giftcard,
+                ModernTheme.oasisGreen),
           if (breakdown.surgeEarnings > 0)
-            _buildBreakdownItem('Tarifa dinámica', breakdown.surgeEarnings, Icons.trending_up, Colors.red),
-          Divider(),
-          _buildBreakdownItem('Comisión (-20%)', -_earningsData!.commission, Icons.remove_circle, ModernTheme.error),
-          Divider(),
-          _buildBreakdownItem('Total neto', _earningsData!.netEarnings, Icons.account_balance_wallet, ModernTheme.oasisGreen, isTotal: true),
+            _buildBreakdownItem('Tarifa dinámica', breakdown.surgeEarnings,
+                Icons.trending_up, Colors.red),
+          const Divider(),
+          _buildBreakdownItem('Comisión (-20%)', -_earningsData!.commission,
+              Icons.remove_circle, ModernTheme.error),
+          const Divider(),
+          _buildBreakdownItem('Total neto', _earningsData!.netEarnings,
+              Icons.account_balance_wallet, ModernTheme.oasisGreen,
+              isTotal: true),
         ],
       ),
     );
   }
-  
-  Widget _buildBreakdownItem(String label, double amount, IconData icon, Color color, {bool isTotal = false}) {
+
+  Widget _buildBreakdownItem(
+      String label, double amount, IconData icon, Color color,
+      {bool isTotal = false}) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, color: color, size: 18),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
@@ -766,14 +980,16 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
               fontSize: isTotal ? 16 : 14,
-              color: isTotal ? color : (amount >= 0 ? ModernTheme.textPrimary : ModernTheme.error),
+              color: isTotal
+                  ? color
+                  : (amount >= 0 ? ModernTheme.textPrimary : ModernTheme.error),
             ),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildInsights() {
     return Container(
       margin: EdgeInsets.all(16),
@@ -795,7 +1011,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
           Row(
             children: [
               Icon(Icons.insights, color: Colors.teal),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Insights y Recomendaciones',
                 style: TextStyle(
@@ -805,21 +1021,21 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildInsightCard(
             'Mejores días',
             'Martes y Viernes son tus días más rentables',
             Icons.calendar_today,
             ModernTheme.success,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildInsightCard(
             'Horario óptimo',
             'Concéntrate en las horas de 7-9 AM y 6-8 PM',
             Icons.schedule,
             ModernTheme.primaryBlue,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildInsightCard(
             'Oportunidad',
             'Puedes aumentar 15% trabajando 2 horas más los fines de semana',
@@ -830,8 +1046,9 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
-  Widget _buildInsightCard(String title, String description, IconData icon, Color color) {
+
+  Widget _buildInsightCard(
+      String title, String description, IconData icon, Color color) {
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -849,7 +1066,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
             ),
             child: Icon(icon, color: color, size: 16),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -876,7 +1093,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   void _exportData() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -885,7 +1102,7 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
       ),
     );
   }
-  
+
   void _shareReport() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -900,31 +1117,33 @@ class _EarningsDetailsScreenState extends State<EarningsDetailsScreen>
 class EarningsChartPainter extends CustomPainter {
   final List<DailyEarnings> data;
   final double animation;
-  
-  const EarningsChartPainter({super.repaint, required this.data, required this.animation});
-  
+
+  const EarningsChartPainter(
+      {super.repaint, required this.data, required this.animation});
+
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
-    
+
     final paint = Paint()
       ..color = ModernTheme.oasisGreen.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
-    
+
     final linePaint = Paint()
       ..color = ModernTheme.oasisGreen
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
-    
+
     final maxEarnings = data.map((d) => d.earnings).reduce(math.max);
     final points = <Offset>[];
-    
+
     for (int i = 0; i < data.length; i++) {
       final x = (size.width / (data.length - 1)) * i;
-      final y = size.height - (data[i].earnings / maxEarnings * size.height * animation);
+      final y = size.height -
+          (data[i].earnings / maxEarnings * size.height * animation);
       points.add(Offset(x, y));
     }
-    
+
     // Draw filled area
     final path = Path();
     path.moveTo(0, size.height);
@@ -933,9 +1152,9 @@ class EarningsChartPainter extends CustomPainter {
     }
     path.lineTo(size.width, size.height);
     path.close();
-    
+
     canvas.drawPath(path, paint);
-    
+
     // Draw line
     if (points.length > 1) {
       final linePath = Path();
@@ -945,31 +1164,31 @@ class EarningsChartPainter extends CustomPainter {
       }
       canvas.drawPath(linePath, linePaint);
     }
-    
+
     // Draw points
     final pointPaint = Paint()
       ..color = ModernTheme.oasisGreen
       ..style = PaintingStyle.fill;
-    
+
     for (final point in points) {
       canvas.drawCircle(point, 4, pointPaint);
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class HourlyEarningsChartPainter extends CustomPainter {
   final List<HourlyEarnings> data;
-  
+
   const HourlyEarningsChartPainter({super.repaint, required this.data});
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final maxEarnings = data.map((d) => d.earnings).reduce(math.max);
     final barWidth = size.width / data.length;
-    
+
     for (int i = 0; i < data.length; i++) {
       final barHeight = (data[i].earnings / maxEarnings) * size.height;
       final rect = Rect.fromLTWH(
@@ -978,19 +1197,19 @@ class HourlyEarningsChartPainter extends CustomPainter {
         barWidth * 0.6,
         barHeight,
       );
-      
+
       final paint = Paint()
-        ..color = data[i].earnings > maxEarnings * 0.5 
+        ..color = data[i].earnings > maxEarnings * 0.5
             ? ModernTheme.oasisGreen
             : ModernTheme.oasisGreen.withValues(alpha: 0.5);
-      
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, Radius.circular(2)),
         paint,
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
@@ -1010,7 +1229,7 @@ class EarningsData {
   final List<HourlyEarnings> hourlyData;
   final EarningsBreakdown breakdown;
   final WeeklyGoals goals;
-  
+
   EarningsData({
     required this.period,
     required this.totalEarnings,
@@ -1034,7 +1253,7 @@ class DailyEarnings {
   final int trips;
   final double hours;
   final bool online;
-  
+
   DailyEarnings({
     required this.date,
     required this.earnings,
@@ -1048,7 +1267,7 @@ class HourlyEarnings {
   final int hour;
   final double earnings;
   final int trips;
-  
+
   HourlyEarnings({
     required this.hour,
     required this.earnings,
@@ -1063,7 +1282,7 @@ class EarningsBreakdown {
   final double tips;
   final double bonuses;
   final double surgeEarnings;
-  
+
   EarningsBreakdown({
     required this.baseFares,
     required this.distanceFares,
@@ -1081,7 +1300,7 @@ class WeeklyGoals {
   final double achievedEarnings;
   final int achievedTrips;
   final double achievedHours;
-  
+
   WeeklyGoals({
     required this.earningsGoal,
     required this.tripsGoal,

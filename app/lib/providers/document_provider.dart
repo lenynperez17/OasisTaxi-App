@@ -1,163 +1,202 @@
+import '../utils/app_logger.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../services/firebase_service.dart';
+import '../models/document_model.dart';
 
 class DocumentProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseService().firestore;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Estados
   bool _isLoading = false;
   String? _error;
   double _uploadProgress = 0.0;
 
-  // Documentos del conductor
-  Map<String, dynamic>? _driverDocuments;
-  List<Map<String, dynamic>> _vehicleDocuments = [];
-  Map<String, dynamic>? _verificationStatus;
+  // Documentos usando el nuevo modelo
+  List<DocumentModel> _documents = [];
+  DriverVerificationStatus? _verificationStatus;
 
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
   double get uploadProgress => _uploadProgress;
-  Map<String, dynamic>? get driverDocuments => _driverDocuments;
-  List<Map<String, dynamic>> get vehicleDocuments => _vehicleDocuments;
-  Map<String, dynamic>? get verificationStatus => _verificationStatus;
+  List<DocumentModel> get documents => _documents;
+  DriverVerificationStatus? get verificationStatus => _verificationStatus;
 
-  // Tipos de documentos requeridos
-  final List<Map<String, dynamic>> requiredDocuments = [
-    {
-      'id': 'license',
-      'name': 'Licencia de Conducir',
-      'description': 'Foto clara de tu licencia de conducir vigente',
-      'icon': Icons.badge,
-      'required': true,
-    },
-    {
-      'id': 'dni',
-      'name': 'DNI',
-      'description': 'Foto de ambos lados de tu DNI',
-      'icon': Icons.credit_card,
-      'required': true,
-    },
-    {
-      'id': 'criminal_record',
-      'name': 'Antecedentes Penales',
-      'description': 'Certificado de antecedentes penales reciente',
-      'icon': Icons.gavel,
-      'required': true,
-    },
-    {
-      'id': 'vehicle_card',
-      'name': 'Tarjeta de Propiedad',
-      'description': 'Tarjeta de propiedad del vehículo',
-      'icon': Icons.directions_car,
-      'required': true,
-    },
-    {
-      'id': 'soat',
-      'name': 'SOAT',
-      'description': 'Seguro obligatorio vigente',
-      'icon': Icons.security,
-      'required': true,
-    },
-    {
-      'id': 'technical_review',
-      'name': 'Revisión Técnica',
-      'description': 'Certificado de revisión técnica vigente',
-      'icon': Icons.build,
-      'required': true,
-    },
-    {
-      'id': 'vehicle_photo',
-      'name': 'Foto del Vehículo',
-      'description': 'Foto clara del vehículo (frontal y lateral)',
-      'icon': Icons.photo_camera,
-      'required': true,
-    },
-  ];
+  // Obtener todos los tipos de documentos requeridos
+  List<DocumentType> get requiredDocumentTypes =>
+      DocumentType.values.where((type) => type.isRequired).toList();
 
-  // Cargar documentos del conductor
+  /// Cargar documentos del conductor
   Future<void> loadDriverDocuments(String driverId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _setLoading(true);
+    _clearError();
 
     try {
-      final doc = await _firestore
+      // Cargar documentos desde Firestore
+      final documentsSnapshot = await _firestore
           .collection('drivers')
           .doc(driverId)
           .collection('documents')
-          .doc('info')
           .get();
 
-      if (doc.exists) {
-        _driverDocuments = doc.data();
-      } else {
-        _driverDocuments = {};
-      }
+      _documents = documentsSnapshot.docs.map((doc) {
+        return DocumentModel.fromFirestore(doc.data(), doc.id);
+      }).toList();
 
-      // Cargar estado de verificación
-      await loadVerificationStatus(driverId);
+      // Cargar estado de verificación del conductor
+      await _loadDriverVerificationStatus(driverId);
+
+      // Crear documentos faltantes con estado pending
+      await _createMissingDocuments(driverId);
     } catch (e) {
-      _error = 'Error al cargar documentos: $e';
+      _setError('Error al cargar documentos: $e');
     }
 
-    _isLoading = false;
-    notifyListeners();
+    _setLoading(false);
   }
 
-  // Cargar estado de verificación
-  Future<void> loadVerificationStatus(String driverId) async {
+  /// Cargar estado de verificación del conductor
+  Future<void> _loadDriverVerificationStatus(String driverId) async {
     try {
-      final doc = await _firestore
-          .collection('drivers')
-          .doc(driverId)
-          .get();
+      final driverDoc =
+          await _firestore.collection('drivers').doc(driverId).get();
 
-      if (doc.exists) {
-        _verificationStatus = {
-          'isVerified': doc.data()?['isVerified'] ?? false,
-          'verificationStatus': doc.data()?['verificationStatus'] ?? 'pending',
-          'verificationDate': doc.data()?['verificationDate'],
-          'rejectionReason': doc.data()?['rejectionReason'],
-        };
+      if (driverDoc.exists) {
+        _verificationStatus = DriverVerificationStatus.fromFirestore(
+          driverDoc.data() ?? {},
+          _documents,
+        );
       }
     } catch (e) {
-      _error = 'Error al cargar estado de verificación: $e';
+      AppLogger.debug('Error al cargar estado de verificación: $e');
     }
-    notifyListeners();
   }
 
-  // Subir documento
-  Future<bool> uploadDocument({
+  /// Crear documentos faltantes con estado pending
+  Future<void> _createMissingDocuments(String driverId) async {
+    final existingTypes = _documents.map((doc) => doc.type).toSet();
+
+    for (final type in DocumentType.values) {
+      if (!existingTypes.contains(type)) {
+        final newDocument = DocumentModel(
+          id: type.value,
+          type: type,
+          status: DocumentStatus.pending,
+        );
+
+        _documents.add(newDocument);
+
+        // Crear documento en Firestore
+        try {
+          await _firestore
+              .collection('drivers')
+              .doc(driverId)
+              .collection('documents')
+              .doc(type.value)
+              .set(newDocument.toFirestore());
+        } catch (e) {
+          AppLogger.debug(
+              'Error al crear documento faltante ${type.value}: $e');
+        }
+      }
+    }
+
+    // Ordenar documentos por tipo
+    _documents.sort((a, b) => a.type.displayName.compareTo(b.type.displayName));
+  }
+
+  /// Tomar foto desde cámara
+  Future<bool> takePhotoFromCamera({
     required String driverId,
-    required String documentType,
-    required File file,
+    required DocumentType documentType,
   }) async {
-    _isLoading = true;
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
+      );
+
+      if (image != null) {
+        return await _uploadDocument(
+          driverId: driverId,
+          documentType: documentType,
+          file: File(image.path),
+          fileName: image.name,
+        );
+      }
+      return false;
+    } catch (e) {
+      _setError('Error al acceder a la cámara: $e');
+      return false;
+    }
+  }
+
+  /// Seleccionar foto desde galería
+  Future<bool> pickImageFromGallery({
+    required String driverId,
+    required DocumentType documentType,
+  }) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
+      );
+
+      if (image != null) {
+        return await _uploadDocument(
+          driverId: driverId,
+          documentType: documentType,
+          file: File(image.path),
+          fileName: image.name,
+        );
+      }
+      return false;
+    } catch (e) {
+      _setError('Error al acceder a la galería: $e');
+      return false;
+    }
+  }
+
+  /// Subir documento a Firebase Storage y actualizar Firestore
+  Future<bool> _uploadDocument({
+    required String driverId,
+    required DocumentType documentType,
+    required File file,
+    String? fileName,
+  }) async {
+    _setLoading(true);
     _uploadProgress = 0.0;
-    _error = null;
-    notifyListeners();
+    _clearError();
 
     try {
-      // Crear referencia en Storage
+      // Generar nombre único para el archivo
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = '${documentType}_$timestamp.jpg';
-      final ref = _storage
+      final extension = fileName?.split('.').last ?? 'jpg';
+      final uniqueFileName = '${documentType.value}_$timestamp.$extension';
+
+      // Crear referencia en Storage
+      final storageRef = _storage
           .ref()
           .child('drivers')
           .child(driverId)
           .child('documents')
-          .child(fileName);
+          .child(uniqueFileName);
 
       // Subir archivo con progreso
-      final uploadTask = ref.putFile(file);
-      
+      final uploadTask = storageRef.putFile(file);
+
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
         _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
         notifyListeners();
@@ -167,206 +206,263 @@ class DocumentProvider extends ChangeNotifier {
       await uploadTask;
 
       // Obtener URL de descarga
-      final downloadUrl = await ref.getDownloadURL();
+      final downloadUrl = await storageRef.getDownloadURL();
 
-      // Guardar información en Firestore
+      // Crear documento actualizado
+      final updatedDocument = DocumentModel(
+        id: documentType.value,
+        type: documentType,
+        status: DocumentStatus.pending,
+        url: downloadUrl,
+        fileName: uniqueFileName,
+        uploadedAt: DateTime.now(),
+      );
+
+      // Actualizar en Firestore
       await _firestore
           .collection('drivers')
           .doc(driverId)
           .collection('documents')
-          .doc('info')
-          .set({
-        documentType: {
-          'url': downloadUrl,
-          'uploadedAt': FieldValue.serverTimestamp(),
-          'fileName': fileName,
-          'status': 'pending',
-          'verified': false,
-        }
-      }, SetOptions(merge: true));
+          .doc(documentType.value)
+          .set(updatedDocument.toFirestore(), SetOptions(merge: true));
 
-      // Actualizar estado local
-      _driverDocuments ??= {};
-      _driverDocuments![documentType] = {
-        'url': downloadUrl,
-        'uploadedAt': DateTime.now(),
-        'fileName': fileName,
-        'status': 'pending',
-        'verified': false,
-      };
+      // Actualizar documento local
+      final index = _documents.indexWhere((doc) => doc.type == documentType);
+      if (index != -1) {
+        _documents[index] = updatedDocument;
+      } else {
+        _documents.add(updatedDocument);
+      }
 
-      _isLoading = false;
+      // Crear notificación para admin si es la primera vez que sube este tipo
+      await _createAdminNotification(
+          driverId, documentType, 'document_uploaded');
+
+      _setLoading(false);
       _uploadProgress = 0.0;
-      notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Error al subir documento: $e';
-      _isLoading = false;
+      _setError('Error al subir documento: $e');
+      _setLoading(false);
       _uploadProgress = 0.0;
-      notifyListeners();
       return false;
     }
   }
 
-  // Eliminar documento
+  /// Eliminar documento
   Future<bool> deleteDocument({
     required String driverId,
-    required String documentType,
+    required DocumentType documentType,
   }) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _setLoading(true);
+    _clearError();
 
     try {
-      // Obtener información del documento
-      final docInfo = _driverDocuments?[documentType];
-      if ( docInfo['fileName'] != null) {
-        // Eliminar de Storage
-        final ref = _storage
-            .ref()
-            .child('drivers')
-            .child(driverId)
-            .child('documents')
-            .child(docInfo['fileName']);
-        
-        await ref.delete();
+      final document = _documents.firstWhere(
+        (doc) => doc.type == documentType,
+        orElse: () => throw Exception('Documento no encontrado'),
+      );
+
+      // Eliminar archivo de Storage si existe
+      if (document.fileName != null) {
+        try {
+          final storageRef = _storage
+              .ref()
+              .child('drivers')
+              .child(driverId)
+              .child('documents')
+              .child(document.fileName!);
+          await storageRef.delete();
+        } catch (e) {
+          AppLogger.debug('Error al eliminar archivo de Storage: $e');
+        }
       }
 
-      // Eliminar de Firestore
+      // Actualizar documento en Firestore (resetear a estado inicial)
+      final resetDocument = DocumentModel(
+        id: documentType.value,
+        type: documentType,
+        status: DocumentStatus.pending,
+      );
+
       await _firestore
           .collection('drivers')
           .doc(driverId)
           .collection('documents')
-          .doc('info')
-          .update({
-        documentType: FieldValue.delete(),
-      });
+          .doc(documentType.value)
+          .set(resetDocument.toFirestore());
 
-      // Actualizar estado local
-      _driverDocuments?.remove(documentType);
+      // Actualizar documento local
+      final index = _documents.indexWhere((doc) => doc.type == documentType);
+      if (index != -1) {
+        _documents[index] = resetDocument;
+      }
 
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
       return true;
     } catch (e) {
-      _error = 'Error al eliminar documento: $e';
-      _isLoading = false;
-      notifyListeners();
+      _setError('Error al eliminar documento: $e');
+      _setLoading(false);
       return false;
     }
   }
 
-  // Verificar si todos los documentos están completos
-  bool areAllDocumentsComplete() {
-    if (_driverDocuments == null) return false;
-
-    for (var doc in requiredDocuments) {
-      if (doc['required'] == true) {
-        if (!_driverDocuments!.containsKey(doc['id'])) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  // Obtener estado del documento
-  String getDocumentStatus(String documentType) {
-    if (_driverDocuments == null || !_driverDocuments!.containsKey(documentType)) {
-      return 'not_uploaded';
-    }
-    
-    final doc = _driverDocuments![documentType];
-    if (doc['verified'] == true) {
-      return 'verified';
-    } else if (doc['status'] == 'rejected') {
-      return 'rejected';
-    } else {
-      return 'pending';
-    }
-  }
-
-  // Solicitar verificación
+  /// Solicitar verificación de documentos
   Future<bool> requestVerification(String driverId) async {
-    if (!areAllDocumentsComplete()) {
-      _error = 'Por favor sube todos los documentos requeridos';
-      notifyListeners();
+    if (!_canRequestVerification()) {
+      _setError(
+          'Por favor sube todos los documentos requeridos antes de solicitar verificación');
       return false;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _setLoading(true);
+    _clearError();
 
     try {
+      // Actualizar estado del conductor
       await _firestore.collection('drivers').doc(driverId).update({
         'verificationStatus': 'under_review',
         'verificationRequestedAt': FieldValue.serverTimestamp(),
       });
 
+      // Actualizar todos los documentos a estado "under_review"
+      final batch = _firestore.batch();
+
+      for (final document in _documents) {
+        if (document.url != null && document.type.isRequired) {
+          final docRef = _firestore
+              .collection('drivers')
+              .doc(driverId)
+              .collection('documents')
+              .doc(document.type.value);
+
+          batch.update(docRef, {
+            'status': DocumentStatus.underReview.value,
+          });
+        }
+      }
+
+      await batch.commit();
+
       // Crear notificación para admin
-      await _firestore.collection('admin_notifications').add({
-        'type': 'verification_request',
-        'driverId': driverId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      await _createAdminNotification(driverId, null, 'verification_request');
 
-      _verificationStatus = {
-        ..._verificationStatus ?? {},
-        'verificationStatus': 'under_review',
-      };
+      // Actualizar estado local
+      for (int i = 0; i < _documents.length; i++) {
+        if (_documents[i].url != null && _documents[i].type.isRequired) {
+          _documents[i] = _documents[i].copyWith(
+            status: DocumentStatus.underReview,
+          );
+        }
+      }
 
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
       return true;
     } catch (e) {
-      _error = 'Error al solicitar verificación: $e';
-      _isLoading = false;
-      notifyListeners();
+      _setError('Error al solicitar verificación: $e');
+      _setLoading(false);
       return false;
     }
   }
 
-  // Cargar documentos del vehículo
-  Future<void> loadVehicleDocuments(String driverId, String vehicleId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  /// Verificar si se puede solicitar verificación
+  bool _canRequestVerification() {
+    final requiredDocuments = _documents.where((doc) => doc.type.isRequired);
+    return requiredDocuments.every((doc) => doc.url != null);
+  }
 
+  /// Crear notificación para administrador
+  Future<void> _createAdminNotification(
+      String driverId, DocumentType? documentType, String type) async {
     try {
-      final snapshot = await _firestore
-          .collection('drivers')
-          .doc(driverId)
-          .collection('vehicles')
-          .doc(vehicleId)
-          .collection('documents')
-          .get();
-
-      _vehicleDocuments = snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data(),
-      }).toList();
+      await _firestore.collection('admin_notifications').add({
+        'type': type,
+        'driverId': driverId,
+        'documentType': documentType?.value,
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
+        'priority': type == 'verification_request' ? 'high' : 'normal',
+      });
     } catch (e) {
-      _error = 'Error al cargar documentos del vehículo: $e';
+      AppLogger.debug('Error al crear notificación de admin: $e');
     }
+  }
 
-    _isLoading = false;
+  /// Obtener documento por tipo
+  DocumentModel? getDocumentByType(DocumentType type) {
+    try {
+      return _documents.firstWhere((doc) => doc.type == type);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obtener documentos que necesitan acción del conductor
+  List<DocumentModel> getDocumentsNeedingAction() {
+    return _documents.where((doc) => doc.needsDriverAction).toList();
+  }
+
+  /// Obtener documentos por estado
+  List<DocumentModel> getDocumentsByStatus(DocumentStatus status) {
+    return _documents.where((doc) => doc.status == status).toList();
+  }
+
+  /// Verificar si todos los documentos requeridos están aprobados
+  bool get allRequiredDocumentsApproved {
+    final requiredDocuments = _documents.where((doc) => doc.type.isRequired);
+    return requiredDocuments.isNotEmpty &&
+        requiredDocuments.every((doc) => doc.status == DocumentStatus.approved);
+  }
+
+  /// Obtener progreso de verificación (0.0 a 1.0)
+  double get verificationProgress {
+    final requiredDocuments = _documents.where((doc) => doc.type.isRequired);
+    if (requiredDocuments.isEmpty) return 0.0;
+
+    final approvedCount = requiredDocuments
+        .where((doc) => doc.status == DocumentStatus.approved)
+        .length;
+
+    return approvedCount / requiredDocuments.length;
+  }
+
+  /// Métodos auxiliares de estado
+  void _setLoading(bool loading) {
+    _isLoading = loading;
     notifyListeners();
   }
 
-  // Limpiar error
-  void clearError() {
+  void _setError(String error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  void _clearError() {
     _error = null;
     notifyListeners();
   }
 
-  // Limpiar datos
+  /// Limpiar todos los datos
   void clearData() {
-    _driverDocuments = null;
-    _vehicleDocuments = [];
+    _documents.clear();
     _verificationStatus = null;
     _error = null;
+    _isLoading = false;
+    _uploadProgress = 0.0;
     notifyListeners();
+  }
+
+  /// Escuchar cambios en tiempo real (para futuras implementaciones)
+  Stream<List<DocumentModel>> streamDriverDocuments(String driverId) {
+    return _firestore
+        .collection('drivers')
+        .doc(driverId)
+        .collection('documents')
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return DocumentModel.fromFirestore(doc.data(), doc.id);
+      }).toList();
+    });
   }
 }

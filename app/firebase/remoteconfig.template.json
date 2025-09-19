@@ -1,0 +1,542 @@
+{
+  "version": {
+    "versionNumber": "1",
+    "updateTime": "2025-01-11T08:00:00Z",
+    "updateUser": {
+      "email": "admin@oasistaxiperu.com"
+    },
+    "description": "Configuración inicial de Remote Config para OasisTaxi - Versión de producción con parámetros críticos del sistema",
+    "updateOrigin": "CONSOLE"
+  },
+  "parameters": {
+    "app_maintenance_mode": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Modo de mantenimiento de la aplicación - Activa pantalla de mantenimiento cuando es true",
+      "valueType": "BOOLEAN"
+    },
+    "app_force_update": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Forzar actualización de la app - Muestra diálogo obligatorio de actualización",
+      "valueType": "BOOLEAN"
+    },
+    "app_minimum_version": {
+      "defaultValue": {
+        "value": "1.0.0"
+      },
+      "description": "Versión mínima soportada de la aplicación",
+      "valueType": "STRING"
+    },
+    "app_current_version": {
+      "defaultValue": {
+        "value": "1.0.0"
+      },
+      "description": "Versión actual disponible en las tiendas",
+      "valueType": "STRING"
+    },
+    "commission_rate_passenger": {
+      "defaultValue": {
+        "value": "0.15"
+      },
+      "description": "Tasa de comisión para pasajeros (15% por defecto)",
+      "valueType": "NUMBER"
+    },
+    "commission_rate_driver": {
+      "defaultValue": {
+        "value": "0.20"
+      },
+      "description": "Tasa de comisión para conductores (20% por defecto)",
+      "valueType": "NUMBER"
+    },
+    "base_fare_sedan": {
+      "defaultValue": {
+        "value": "5.00"
+      },
+      "description": "Tarifa base para vehículos sedán en soles peruanos",
+      "valueType": "NUMBER"
+    },
+    "base_fare_suv": {
+      "defaultValue": {
+        "value": "7.00"
+      },
+      "description": "Tarifa base para vehículos SUV en soles peruanos",
+      "valueType": "NUMBER"
+    },
+    "base_fare_minivan": {
+      "defaultValue": {
+        "value": "8.00"
+      },
+      "description": "Tarifa base para vehículos minivan en soles peruanos",
+      "valueType": "NUMBER"
+    },
+    "price_per_km": {
+      "defaultValue": {
+        "value": "1.50"
+      },
+      "description": "Precio por kilómetro en soles peruanos",
+      "valueType": "NUMBER"
+    },
+    "price_per_minute": {
+      "defaultValue": {
+        "value": "0.30"
+      },
+      "description": "Precio por minuto de viaje en soles peruanos",
+      "valueType": "NUMBER"
+    },
+    "surge_pricing_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar pricing dinámico por demanda",
+      "valueType": "BOOLEAN"
+    },
+    "surge_multiplier_max": {
+      "defaultValue": {
+        "value": "3.0"
+      },
+      "description": "Multiplicador máximo de tarifa por alta demanda",
+      "valueType": "NUMBER"
+    },
+    "price_negotiation_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar negociación de precios entre pasajero y conductor",
+      "valueType": "BOOLEAN"
+    },
+    "max_negotiation_rounds": {
+      "defaultValue": {
+        "value": "3"
+      },
+      "description": "Número máximo de rondas de negociación permitidas",
+      "valueType": "NUMBER"
+    },
+    "negotiation_timeout_seconds": {
+      "defaultValue": {
+        "value": "300"
+      },
+      "description": "Tiempo límite para negociación en segundos (5 minutos)",
+      "valueType": "NUMBER"
+    },
+    "driver_search_radius_km": {
+      "defaultValue": {
+        "value": "10"
+      },
+      "description": "Radio de búsqueda de conductores en kilómetros",
+      "valueType": "NUMBER"
+    },
+    "max_pickup_time_minutes": {
+      "defaultValue": {
+        "value": "15"
+      },
+      "description": "Tiempo máximo estimado de llegada del conductor",
+      "valueType": "NUMBER"
+    },
+    "trip_timeout_minutes": {
+      "defaultValue": {
+        "value": "30"
+      },
+      "description": "Timeout para encontrar conductor disponible",
+      "valueType": "NUMBER"
+    },
+    "emergency_phone_number": {
+      "defaultValue": {
+        "value": "+51945123456"
+      },
+      "description": "Número de emergencia de OasisTaxi",
+      "valueType": "STRING"
+    },
+    "support_phone_number": {
+      "defaultValue": {
+        "value": "+51945654321"
+      },
+      "description": "Número de soporte técnico",
+      "valueType": "STRING"
+    },
+    "support_email": {
+      "defaultValue": {
+        "value": "soporte@oasistaxiperu.com"
+      },
+      "description": "Email de soporte técnico",
+      "valueType": "STRING"
+    },
+    "payment_methods_enabled": {
+      "defaultValue": {
+        "value": "[\"cash\", \"card\", \"wallet\"]"
+      },
+      "description": "Métodos de pago habilitados (JSON array)",
+      "valueType": "JSON"
+    },
+    "mercadopago_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar pagos con MercadoPago",
+      "valueType": "BOOLEAN"
+    },
+    "wallet_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar wallet digital de OasisTaxi",
+      "valueType": "BOOLEAN"
+    },
+    "wallet_bonus_new_user": {
+      "defaultValue": {
+        "value": "10.00"
+      },
+      "description": "Bono de bienvenida para nuevos usuarios en soles",
+      "valueType": "NUMBER"
+    },
+    "wallet_min_balance": {
+      "defaultValue": {
+        "value": "5.00"
+      },
+      "description": "Balance mínimo requerido en wallet para usar",
+      "valueType": "NUMBER"
+    },
+    "referral_bonus_amount": {
+      "defaultValue": {
+        "value": "15.00"
+      },
+      "description": "Bono por referir nuevos usuarios en soles",
+      "valueType": "NUMBER"
+    },
+    "referral_program_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar programa de referidos",
+      "valueType": "BOOLEAN"
+    },
+    "driver_documents_required": {
+      "defaultValue": {
+        "value": "[\"license\", \"soat\", \"criminal_record\", \"vehicle_photo\"]"
+      },
+      "description": "Documentos requeridos para conductores (JSON array)",
+      "valueType": "JSON"
+    },
+    "document_verification_timeout_hours": {
+      "defaultValue": {
+        "value": "48"
+      },
+      "description": "Tiempo máximo para verificación de documentos en horas",
+      "valueType": "NUMBER"
+    },
+    "auto_approval_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Habilitar aprobación automática de documentos",
+      "valueType": "BOOLEAN"
+    },
+    "rating_system_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar sistema de calificaciones",
+      "valueType": "BOOLEAN"
+    },
+    "min_driver_rating": {
+      "defaultValue": {
+        "value": "4.0"
+      },
+      "description": "Calificación mínima requerida para conductores activos",
+      "valueType": "NUMBER"
+    },
+    "driver_deactivation_rating": {
+      "defaultValue": {
+        "value": "3.5"
+      },
+      "description": "Calificación mínima antes de desactivación automática",
+      "valueType": "NUMBER"
+    },
+    "chat_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar chat entre pasajero y conductor",
+      "valueType": "BOOLEAN"
+    },
+    "chat_message_encryption": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar cifrado end-to-end en mensajes de chat",
+      "valueType": "BOOLEAN"
+    },
+    "location_sharing_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar compartir ubicación en tiempo real",
+      "valueType": "BOOLEAN"
+    },
+    "location_update_interval_seconds": {
+      "defaultValue": {
+        "value": "5"
+      },
+      "description": "Intervalo de actualización de ubicación en segundos",
+      "valueType": "NUMBER"
+    },
+    "push_notifications_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar notificaciones push",
+      "valueType": "BOOLEAN"
+    },
+    "email_notifications_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar notificaciones por email",
+      "valueType": "BOOLEAN"
+    },
+    "sms_notifications_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Habilitar notificaciones por SMS",
+      "valueType": "BOOLEAN"
+    },
+    "analytics_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar recopilación de analytics",
+      "valueType": "BOOLEAN"
+    },
+    "crash_reporting_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar reportes automáticos de crashes",
+      "valueType": "BOOLEAN"
+    },
+    "debug_mode_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Habilitar modo debug (solo para desarrollo)",
+      "valueType": "BOOLEAN"
+    },
+    "feature_flag_dark_mode": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar modo oscuro en la aplicación",
+      "valueType": "BOOLEAN"
+    },
+    "feature_flag_social_login": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar login con redes sociales",
+      "valueType": "BOOLEAN"
+    },
+    "feature_flag_biometric_auth": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Habilitar autenticación biométrica",
+      "valueType": "BOOLEAN"
+    },
+    "map_style_preference": {
+      "defaultValue": {
+        "value": "default"
+      },
+      "description": "Estilo de mapa por defecto (default, satellite, terrain)",
+      "valueType": "STRING"
+    },
+    "traffic_layer_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Mostrar capa de tráfico en el mapa",
+      "valueType": "BOOLEAN"
+    },
+    "promotional_banners": {
+      "defaultValue": {
+        "value": "[]"
+      },
+      "description": "Banners promocionales activos (JSON array)",
+      "valueType": "JSON"
+    },
+    "welcome_message": {
+      "defaultValue": {
+        "value": "¡Bienvenido a OasisTaxi! Tu viaje seguro y cómodo por todo Perú."
+      },
+      "description": "Mensaje de bienvenida para nuevos usuarios",
+      "valueType": "STRING"
+    },
+    "terms_url": {
+      "defaultValue": {
+        "value": "https://oasistaxiperu.com/terminos"
+      },
+      "description": "URL de términos y condiciones",
+      "valueType": "STRING"
+    },
+    "privacy_url": {
+      "defaultValue": {
+        "value": "https://oasistaxiperu.com/privacidad"
+      },
+      "description": "URL de política de privacidad",
+      "valueType": "STRING"
+    },
+    "faq_url": {
+      "defaultValue": {
+        "value": "https://oasistaxiperu.com/faq"
+      },
+      "description": "URL de preguntas frecuentes",
+      "valueType": "STRING"
+    },
+    "certificate_pins": {
+      "defaultValue": {
+        "value": "{\"api.oasistaxiperu.com\":[\"sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=\",\"sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=\",\"sha256/J2/oqMTsdhFWW/n85tys6b4yDBtb6idZayIEBx7QTxA=\"],\"oasistaxiperu.com\":[\"sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=\",\"sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=\",\"sha256/J2/oqMTsdhFWW/n85tys6b4yDBtb6idZayIEBx7QTxA=\"],\"firebaseapp.com\":[\"sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=\",\"sha256/CLOmM1/OXvSPjw5UOYbAf9GKOxImEp9hhku9W90fHMk=\"],\"mercadopago.com\":[\"sha256/r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=\",\"sha256/5kJvNEMw0KjrCAu7eXY5HmQkP/Ulb5/OlyMoIIWDGA=\"]}"
+      },
+      "description": "SPKI pins for certificate pinning (JSON map)",
+      "valueType": "JSON"
+    }
+  },
+  "conditions": [
+    {
+      "name": "production_environment",
+      "expression": "app.id == 'com.oasistaxiperu.app'",
+      "tagColor": "GREEN"
+    },
+    {
+      "name": "development_environment", 
+      "expression": "app.id == 'com.oasistaxiperu.app.dev'",
+      "tagColor": "ORANGE"
+    },
+    {
+      "name": "android_platform",
+      "expression": "device.os == 'android'",
+      "tagColor": "BLUE"
+    },
+    {
+      "name": "ios_platform",
+      "expression": "device.os == 'ios'",
+      "tagColor": "BLUE"
+    },
+    {
+      "name": "web_platform",
+      "expression": "device.os == 'web'",
+      "tagColor": "PURPLE"
+    },
+    {
+      "name": "lima_region",
+      "expression": "device.country == 'PE' && user.customAttributes['city'] == 'Lima'",
+      "tagColor": "CYAN"
+    },
+    {
+      "name": "arequipa_region",
+      "expression": "device.country == 'PE' && user.customAttributes['city'] == 'Arequipa'",
+      "tagColor": "CYAN"
+    },
+    {
+      "name": "driver_user_type",
+      "expression": "user.customAttributes['userType'] == 'driver'",
+      "tagColor": "YELLOW"
+    },
+    {
+      "name": "passenger_user_type",
+      "expression": "user.customAttributes['userType'] == 'passenger'",
+      "tagColor": "PINK"
+    },
+    {
+      "name": "admin_user_type",
+      "expression": "user.customAttributes['userType'] == 'admin'",
+      "tagColor": "RED"
+    }
+  ],
+  "parameterGroups": [
+    {
+      "groupId": "app_config",
+      "description": "Configuración general de la aplicación",
+      "parameters": [
+        "app_maintenance_mode",
+        "app_force_update", 
+        "app_minimum_version",
+        "app_current_version"
+      ]
+    },
+    {
+      "groupId": "pricing_config",
+      "description": "Configuración de precios y tarifas",
+      "parameters": [
+        "commission_rate_passenger",
+        "commission_rate_driver",
+        "base_fare_sedan",
+        "base_fare_suv", 
+        "base_fare_minivan",
+        "price_per_km",
+        "price_per_minute",
+        "surge_pricing_enabled",
+        "surge_multiplier_max"
+      ]
+    },
+    {
+      "groupId": "trip_config",
+      "description": "Configuración de viajes y negociación",
+      "parameters": [
+        "price_negotiation_enabled",
+        "max_negotiation_rounds",
+        "negotiation_timeout_seconds",
+        "driver_search_radius_km",
+        "max_pickup_time_minutes",
+        "trip_timeout_minutes"
+      ]
+    },
+    {
+      "groupId": "payment_config",
+      "description": "Configuración de métodos de pago",
+      "parameters": [
+        "payment_methods_enabled",
+        "mercadopago_enabled",
+        "wallet_enabled",
+        "wallet_bonus_new_user",
+        "wallet_min_balance"
+      ]
+    },
+    {
+      "groupId": "driver_config",
+      "description": "Configuración específica para conductores",
+      "parameters": [
+        "driver_documents_required",
+        "document_verification_timeout_hours",
+        "auto_approval_enabled",
+        "min_driver_rating",
+        "driver_deactivation_rating"
+      ]
+    },
+    {
+      "groupId": "communication_config",
+      "description": "Configuración de comunicación y notificaciones",
+      "parameters": [
+        "chat_enabled",
+        "chat_message_encryption",
+        "push_notifications_enabled",
+        "email_notifications_enabled",
+        "sms_notifications_enabled",
+        "emergency_phone_number",
+        "support_phone_number",
+        "support_email"
+      ]
+    },
+    {
+      "groupId": "feature_flags",
+      "description": "Banderas de características experimentales",
+      "parameters": [
+        "feature_flag_dark_mode",
+        "feature_flag_social_login",
+        "feature_flag_biometric_auth",
+        "debug_mode_enabled"
+      ]
+    }
+  ]
+}

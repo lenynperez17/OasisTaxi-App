@@ -1,5 +1,5 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -11,7 +11,7 @@ import '../../widgets/loading_overlay.dart';
 
 /// PANTALLA DE TRACKING EN TIEMPO REAL - OASIS TAXI
 /// ===============================================
-/// 
+///
 /// Funcionalidades implementadas:
 /// 🗺️ Mapa de Google Maps con ubicación en tiempo real
 /// 📍 Tracking del conductor cada 5 segundos
@@ -34,10 +34,10 @@ class LiveTrackingMapScreen extends StatefulWidget {
   });
 
   @override
-  State<LiveTrackingMapScreen> createState() => _LiveTrackingMapScreenState();
+  State<LiveTrackingMapScreen> createState() => LiveTrackingMapScreenState();
 }
 
-class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
+class LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
     with WidgetsBindingObserver {
   final TrackingService _trackingService = TrackingService();
   final FirebaseService _firebaseService = FirebaseService();
@@ -69,6 +69,8 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('LiveTrackingMapScreen',
+        'initState - RideId: ${widget.rideId}, UserType: ${widget.userType}');
     WidgetsBinding.instance.addObserver(this);
     _initializeServices();
   }
@@ -94,11 +96,10 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
 
     try {
       await _trackingService.initialize();
-      
+
       await _loadCustomIcons();
       await _loadTrackingInfo();
       await _startTrackingUpdates();
-
     } catch (e) {
       _showErrorSnackBar('Error inicializando servicios: $e');
     } finally {
@@ -111,10 +112,12 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
       _driverIcon = await _createCustomIcon('🚗', Colors.blue);
       _destinationIcon = await _createCustomIcon('🏁', Colors.red);
     } catch (e) {
-      debugPrint('Error cargando íconos: $e');
+      AppLogger.debug('Error cargando íconos: $e');
       // Usar íconos por defecto si hay error
-      _driverIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
-      _destinationIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+      _driverIcon =
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+      _destinationIcon =
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
     }
   }
 
@@ -127,7 +130,7 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-    
+
     canvas.drawCircle(
       const Offset(size / 2, size / 2),
       size / 2,
@@ -139,7 +142,7 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
-    
+
     canvas.drawCircle(
       const Offset(size / 2, size / 2),
       size / 2,
@@ -154,7 +157,7 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
         style: const TextStyle(fontSize: 40),
       ),
     );
-    
+
     textPainter.layout();
     textPainter.paint(
       canvas,
@@ -166,15 +169,17 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
 
     final ui.Picture picture = pictureRecorder.endRecording();
     final ui.Image image = await picture.toImage(size.toInt(), size.toInt());
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+
     return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
   }
 
   Future<void> _loadTrackingInfo() async {
     try {
-      _trackingInfo = await _trackingService.getActiveTrackingByRide(widget.rideId);
-      
+      _trackingInfo =
+          await _trackingService.getActiveTrackingByRide(widget.rideId);
+
       if (!mounted) return;
       if (_trackingInfo != null) {
         setState(() {
@@ -187,7 +192,8 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
         await _updateMapMarkersAndRoute();
         await _centerMapOnRoute();
       } else {
-        _showErrorSnackBar('No se encontró información de tracking para este viaje');
+        _showErrorSnackBar(
+            'No se encontró información de tracking para este viaje');
       }
     } catch (e) {
       _showErrorSnackBar('Error cargando información de tracking: $e');
@@ -196,19 +202,18 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
 
   Future<void> _startTrackingUpdates() async {
     try {
-      _trackingSubscription = _trackingService
-          .getTrackingUpdates(widget.rideId)
-          .listen(
+      _trackingSubscription =
+          _trackingService.getTrackingUpdates(widget.rideId).listen(
         (update) async {
           await _handleTrackingUpdate(update);
         },
         onError: (error) {
-          debugPrint('Error en stream de tracking: $error');
+          AppLogger.debug('Error en stream de tracking: $error');
           _reconnectTracking();
         },
       );
 
-      await _firebaseService.analytics.logEvent(
+      await _firebaseService.analytics?.logEvent(
         name: 'tracking_started_map_view',
         parameters: {
           'ride_id': widget.rideId,
@@ -292,7 +297,9 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
             points: _decodePolyline(routePolyline),
             color: _hasDeviation ? Colors.orange : Colors.blue,
             width: 5,
-            patterns: _hasDeviation ? [PatternItem.dash(20), PatternItem.gap(10)] : [],
+            patterns: _hasDeviation
+                ? [PatternItem.dash(20), PatternItem.gap(10)]
+                : [],
           ),
         );
       }
@@ -305,7 +312,9 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
   }
 
   Future<void> _centerMapOnRoute() async {
-    if (_mapController == null || _currentDriverLocation == null || _destination == null) {
+    if (_mapController == null ||
+        _currentDriverLocation == null ||
+        _destination == null) {
       return;
     }
 
@@ -370,7 +379,7 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
       await Future.delayed(const Duration(seconds: 2));
       await _startTrackingUpdates();
     } catch (e) {
-      debugPrint('Error reconectando tracking: $e');
+      AppLogger.debug('Error reconectando tracking: $e');
     }
   }
 
@@ -420,14 +429,14 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
 
   String _formatETA() {
     if (_estimatedArrival == null) return 'Calculando...';
-    
+
     final now = DateTime.now();
     final difference = _estimatedArrival!.difference(now);
-    
+
     if (difference.isNegative) {
       return 'Arribando';
     }
-    
+
     final minutes = difference.inMinutes;
     if (minutes < 1) {
       return 'Menos de 1 min';
@@ -461,7 +470,8 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
                 _mapController = controller;
               },
               initialCameraPosition: CameraPosition(
-                target: _currentDriverLocation ?? const LatLng(-12.0464, -77.0428), // Lima, Perú
+                target: _currentDriverLocation ??
+                    const LatLng(-12.0464, -77.0428), // Lima, Perú
                 zoom: 14.0,
               ),
               markers: _markers,
@@ -534,7 +544,8 @@ class _LiveTrackingMapScreenState extends State<LiveTrackingMapScreen>
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: _hasDeviation ? Colors.orange : Colors.green,
                     borderRadius: BorderRadius.circular(12),

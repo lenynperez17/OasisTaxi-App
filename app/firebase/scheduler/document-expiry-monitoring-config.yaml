@@ -1,0 +1,646 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: document-expiry-monitoring-config
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: scheduler
+    version: "1.0.0"
+data:
+  config.yaml: |
+    # Configuración para monitoreo automático de vencimientos de documentos
+    # OasisTaxi Peru - Sistema de monitoreo y alertas
+    
+    monitoring:
+      timezone: "America/Lima"
+      notification_channels:
+        - email
+        - push
+        - sms
+      
+    document_types:
+      dni:
+        expiry_check: false  # DNI no vence
+        renewal_required: false
+      
+      license_a:
+        expiry_check: true
+        advance_warnings: [30, 15, 7, 3, 1]  # días antes del vencimiento
+        renewal_required: true
+        automatic_disable: true  # deshabilitar conductor si vence
+      
+      license_b:
+        expiry_check: true
+        advance_warnings: [30, 15, 7, 3, 1]
+        renewal_required: true
+        automatic_disable: true
+      
+      soat:
+        expiry_check: true
+        advance_warnings: [45, 30, 15, 7, 3, 1]
+        renewal_required: true
+        automatic_disable: true  # vehículo no puede operar
+      
+      vehicle_registration:
+        expiry_check: true
+        advance_warnings: [60, 30, 15, 7]
+        renewal_required: true
+        automatic_disable: false
+      
+      technical_review:
+        expiry_check: true
+        advance_warnings: [30, 15, 7, 3, 1]
+        renewal_required: true
+        automatic_disable: true
+      
+      criminal_record:
+        expiry_check: true
+        advance_warnings: [15, 7, 3, 1]
+        renewal_required: true
+        automatic_disable: false
+        max_age_days: 30  # máximo 30 días de antigüedad
+      
+      health_certificate:
+        expiry_check: true
+        advance_warnings: [30, 15, 7, 3]
+        renewal_required: true
+        automatic_disable: false
+        max_age_days: 90  # máximo 90 días
+
+    escalation:
+      levels:
+        - name: "usuario"
+          channels: ["push", "email"]
+          delay_hours: 0
+        
+        - name: "supervisor"
+          channels: ["email", "sms"]
+          delay_hours: 24
+        
+        - name: "administrador"
+          channels: ["email", "sms", "call"]
+          delay_hours: 72
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: document-expiry-daily-check
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: daily
+spec:
+  schedule: "0 8 * * *"  # Todos los días a las 8:00 AM Lima
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: oasis-taxi
+            job: document-expiry-check
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: document-expiry-checker
+            image: gcr.io/oasis-taxi-peru/document-expiry-checker:latest
+            env:
+            - name: FIRESTORE_PROJECT
+              value: "oasis-taxi-peru"
+            - name: FUNCTION_URL
+              value: "https://us-central1-oasis-taxi-peru.cloudfunctions.net/checkDocumentExpiry"
+            - name: NOTIFICATION_SERVICE
+              value: "https://us-central1-oasis-taxi-peru.cloudfunctions.net/sendExpiryNotification"
+            - name: TZ
+              value: "America/Lima"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Iniciando verificación de vencimientos de documentos..."
+              
+              # Verificar documentos próximos a vencer
+              curl -X POST "${FUNCTION_URL}/checkExpiry" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "check_type": "daily",
+                  "advance_days": [30, 15, 7, 3, 1],
+                  "timezone": "America/Lima"
+                }'
+              
+              # Verificar documentos ya vencidos
+              curl -X POST "${FUNCTION_URL}/checkExpired" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "check_type": "expired",
+                  "auto_disable": true,
+                  "send_notifications": true
+                }'
+              
+              echo "$(date): Verificación de vencimientos completada"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: document-expiry-weekly-report
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: weekly
+spec:
+  schedule: "0 9 * * 1"  # Todos los lunes a las 9:00 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: weekly-report-generator
+            image: gcr.io/oasis-taxi-peru/document-reporter:latest
+            env:
+            - name: REPORT_TYPE
+              value: "weekly"
+            - name: EMAIL_RECIPIENTS
+              value: "admin@oasistaxiperu.com,operations@oasistaxiperu.com"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Generando reporte semanal de documentos..."
+              
+              curl -X POST "${FUNCTION_URL}/generateExpiryReport" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "report_type": "weekly",
+                  "include_charts": true,
+                  "email_recipients": ["admin@oasistaxiperu.com", "operations@oasistaxiperu.com"],
+                  "format": "pdf"
+                }'
+              
+              echo "$(date): Reporte semanal enviado"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: soat-emergency-check
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: emergency
+    priority: high
+spec:
+  schedule: "0 */4 * * *"  # Cada 4 horas para SOAT (crítico)
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: soat-emergency-checker
+            image: gcr.io/oasis-taxi-peru/document-checker:latest
+            env:
+            - name: DOCUMENT_TYPE
+              value: "soat"
+            - name: PRIORITY
+              value: "emergency"
+            - name: AUTO_DISABLE
+              value: "true"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Verificación de emergencia SOAT iniciada..."
+              
+              # Verificar SOAT vencidos o por vencer en 24 horas
+              curl -X POST "${FUNCTION_URL}/checkCriticalExpiry" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "document_type": "soat",
+                  "critical_hours": 24,
+                  "auto_disable_vehicle": true,
+                  "emergency_notification": true,
+                  "notify_authorities": true
+                }'
+              
+              echo "$(date): Verificación de emergencia SOAT completada"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: license-expiry-check
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: license-monitoring
+spec:
+  schedule: "30 8 * * *"  # Diario a las 8:30 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: license-expiry-checker
+            image: gcr.io/oasis-taxi-peru/license-checker:latest
+            env:
+            - name: MTC_API_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: peru-government-apis
+                  key: mtc-endpoint
+            - name: MTC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-government-apis
+                  key: mtc-api-key
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Verificación de licencias de conducir iniciada..."
+              
+              # Verificar licencias próximas a vencer
+              curl -X POST "${FUNCTION_URL}/checkLicenseExpiry" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${MTC_API_KEY}" \
+                -d '{
+                  "check_with_mtc": true,
+                  "advance_warnings": [30, 15, 7, 3, 1],
+                  "auto_disable_driver": true,
+                  "send_renewal_instructions": true
+                }'
+              
+              # Verificar validez con MTC
+              curl -X POST "${FUNCTION_URL}/validateLicenseWithMTC" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${MTC_API_KEY}"
+              
+              echo "$(date): Verificación de licencias completada"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: technical-review-monitor
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: technical-review
+spec:
+  schedule: "0 10 * * *"  # Diario a las 10:00 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: technical-review-monitor
+            image: gcr.io/oasis-taxi-peru/technical-review-monitor:latest
+            env:
+            - name: SUTRAN_API_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: peru-government-apis
+                  key: sutran-endpoint
+            - name: SUTRAN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-government-apis
+                  key: sutran-api-key
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Monitoreo de revisiones técnicas iniciado..."
+              
+              # Verificar revisiones técnicas próximas a vencer
+              curl -X POST "${FUNCTION_URL}/checkTechnicalReview" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${SUTRAN_API_KEY}" \
+                -d '{
+                  "advance_warnings": [30, 15, 7, 3, 1],
+                  "validate_with_sutran": true,
+                  "auto_disable_vehicle": true,
+                  "send_inspection_reminders": true
+                }'
+              
+              echo "$(date): Monitoreo de revisiones técnicas completado"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: document-quality-audit
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: quality-audit
+spec:
+  schedule: "0 2 * * 0"  # Domingos a las 2:00 AM (auditoría semanal)
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: document-quality-auditor
+            image: gcr.io/oasis-taxi-peru/document-auditor:latest
+            env:
+            - name: AUDIT_LEVEL
+              value: "comprehensive"
+            - name: CLOUD_VISION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: google-cloud-credentials
+                  key: vision-api-key
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Auditoría de calidad de documentos iniciada..."
+              
+              # Auditar documentos con baja confianza
+              curl -X POST "${FUNCTION_URL}/auditDocumentQuality" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${CLOUD_VISION_API_KEY}" \
+                -d '{
+                  "min_confidence_threshold": 0.7,
+                  "reprocess_low_quality": true,
+                  "flag_suspicious_documents": true,
+                  "generate_audit_report": true
+                }'
+              
+              # Re-verificar documentos problemáticos
+              curl -X POST "${FUNCTION_URL}/reprocessProblematicDocuments" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${CLOUD_VISION_API_KEY}"
+              
+              echo "$(date): Auditoría de calidad completada"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: renewal-notification-sender
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: document-monitoring
+    schedule-type: notifications
+spec:
+  schedule: "0 18 * * *"  # Diario a las 6:00 PM (hora conveniente)
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: renewal-notification-sender
+            image: gcr.io/oasis-taxi-peru/notification-sender:latest
+            env:
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-credentials
+                  key: fcm-server-key
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sendgrid-credentials
+                  key: api-key
+            - name: SMS_PROVIDER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sms-credentials
+                  key: api-key
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Envío de notificaciones de renovación iniciado..."
+              
+              # Enviar notificaciones push
+              curl -X POST "${FUNCTION_URL}/sendRenewalNotifications" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${FCM_SERVER_KEY}" \
+                -d '{
+                  "notification_types": ["push", "email", "sms"],
+                  "priority_documents": ["soat", "license", "technical_review"],
+                  "personalized_messages": true,
+                  "include_renewal_instructions": true
+                }'
+              
+              # Enviar recordatorios específicos por tipo de documento
+              curl -X POST "${FUNCTION_URL}/sendDocumentSpecificReminders" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "soat_reminders": true,
+                  "license_reminders": true,
+                  "technical_review_reminders": true,
+                  "include_renewal_links": true
+                }'
+              
+              echo "$(date): Notificaciones de renovación enviadas"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "200m"
+              limits:
+                memory: "512Mi"
+                cpu: "400m"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: peru-government-apis
+  namespace: oasis-taxi-scheduler
+type: Opaque
+stringData:
+  # APIs del gobierno peruano para validación
+  mtc-endpoint: "https://api.mtc.gob.pe/v1"
+  mtc-api-key: "MTC_API_KEY_PLACEHOLDER"
+  sutran-endpoint: "https://api.sutran.gob.pe/v1"
+  sutran-api-key: "SUTRAN_API_KEY_PLACEHOLDER"
+  reniec-endpoint: "https://api.reniec.gob.pe/v1"
+  reniec-api-key: "RENIEC_API_KEY_PLACEHOLDER"
+  sunarp-endpoint: "https://api.sunarp.gob.pe/v1"
+  sunarp-api-key: "SUNARP_API_KEY_PLACEHOLDER"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notification-credentials
+  namespace: oasis-taxi-scheduler
+type: Opaque
+stringData:
+  # Credenciales para servicios de notificación
+  sendgrid-api-key: "SG.PLACEHOLDER_API_KEY"
+  twilio-account-sid: "TWILIO_ACCOUNT_SID_PLACEHOLDER"
+  twilio-auth-token: "TWILIO_AUTH_TOKEN_PLACEHOLDER"
+  firebase-fcm-key: "FIREBASE_FCM_SERVER_KEY_PLACEHOLDER"
+
+---
+# Monitoreo y alertas con Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: document-expiry-monitoring
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: oasis-taxi
+      component: document-monitoring
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# ConfigMap para métricas personalizadas
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: document-monitoring-metrics
+  namespace: oasis-taxi-scheduler
+data:
+  metrics.yaml: |
+    # Métricas personalizadas para monitoreo de documentos
+    custom_metrics:
+      - name: documents_expiring_soon
+        type: gauge
+        description: "Número de documentos que vencen en los próximos 7 días"
+        labels: ["document_type", "user_type"]
+      
+      - name: documents_expired
+        type: gauge
+        description: "Número de documentos vencidos"
+        labels: ["document_type", "days_expired"]
+      
+      - name: document_processing_duration
+        type: histogram
+        description: "Tiempo de procesamiento de documentos"
+        buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+      
+      - name: document_verification_success_rate
+        type: gauge
+        description: "Tasa de éxito en verificación de documentos"
+        labels: ["document_type", "verification_method"]
+      
+      - name: notification_delivery_rate
+        type: gauge
+        description: "Tasa de entrega de notificaciones"
+        labels: ["notification_type", "channel"]
+      
+      - name: auto_disabled_vehicles
+        type: counter
+        description: "Vehículos deshabilitados automáticamente por documentos vencidos"
+        labels: ["reason", "document_type"]
+      
+      - name: auto_disabled_drivers
+        type: counter
+        description: "Conductores deshabilitados automáticamente por documentos vencidos"
+        labels: ["reason", "document_type"]
+
+---
+# Alertas de Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: document-expiry-alerts
+  namespace: oasis-taxi-scheduler
+  labels:
+    app: oasis-taxi
+    component: alerting
+spec:
+  groups:
+  - name: document.expiry.rules
+    interval: 30s
+    rules:
+    - alert: CriticalDocumentsExpiring
+      expr: documents_expiring_soon{document_type=~"soat|license.*"} > 10
+      for: 5m
+      labels:
+        severity: critical
+        component: document-monitoring
+      annotations:
+        summary: "Documentos críticos próximos a vencer"
+        description: "{{ $value }} documentos críticos ({{ $labels.document_type }}) vencen en los próximos 7 días"
+    
+    - alert: SOATExpired
+      expr: documents_expired{document_type="soat"} > 0
+      for: 0s
+      labels:
+        severity: critical
+        component: document-monitoring
+      annotations:
+        summary: "SOAT vencidos detectados"
+        description: "{{ $value }} documentos SOAT han vencido - vehículos deben ser deshabilitados inmediatamente"
+    
+    - alert: LicenseExpired
+      expr: documents_expired{document_type=~"license.*"} > 0
+      for: 0s
+      labels:
+        severity: critical
+        component: document-monitoring
+      annotations:
+        summary: "Licencias de conducir vencidas"
+        description: "{{ $value }} licencias de conducir han vencido - conductores deben ser deshabilitados"
+    
+    - alert: DocumentProcessingFailure
+      expr: rate(document_processing_duration_count[5m]) == 0
+      for: 10m
+      labels:
+        severity: warning
+        component: document-monitoring
+      annotations:
+        summary: "Procesamiento de documentos detenido"
+        description: "No se han procesado documentos en los últimos 10 minutos"
+    
+    - alert: LowVerificationSuccessRate
+      expr: document_verification_success_rate < 0.8
+      for: 15m
+      labels:
+        severity: warning
+        component: document-monitoring
+      annotations:
+        summary: "Baja tasa de éxito en verificación"
+        description: "Tasa de verificación exitosa: {{ $value | humanizePercentage }} para {{ $labels.document_type }}"

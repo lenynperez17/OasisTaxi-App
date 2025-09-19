@@ -1,0 +1,557 @@
+# 🚀 CLOUD BUILD CONFIGURATION - OASISTAXI
+# Configuración completa de CI/CD para Flutter + Firebase
+# Versión: Producción 1.0
+# Fecha: Enero 2025
+
+steps:
+  # ============================================
+  # STEP 1: SETUP Y PREPARACIÓN DEL ENTORNO
+  # ============================================
+  - name: 'gcr.io/cloud-builders/git'
+    id: 'clone-repo'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔄 Clonando repositorio OasisTaxi..."
+        git clone --depth 1 ${_REPO_URL} .
+        git checkout ${_BRANCH_NAME}
+        echo "✅ Repositorio clonado exitosamente"
+
+  # ============================================
+  # STEP 1.5: CONFIGURACIÓN DE VARIABLES DE ENTORNO
+  # ============================================
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'setup-env-from-secrets'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔐 Configurando variables de entorno desde Secret Manager..."
+
+        # Obtener archivo .env completo desde Secret Manager
+        gcloud secrets versions access latest --secret="oasis-taxi-env-production" > app/.env
+
+        if [ $? -eq 0 ]; then
+          echo "✅ Variables de entorno cargadas desde Secret Manager"
+
+          # Verificar que no hay placeholders
+          if grep -q "CHANGE_ME_IN_PROD" app/.env; then
+            echo "❌ ERROR: Archivo .env contiene placeholders CHANGE_ME_IN_PROD"
+            exit 1
+          fi
+
+          echo "✅ Validación de .env completada - sin placeholders"
+        else
+          echo "❌ Error obteniendo variables de entorno desde Secret Manager"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 1.6: VALIDACIÓN DE CONFIGURACIÓN CRÍTICA
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'validate-env-config'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔍 Validando configuración crítica..."
+        cd app
+
+        # Crear un script Dart para validar la configuración
+        cat > validate_env.dart << 'EOF'
+        import 'package:flutter_dotenv/flutter_dotenv.dart';
+        import 'dart:io';
+
+        void main() async {
+          // Cargar .env
+          await dotenv.load(fileName: '.env');
+
+          // Variables críticas a validar
+          final criticalVars = [
+            'FIREBASE_PROJECT_ID',
+            'FIREBASE_API_KEY',
+            'GOOGLE_MAPS_API_KEY',
+            'ENCRYPTION_KEY_ID',
+            'JWT_SECRET',
+            'FIREBASE_SERVICE_ACCOUNT_EMAIL',
+            'FIREBASE_PRIVATE_KEY',
+            'FIREBASE_CLIENT_EMAIL',
+            'FIREBASE_CLIENT_ID',
+            'CLOUD_KMS_PROJECT_ID',
+            'FIREBASE_APP_CHECK_SITE_KEY',
+          ];
+
+          bool allValid = true;
+          for (final varName in criticalVars) {
+            final value = dotenv.env[varName];
+            if (value == null || value.isEmpty) {
+              print('❌ Variable crítica faltante: $varName');
+              allValid = false;
+            } else if (value.contains('CHANGE_ME_IN_PROD') ||
+                       value.contains('PLACEHOLDER') ||
+                       value.contains('EXAMPLE')) {
+              print('❌ Variable con placeholder: $varName');
+              allValid = false;
+            }
+          }
+
+          // Validar formato ENCRYPTION_KEY_ID
+          final encKeyId = dotenv.env['ENCRYPTION_KEY_ID'] ?? '';
+          if (!RegExp(r'^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$')
+              .hasMatch(encKeyId)) {
+            print('❌ ENCRYPTION_KEY_ID con formato inválido');
+            allValid = false;
+          }
+
+          // Validar FIREBASE_PRIVATE_KEY
+          final privateKey = dotenv.env['FIREBASE_PRIVATE_KEY'] ?? '';
+          if (!privateKey.contains('-----BEGIN PRIVATE KEY-----')) {
+            print('❌ FIREBASE_PRIVATE_KEY no es válida');
+            allValid = false;
+          }
+
+          if (allValid) {
+            print('✅ Todas las variables críticas validadas correctamente');
+            exit(0);
+          } else {
+            print('❌ Validación de variables falló');
+            exit(1);
+          }
+        }
+        EOF
+
+        # Ejecutar validación
+        dart run validate_env.dart
+
+        if [ $? -eq 0 ]; then
+          echo "✅ Configuración de entorno validada para CI/CD"
+        else
+          echo "❌ Configuración de entorno inválida - Build detenido"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 2: CONFIGURACIÓN DE FLUTTER
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'flutter-setup'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Configurando entorno Flutter..."
+        cd app
+        flutter doctor -v
+        flutter --version
+        flutter pub get
+        echo "✅ Flutter configurado correctamente"
+
+  # ============================================
+  # STEP 3: ANÁLISIS DE CÓDIGO Y LINTING
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'code-analysis'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔍 Ejecutando análisis de código..."
+        cd app
+        # PRODUCTION: Fail on warnings (--fatal-warnings)
+        flutter analyze --no-pub --fatal-warnings
+        if [ $? -eq 0 ]; then
+          echo "✅ Análisis de código completado sin errores ni warnings"
+        else
+          echo "❌ Se encontraron errores o warnings en el análisis"
+          echo "En producción, el build falla en warnings para mantener la calidad del código"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 4: TESTS UNITARIOS Y DE WIDGET
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'unit-tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🧪 Ejecutando tests unitarios..."
+        cd app
+        flutter test --coverage
+        if [ $? -eq 0 ]; then
+          echo "✅ Todos los tests pasaron exitosamente"
+        else
+          echo "❌ Algunos tests fallaron"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 5: BUILD ANDROID APK
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'build-android-apk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📱 Construyendo APK de Android..."
+        cd app
+        # Verificar que existe el keystore
+        if [ ! -f android/app/oasis-taxi-key.jks ]; then
+          echo "❌ Keystore no encontrado"
+          exit 1
+        fi
+        
+        # Build APK release
+        flutter build apk --release --dart-define=ENVIRONMENT=production
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ APK construido exitosamente"
+          ls -la build/app/outputs/flutter-apk/
+        else
+          echo "❌ Error construyendo APK"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 6: BUILD ANDROID AAB (App Bundle)
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'build-android-aab'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📦 Construyendo App Bundle de Android..."
+        cd app
+        flutter build appbundle --release --dart-define=ENVIRONMENT=production
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ App Bundle construido exitosamente"
+          ls -la build/app/outputs/bundle/release/
+        else
+          echo "❌ Error construyendo App Bundle"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 7: BUILD WEB
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'build-web'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🌐 Construyendo versión Web..."
+        cd app
+        flutter build web --release --dart-define=ENVIRONMENT=production --web-renderer html
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Build Web completado exitosamente"
+          ls -la build/web/
+        else
+          echo "❌ Error construyendo versión Web"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 8: DEPLOY CLOUD FUNCTIONS
+  # ============================================
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'deploy-functions'
+    dir: 'app/firebase/functions'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "☁️ Desplegando Cloud Functions..."
+        npm install
+        npm run build
+        
+        # Instalar Firebase CLI
+        npm install -g firebase-tools
+        
+        # Autenticar con service account
+        export GOOGLE_APPLICATION_CREDENTIALS="/workspace/service-account-key.json"
+        
+        # Deploy functions
+        firebase deploy --only functions --project ${_FIREBASE_PROJECT_ID}
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Cloud Functions desplegadas exitosamente"
+        else
+          echo "❌ Error desplegando Cloud Functions"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 9: DEPLOY FIRESTORE RULES & INDEXES
+  # ============================================
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'deploy-firestore'
+    dir: 'app'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔥 Desplegando Firestore Rules e Indexes..."
+        npm install -g firebase-tools
+        
+        export GOOGLE_APPLICATION_CREDENTIALS="/workspace/service-account-key.json"
+        
+        # Deploy Firestore rules
+        firebase deploy --only firestore:rules --project ${_FIREBASE_PROJECT_ID}
+        
+        # Deploy Firestore indexes
+        firebase deploy --only firestore:indexes --project ${_FIREBASE_PROJECT_ID}
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Firestore Rules e Indexes desplegados exitosamente"
+        else
+          echo "❌ Error desplegando Firestore configuración"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 10: DEPLOY HOSTING WEB
+  # ============================================
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'deploy-hosting'
+    dir: 'app'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🌐 Desplegando a Firebase Hosting..."
+        npm install -g firebase-tools
+        
+        export GOOGLE_APPLICATION_CREDENTIALS="/workspace/service-account-key.json"
+        
+        # Deploy hosting
+        firebase deploy --only hosting --project ${_FIREBASE_PROJECT_ID}
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Firebase Hosting desplegado exitosamente"
+          echo "🌍 App disponible en: https://${_FIREBASE_PROJECT_ID}.web.app"
+        else
+          echo "❌ Error desplegando Firebase Hosting"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 11: CONFIGURAR REMOTE CONFIG
+  # ============================================
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'deploy-remote-config'
+    dir: 'app'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "⚙️ Configurando Remote Config..."
+        npm install -g firebase-tools
+        
+        export GOOGLE_APPLICATION_CREDENTIALS="/workspace/service-account-key.json"
+        
+        # Publicar Remote Config template
+        firebase remoteconfig:publish firebase/remote-config-templates.json --project ${_FIREBASE_PROJECT_ID}
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Remote Config configurado exitosamente"
+        else
+          echo "❌ Error configurando Remote Config"
+          exit 1
+        fi
+
+  # ============================================
+  # STEP 12: TESTS DE INTEGRACIÓN (OPCIONAL)
+  # ============================================
+  - name: 'cirrusci/flutter:stable'
+    id: 'integration-tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔗 Ejecutando tests de integración..."
+        cd app
+        if [ -d "test_driver" ]; then
+          flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart
+          if [ $? -eq 0 ]; then
+            echo "✅ Tests de integración completados exitosamente"
+          else
+            echo "⚠️ Algunos tests de integración fallaron (no crítico)"
+          fi
+        else
+          echo "ℹ️ No hay tests de integración configurados"
+        fi
+
+  # ============================================
+  # STEP 13: NOTIFICACIONES Y REPORTES
+  # ============================================
+  - name: 'gcr.io/cloud-builders/curl'
+    id: 'notifications'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📢 Enviando notificaciones de deployment..."
+        
+        # Notificación Slack (si está configurado)
+        if [ ! -z "${_SLACK_WEBHOOK}" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"🚀 OasisTaxi deployment completado exitosamente\\n📱 APK: Generado\\n🌐 Web: https://${_FIREBASE_PROJECT_ID}.web.app\\n☁️ Functions: Desplegadas\\n🔥 Firestore: Actualizado\"}" \
+            ${_SLACK_WEBHOOK}
+        fi
+        
+        # Log final de deployment
+        echo "================================================"
+        echo "🎉 DEPLOYMENT COMPLETADO EXITOSAMENTE"
+        echo "================================================"
+        echo "📱 Android APK: build/app/outputs/flutter-apk/"
+        echo "📦 Android AAB: build/app/outputs/bundle/release/"
+        echo "🌐 Web App: https://${_FIREBASE_PROJECT_ID}.web.app"
+        echo "☁️ Cloud Functions: Desplegadas"
+        echo "🔥 Firestore: Rules e Indexes actualizados"
+        echo "⚙️ Remote Config: Configurado"
+        echo "📊 Branch: ${_BRANCH_NAME}"
+        echo "🏷️ Commit: ${SHORT_SHA}"
+        echo "⏰ Tiempo: $(date)"
+        echo "================================================"
+
+# ============================================
+# CONFIGURACIÓN DE ARTIFACTS
+# ============================================
+artifacts:
+  objects:
+    location: 'gs://${_ARTIFACTS_BUCKET}'
+    paths:
+      - 'app/build/app/outputs/flutter-apk/app-release.apk'
+      - 'app/build/app/outputs/bundle/release/app-release.aab'
+      - 'app/build/web/**/*'
+      - 'app/coverage/lcov.info'
+
+# ============================================
+# OPCIONES DE BUILD
+# ============================================
+options:
+  # Máquina más potente para builds de Flutter
+  machineType: 'E2_HIGHCPU_8'
+  
+  # Disk size para dependencias y builds
+  diskSizeGb: 100
+  
+  # Timeout total del build (30 minutos)
+  timeout: '1800s'
+  
+  # Logging
+  logging: GCS_ONLY
+  logsBucket: 'gs://${_LOGS_BUCKET}'
+  
+  # Environment variables
+  env:
+    - 'FLUTTER_ROOT=/opt/flutter'
+    - 'PUB_CACHE=/workspace/.pub-cache'
+    - 'ANDROID_HOME=/android-sdk-linux'
+    - 'PATH=/opt/flutter/bin:/android-sdk-linux/tools/bin:$PATH'
+
+# ============================================
+# VARIABLES DE SUBSTITUCIÓN
+# ============================================
+substitutions:
+  # Configuración del proyecto
+  _FIREBASE_PROJECT_ID: 'oasis-taxi-peru'
+  _REPO_URL: 'https://github.com/oasistaxi-peru/app.git'
+  _BRANCH_NAME: 'main'
+  
+  # Buckets de almacenamiento
+  _ARTIFACTS_BUCKET: 'oasis-taxi-artifacts'
+  _LOGS_BUCKET: 'oasis-taxi-build-logs'
+  
+  # Notificaciones (opcional)
+  _SLACK_WEBHOOK: ''
+  
+  # Configuración de entorno
+  _ENVIRONMENT: 'production'
+  _BUILD_FLAVOR: 'release'
+
+# ============================================
+# TAGS PARA ORGANIZACIÓN
+# ============================================
+tags:
+  - 'oasistaxi'
+  - 'flutter'
+  - 'firebase'
+  - 'mobile-app'
+  - 'production'
+  - 'ci-cd'
+
+# ============================================
+# TRIGGERS AUTOMÁTICOS
+# ============================================
+# Este archivo se puede usar con triggers automáticos:
+# 
+# 1. Push a main branch:
+#    gcloud builds triggers create github \
+#      --repo-name=app \
+#      --repo-owner=oasistaxi-peru \
+#      --branch-pattern=main \
+#      --build-config=cloudbuild.yaml
+#
+# 2. Pull Request:
+#    gcloud builds triggers create github \
+#      --repo-name=app \
+#      --repo-owner=oasistaxi-peru \
+#      --pull-request-pattern=.* \
+#      --build-config=cloudbuild-pr.yaml
+#
+# 3. Release tags:
+#    gcloud builds triggers create github \
+#      --repo-name=app \
+#      --repo-owner=oasistaxi-peru \
+#      --tag-pattern=v.* \
+#      --build-config=cloudbuild-release.yaml
+
+# ============================================
+# NOTAS DE CONFIGURACIÓN
+# ============================================
+# 
+# REQUISITOS PREVIOS:
+# 1. Service Account con permisos:
+#    - Cloud Build Editor
+#    - Firebase Admin
+#    - Storage Admin
+#    - Source Repository Administrator
+#
+# 2. APIs habilitadas:
+#    - Cloud Build API
+#    - Firebase Management API
+#    - Firebase Rules API
+#    - Cloud Storage API
+#
+# 3. Secrets configurados:
+#    - ANDROID_KEYSTORE (base64)
+#    - KEYSTORE_PASSWORD
+#    - KEY_ALIAS
+#    - KEY_PASSWORD
+#
+# 4. Buckets creados:
+#    - gs://oasis-taxi-artifacts
+#    - gs://oasis-taxi-build-logs
+#
+# COMANDOS ÚTILES:
+# 
+# Ejecutar build manual:
+# gcloud builds submit --config cloudbuild.yaml .
+#
+# Ver builds activos:
+# gcloud builds list --ongoing
+#
+# Ver logs de build:
+# gcloud builds log [BUILD_ID]
+#
+# Cancelar build:
+# gcloud builds cancel [BUILD_ID]

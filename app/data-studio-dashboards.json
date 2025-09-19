@@ -1,0 +1,620 @@
+{
+  "dashboards": [
+    {
+      "name": "OasisTaxi - Executive Dashboard",
+      "description": "Dashboard ejecutivo con KPIs principales para la gerencia",
+      "dataSource": {
+        "type": "bigquery",
+        "projectId": "oasis-taxi-peru",
+        "datasetId": "oasis_taxi_analytics",
+        "tableId": "v_main_kpis"
+      },
+      "pages": [
+        {
+          "name": "Resumen Ejecutivo",
+          "charts": [
+            {
+              "type": "scorecard",
+              "title": "Usuarios Activos (24h)",
+              "metric": "active_users_24h",
+              "position": {"x": 0, "y": 0, "width": 3, "height": 2},
+              "style": {
+                "backgroundColor": "#1E88E5",
+                "textColor": "#FFFFFF",
+                "fontSize": 24,
+                "sparkline": true
+              },
+              "comparison": {
+                "type": "previous_period",
+                "show": true
+              }
+            },
+            {
+              "type": "scorecard", 
+              "title": "Viajes Completados (24h)",
+              "metric": "completed_trips_24h",
+              "position": {"x": 3, "y": 0, "width": 3, "height": 2},
+              "style": {
+                "backgroundColor": "#4CAF50",
+                "textColor": "#FFFFFF",
+                "fontSize": 24,
+                "sparkline": true
+              }
+            },
+            {
+              "type": "scorecard",
+              "title": "Valor Promedio por Viaje",
+              "metric": "avg_trip_value", 
+              "format": "currency",
+              "currency": "PEN",
+              "position": {"x": 6, "y": 0, "width": 3, "height": 2},
+              "style": {
+                "backgroundColor": "#FFC107",
+                "textColor": "#000000",
+                "fontSize": 24
+              }
+            },
+            {
+              "type": "scorecard",
+              "title": "Conductores En Línea",
+              "metric": "online_drivers",
+              "position": {"x": 9, "y": 0, "width": 3, "height": 2},
+              "style": {
+                "backgroundColor": "#9C27B0",
+                "textColor": "#FFFFFF", 
+                "fontSize": 24
+              }
+            },
+            {
+              "type": "line_chart",
+              "title": "Tendencia de Viajes - Últimos 30 Días",
+              "dataSource": {
+                "table": "trips",
+                "groupBy": "DATE(created_at)",
+                "metrics": ["COUNT(*)"],
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=",
+                    "value": "DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)"
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 2, "width": 6, "height": 4},
+              "xAxis": {"title": "Fecha", "format": "date"},
+              "yAxis": {"title": "Número de Viajes"}
+            },
+            {
+              "type": "pie_chart",
+              "title": "Distribución por Estado de Viajes",
+              "dataSource": {
+                "table": "trips",
+                "groupBy": "status",
+                "metrics": ["COUNT(*)"],
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=", 
+                    "value": "DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)"
+                  }
+                ]
+              },
+              "position": {"x": 6, "y": 2, "width": 6, "height": 4},
+              "colors": {
+                "completed": "#4CAF50",
+                "cancelled": "#F44336",
+                "pending": "#FF9800",
+                "in_progress": "#2196F3"
+              }
+            },
+            {
+              "type": "bar_chart",
+              "title": "Ingresos por Día - Última Semana",
+              "dataSource": {
+                "table": "daily_metrics",
+                "groupBy": "date",
+                "metrics": ["gross_revenue"],
+                "filters": [
+                  {
+                    "field": "date",
+                    "operator": ">=",
+                    "value": "DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)"
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 6, "width": 12, "height": 3},
+              "yAxis": {"title": "Ingresos (S/)", "format": "currency"}
+            }
+          ]
+        },
+        {
+          "name": "Análisis de Usuarios",
+          "charts": [
+            {
+              "type": "table",
+              "title": "Nuevos Usuarios por Día",
+              "dataSource": {
+                "table": "daily_metrics",
+                "fields": ["date", "new_users", "active_users", "user_retention_rate"],
+                "orderBy": "date DESC",
+                "limit": 30
+              },
+              "position": {"x": 0, "y": 0, "width": 6, "height": 6}
+            },
+            {
+              "type": "cohort_chart",
+              "title": "Análisis de Retención de Usuarios",
+              "dataSource": {
+                "table": "v_user_retention",
+                "cohortField": "cohort_date",
+                "periodField": "days_since_first_trip",
+                "metricField": "retention_rate"
+              },
+              "position": {"x": 6, "y": 0, "width": 6, "height": 6},
+              "heatmapColors": ["#FFEBEE", "#E91E63"]
+            },
+            {
+              "type": "geo_chart",
+              "title": "Usuarios por Distrito (Lima)",
+              "dataSource": {
+                "table": "users",
+                "groupBy": "city",
+                "metrics": ["COUNT(*)"],
+                "filters": [
+                  {
+                    "field": "country",
+                    "operator": "=",
+                    "value": "PE"
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 6, "width": 12, "height": 4},
+              "mapType": "peru_districts"
+            }
+          ]
+        },
+        {
+          "name": "Rendimiento Operacional",
+          "charts": [
+            {
+              "type": "gauge_chart",
+              "title": "Tiempo Promedio de Respuesta",
+              "dataSource": {
+                "table": "trips",
+                "metric": "AVG(TIMESTAMP_DIFF(accepted_at, created_at, SECOND))",
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=",
+                    "value": "TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)"
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 0, "width": 4, "height": 3},
+              "minValue": 0,
+              "maxValue": 300,
+              "redFrom": 180,
+              "redTo": 300,
+              "yellowFrom": 120,
+              "yellowTo": 180,
+              "greenFrom": 0,
+              "greenTo": 120
+            },
+            {
+              "type": "gauge_chart",
+              "title": "Tasa de Finalización de Viajes",
+              "dataSource": {
+                "table": "trips",
+                "metric": "SAFE_DIVIDE(COUNTIF(status = 'completed'), COUNT(*)) * 100",
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=", 
+                    "value": "DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)"
+                  }
+                ]
+              },
+              "position": {"x": 4, "y": 0, "width": 4, "height": 3},
+              "minValue": 0,
+              "maxValue": 100,
+              "redFrom": 0,
+              "redTo": 70,
+              "yellowFrom": 70,
+              "yellowTo": 85,
+              "greenFrom": 85,
+              "greenTo": 100
+            },
+            {
+              "type": "gauge_chart",
+              "title": "Rating Promedio Conductores",
+              "dataSource": {
+                "table": "trips",
+                "metric": "AVG(driver_rating.rating)",
+                "filters": [
+                  {
+                    "field": "driver_rating.rating",
+                    "operator": "IS NOT NULL"
+                  }
+                ]
+              },
+              "position": {"x": 8, "y": 0, "width": 4, "height": 3},
+              "minValue": 1,
+              "maxValue": 5,
+              "redFrom": 1,
+              "redTo": 3,
+              "yellowFrom": 3,
+              "yellowTo": 4,
+              "greenFrom": 4,
+              "greenTo": 5
+            },
+            {
+              "type": "area_chart",
+              "title": "Conductores Activos vs Demanda",
+              "dataSource": {
+                "table": "daily_metrics",
+                "fields": ["date", "active_drivers", "total_trips"],
+                "orderBy": "date ASC",
+                "limit": 30
+              },
+              "position": {"x": 0, "y": 3, "width": 12, "height": 4},
+              "series": [
+                {
+                  "field": "active_drivers",
+                  "type": "area",
+                  "color": "#2196F3",
+                  "axis": "left"
+                },
+                {
+                  "field": "total_trips", 
+                  "type": "line",
+                  "color": "#FF5722",
+                  "axis": "right"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "filters": [
+        {
+          "name": "Rango de Fechas",
+          "type": "date_range",
+          "defaultValue": "last_30_days",
+          "applyToAllCharts": true
+        },
+        {
+          "name": "Ciudad",
+          "type": "dropdown",
+          "dataSource": {
+            "table": "trips",
+            "field": "origin.city",
+            "distinct": true
+          },
+          "defaultValue": "Lima"
+        },
+        {
+          "name": "Tipo de Usuario",
+          "type": "checkbox",
+          "options": ["passenger", "driver", "admin"],
+          "defaultValue": ["passenger", "driver"]
+        }
+      ],
+      "style": {
+        "theme": "oasis_taxi",
+        "primaryColor": "#1E88E5",
+        "secondaryColor": "#FFC107",
+        "backgroundColor": "#FAFAFA",
+        "fontFamily": "Roboto",
+        "logoUrl": "https://oasistaxiperu.com/logo.png"
+      }
+    },
+    {
+      "name": "OasisTaxi - Financial Dashboard",
+      "description": "Dashboard financiero detallado para análisis de ingresos y costos",
+      "pages": [
+        {
+          "name": "Resumen Financiero",
+          "charts": [
+            {
+              "type": "scorecard",
+              "title": "Ingresos del Mes",
+              "dataSource": {
+                "table": "payments",
+                "metric": "SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END)",
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=",
+                    "value": "DATE_TRUNC(CURRENT_DATE(), MONTH)"
+                  }
+                ]
+              },
+              "format": "currency",
+              "currency": "PEN",
+              "position": {"x": 0, "y": 0, "width": 3, "height": 2}
+            },
+            {
+              "type": "scorecard",
+              "title": "Comisiones Generadas",
+              "dataSource": {
+                "table": "payments",
+                "metric": "SUM(commission_amount)",
+                "filters": [
+                  {
+                    "field": "created_at",
+                    "operator": ">=",
+                    "value": "DATE_TRUNC(CURRENT_DATE(), MONTH)"
+                  }
+                ]
+              },
+              "format": "currency",
+              "position": {"x": 3, "y": 0, "width": 3, "height": 2}
+            },
+            {
+              "type": "scorecard",
+              "title": "Ticket Promedio",
+              "dataSource": {
+                "table": "trips",
+                "metric": "AVG(final_price)",
+                "filters": [
+                  {
+                    "field": "status",
+                    "operator": "=",
+                    "value": "completed"
+                  }
+                ]
+              },
+              "format": "currency",
+              "position": {"x": 6, "y": 0, "width": 3, "height": 2}
+            },
+            {
+              "type": "line_chart",
+              "title": "Evolución de Ingresos Diarios",
+              "dataSource": {
+                "table": "daily_metrics",
+                "fields": ["date", "gross_revenue", "net_revenue"],
+                "orderBy": "date ASC",
+                "limit": 90
+              },
+              "position": {"x": 0, "y": 2, "width": 12, "height": 4}
+            }
+          ]
+        },
+        {
+          "name": "Análisis de Pagos",
+          "charts": [
+            {
+              "type": "pie_chart",
+              "title": "Métodos de Pago Preferidos",
+              "dataSource": {
+                "table": "payments",
+                "groupBy": "payment_method",
+                "metrics": ["COUNT(*)"],
+                "filters": [
+                  {
+                    "field": "status",
+                    "operator": "=",
+                    "value": "completed"
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 0, "width": 6, "height": 4}
+            },
+            {
+              "type": "bar_chart",
+              "title": "Transacciones por Hora del Día",
+              "dataSource": {
+                "table": "payments",
+                "groupBy": "EXTRACT(HOUR FROM created_at)",
+                "metrics": ["COUNT(*)", "SUM(amount)"],
+                "orderBy": "1 ASC"
+              },
+              "position": {"x": 6, "y": 0, "width": 6, "height": 4}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OasisTaxi - Operations Dashboard", 
+      "description": "Dashboard operacional para monitoreo en tiempo real",
+      "pages": [
+        {
+          "name": "Monitoreo en Tiempo Real",
+          "autoRefresh": 30,
+          "charts": [
+            {
+              "type": "real_time_map",
+              "title": "Conductores y Viajes en Vivo",
+              "dataSource": {
+                "table": "drivers",
+                "fields": ["driver_id", "current_location.latitude", "current_location.longitude", "is_online"],
+                "filters": [
+                  {
+                    "field": "is_online",
+                    "operator": "=",
+                    "value": true
+                  }
+                ]
+              },
+              "position": {"x": 0, "y": 0, "width": 8, "height": 6},
+              "mapCenter": {"lat": -12.0464, "lng": -77.0428},
+              "mapZoom": 11
+            },
+            {
+              "type": "table",
+              "title": "Viajes Activos",
+              "dataSource": {
+                "table": "trips",
+                "fields": ["trip_id", "passenger_id", "driver_id", "status", "created_at"],
+                "filters": [
+                  {
+                    "field": "status",
+                    "operator": "IN",
+                    "value": ["pending", "accepted", "in_progress"]
+                  }
+                ],
+                "orderBy": "created_at DESC",
+                "limit": 20
+              },
+              "position": {"x": 8, "y": 0, "width": 4, "height": 6},
+              "autoRefresh": 15
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "name": "OasisTaxi Base Template",
+      "description": "Template base con estilo corporativo de OasisTaxi",
+      "style": {
+        "theme": {
+          "primaryColor": "#1E88E5",
+          "secondaryColor": "#FFC107", 
+          "accentColor": "#4CAF50",
+          "errorColor": "#F44336",
+          "warningColor": "#FF9800",
+          "backgroundColor": "#FAFAFA",
+          "surfaceColor": "#FFFFFF",
+          "textPrimary": "#212121",
+          "textSecondary": "#757575"
+        },
+        "typography": {
+          "fontFamily": "Roboto, sans-serif",
+          "titleSize": 18,
+          "subtitleSize": 14,
+          "bodySize": 12,
+          "captionSize": 10
+        },
+        "spacing": {
+          "small": 8,
+          "medium": 16,
+          "large": 24,
+          "xlarge": 32
+        },
+        "borders": {
+          "radius": 4,
+          "width": 1,
+          "color": "#E0E0E0"
+        }
+      },
+      "components": {
+        "scorecard": {
+          "borderRadius": 8,
+          "padding": 16,
+          "elevation": 2,
+          "showTrend": true,
+          "showComparison": true
+        },
+        "chart": {
+          "gridLines": true,
+          "legend": {
+            "position": "bottom",
+            "alignment": "center"
+          },
+          "tooltip": {
+            "enabled": true,
+            "backgroundColor": "#424242",
+            "textColor": "#FFFFFF"
+          }
+        }
+      }
+    }
+  ],
+  "dataConnectors": [
+    {
+      "name": "OasisTaxi BigQuery",
+      "type": "bigquery",
+      "config": {
+        "projectId": "oasis-taxi-peru",
+        "defaultDataset": "oasis_taxi_analytics",
+        "serviceAccountEmail": "datastudio@oasis-taxi-peru.iam.gserviceaccount.com",
+        "refreshRate": "1 hour",
+        "cacheEnabled": true
+      }
+    },
+    {
+      "name": "Firebase Analytics",
+      "type": "firebase_analytics",
+      "config": {
+        "projectId": "oasis-taxi-peru",
+        "refreshRate": "4 hours"
+      }
+    }
+  ],
+  "scheduledReports": [
+    {
+      "name": "Reporte Diario Ejecutivo",
+      "dashboard": "OasisTaxi - Executive Dashboard",
+      "recipients": [
+        "gerencia@oasistaxiperu.com",
+        "operaciones@oasistaxiperu.com"
+      ],
+      "schedule": {
+        "frequency": "daily",
+        "time": "08:00",
+        "timezone": "America/Lima"
+      },
+      "format": "pdf",
+      "filters": {
+        "date_range": "yesterday"
+      }
+    },
+    {
+      "name": "Reporte Semanal Financiero",
+      "dashboard": "OasisTaxi - Financial Dashboard", 
+      "recipients": [
+        "finanzas@oasistaxiperu.com",
+        "contabilidad@oasistaxiperu.com"
+      ],
+      "schedule": {
+        "frequency": "weekly",
+        "dayOfWeek": "monday",
+        "time": "09:00",
+        "timezone": "America/Lima"
+      },
+      "format": "excel",
+      "filters": {
+        "date_range": "last_week"
+      }
+    }
+  ],
+  "alerts": [
+    {
+      "name": "Ingresos Diarios Bajos",
+      "condition": {
+        "metric": "daily_revenue",
+        "operator": "less_than",
+        "threshold": 1000,
+        "period": "1 day"
+      },
+      "notifications": [
+        {
+          "type": "email",
+          "recipients": ["gerencia@oasistaxiperu.com"]
+        },
+        {
+          "type": "slack",
+          "webhook": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+        }
+      ]
+    },
+    {
+      "name": "Pocos Conductores Activos",
+      "condition": {
+        "metric": "active_drivers",
+        "operator": "less_than", 
+        "threshold": 10,
+        "period": "1 hour"
+      },
+      "notifications": [
+        {
+          "type": "email",
+          "recipients": ["operaciones@oasistaxiperu.com"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../utils/app_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/notification_service.dart';
 import '../services/firebase_service.dart';
@@ -6,10 +7,10 @@ import '../services/fcm_service.dart';
 import '../models/notification_types.dart';
 
 /// Provider de Notificaciones Real para Producción
-class NotificationProvider extends ChangeNotifier {
+class NotificationProvider with ChangeNotifier {
   final NotificationService _notificationService = NotificationService();
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   final List<NotificationData> _notifications = [];
   bool _notificationsEnabled = true;
   bool _isLoading = false;
@@ -25,14 +26,15 @@ class NotificationProvider extends ChangeNotifier {
 
   // Getters
   List<NotificationData> get notifications => List.unmodifiable(_notifications);
-  List<NotificationData> get unreadNotifications => 
+  List<NotificationData> get unreadNotifications =>
       _notifications.where((n) => !n.isRead).toList();
   int get unreadCount => unreadNotifications.length;
   bool get notificationsEnabled => _notificationsEnabled;
   bool get isLoading => _isLoading;
   Map<String, bool> get subscribedTopics => Map.unmodifiable(_subscribedTopics);
   Map<String, bool> get topicSubscriptions => subscribedTopics;
-  String? get fcmToken => _firebaseService.currentUser?.uid; // Token basado en Firebase
+  String? get fcmToken =>
+      _firebaseService.currentUser?.uid; // Token basado en Firebase
   bool get isInitialized => _firebaseService.isInitialized;
 
   NotificationProvider() {
@@ -47,7 +49,8 @@ class NotificationProvider extends ChangeNotifier {
 
   /// Cargar notificaciones desde Firebase
   Future<void> _loadNotificationsFromFirebase() async {
-    if (!_firebaseService.isInitialized || _firebaseService.currentUser == null) {
+    if (!_firebaseService.isInitialized ||
+        _firebaseService.currentUser == null) {
       return;
     }
 
@@ -56,10 +59,10 @@ class NotificationProvider extends ChangeNotifier {
 
     try {
       final userId = _firebaseService.currentUser!.uid;
+      // Buscar en colección global de notificaciones para el usuario
       final snapshot = await _firebaseService.firestore
-          .collection('users')
-          .doc(userId)
           .collection('notifications')
+          .where('userId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(50)
           .get();
@@ -71,7 +74,8 @@ class NotificationProvider extends ChangeNotifier {
           id: doc.id,
           title: data['title'] ?? '',
           body: data['body'] ?? '',
-          timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          timestamp:
+              (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
           type: _getNotificationTypeFromString(data['type'] ?? 'system'),
           isRead: data['isRead'] ?? false,
           data: data['data'],
@@ -79,7 +83,7 @@ class NotificationProvider extends ChangeNotifier {
         ));
       }
     } catch (e) {
-      debugPrint('Error cargando notificaciones: $e');
+      AppLogger.debug('Error cargando notificaciones: $e');
       // En caso de error, no mostrar notificaciones de ejemplo
     } finally {
       _isLoading = false;
@@ -89,17 +93,28 @@ class NotificationProvider extends ChangeNotifier {
 
   NotificationType _getNotificationTypeFromString(String type) {
     switch (type) {
-      case 'general': return NotificationType.general;
-      case 'tripRequest': return NotificationType.tripRequest;
-      case 'tripAccepted': return NotificationType.tripAccepted;
-      case 'tripStarted': return NotificationType.tripStarted;
-      case 'tripCancelled': return NotificationType.tripCancelled;
-      case 'tripCompleted': return NotificationType.tripCompleted;
-      case 'driverArrived': return NotificationType.driverArrived;
-      case 'payment': return NotificationType.payment;
-      case 'promotion': return NotificationType.promotion;
-      case 'support': return NotificationType.support;
-      default: return NotificationType.system;
+      case 'general':
+        return NotificationType.general;
+      case 'tripRequest':
+        return NotificationType.tripRequest;
+      case 'tripAccepted':
+        return NotificationType.tripAccepted;
+      case 'tripStarted':
+        return NotificationType.tripStarted;
+      case 'tripCancelled':
+        return NotificationType.tripCancelled;
+      case 'tripCompleted':
+        return NotificationType.tripCompleted;
+      case 'driverArrived':
+        return NotificationType.driverArrived;
+      case 'payment':
+        return NotificationType.payment;
+      case 'promotion':
+        return NotificationType.promotion;
+      case 'support':
+        return NotificationType.support;
+      default:
+        return NotificationType.system;
     }
   }
 
@@ -114,15 +129,15 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
 
     // Guardar en Firebase si el usuario está autenticado
-    if (_firebaseService.isInitialized && _firebaseService.currentUser != null) {
+    if (_firebaseService.isInitialized &&
+        _firebaseService.currentUser != null) {
       try {
         final userId = _firebaseService.currentUser!.uid;
         await _firebaseService.firestore
-            .collection('users')
-            .doc(userId)
             .collection('notifications')
             .doc(notification.id)
             .set({
+          'userId': userId,
           'title': notification.title,
           'body': notification.body,
           'type': notification.type.toString().split('.').last,
@@ -131,7 +146,7 @@ class NotificationProvider extends ChangeNotifier {
           'data': notification.data,
         });
       } catch (e) {
-        debugPrint('Error guardando notificación: $e');
+        AppLogger.debug('Error guardando notificación: $e');
       }
     }
   }
@@ -183,7 +198,7 @@ class NotificationProvider extends ChangeNotifier {
     _notifications.clear();
     notifyListeners();
   }
-  
+
   void clearAllNotifications() {
     clearAll();
     // También eliminar de Firebase si es necesario
@@ -196,7 +211,7 @@ class NotificationProvider extends ChangeNotifier {
     // Eliminar de Firebase
     _deleteNotificationFromFirebase(notificationId);
   }
-  
+
   void removeNotification(String notificationId) {
     deleteNotification(notificationId);
   }
@@ -205,17 +220,17 @@ class NotificationProvider extends ChangeNotifier {
     _subscribedTopics[topic] = subscribed;
     notifyListeners();
   }
-  
+
   void subscribeToTopic(String topic) {
     _subscribedTopics[topic] = true;
     notifyListeners();
   }
-  
+
   void unsubscribeFromTopic(String topic) {
     _subscribedTopics[topic] = false;
     notifyListeners();
   }
-  
+
   void sendTestNotification() {
     addNotification(NotificationData(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -228,8 +243,10 @@ class NotificationProvider extends ChangeNotifier {
     ));
   }
 
-  Future<void> _updateNotificationInFirebase(String notificationId, Map<String, dynamic> data) async {
-    if (_firebaseService.isInitialized && _firebaseService.currentUser != null) {
+  Future<void> _updateNotificationInFirebase(
+      String notificationId, Map<String, dynamic> data) async {
+    if (_firebaseService.isInitialized &&
+        _firebaseService.currentUser != null) {
       try {
         final userId = _firebaseService.currentUser!.uid;
         await _firebaseService.firestore
@@ -239,13 +256,14 @@ class NotificationProvider extends ChangeNotifier {
             .doc(notificationId)
             .update(data);
       } catch (e) {
-        debugPrint('Error actualizando notificación: $e');
+        AppLogger.debug('Error actualizando notificación: $e');
       }
     }
   }
 
   Future<void> _deleteNotificationFromFirebase(String notificationId) async {
-    if (_firebaseService.isInitialized && _firebaseService.currentUser != null) {
+    if (_firebaseService.isInitialized &&
+        _firebaseService.currentUser != null) {
       try {
         final userId = _firebaseService.currentUser!.uid;
         await _firebaseService.firestore
@@ -255,7 +273,7 @@ class NotificationProvider extends ChangeNotifier {
             .doc(notificationId)
             .delete();
       } catch (e) {
-        debugPrint('Error eliminando notificación: $e');
+        AppLogger.debug('Error eliminando notificación: $e');
       }
     }
   }
@@ -283,7 +301,7 @@ class NotificationProvider extends ChangeNotifier {
     );
 
     await addNotification(notification);
-    
+
     // También mostrar notificación local
     await _notificationService.showRideNotification(
       title: title,
@@ -417,11 +435,12 @@ class NotificationProvider extends ChangeNotifier {
             .collection('users')
             .doc(_firebaseService.currentUser!.uid)
             .update({'fcmToken': token});
-        
-        debugPrint('✅ Token FCM actualizado para usuario: ${_firebaseService.currentUser!.uid}');
+
+        AppLogger.debug(
+            '✅ Token FCM actualizado para usuario: ${_firebaseService.currentUser!.uid}');
       }
     } catch (e) {
-      debugPrint('❌ Error actualizando token FCM: $e');
+      AppLogger.error('Error actualizando token FCM: $e');
     }
   }
 
@@ -431,7 +450,7 @@ class NotificationProvider extends ChangeNotifier {
       // Tópicos base para todos los usuarios
       await FCMService.subscribeToTopic('all_users');
       await FCMService.subscribeToTopic('app_updates');
-      
+
       // Tópicos específicos por tipo de usuario
       switch (userType) {
         case 'passenger':
@@ -450,10 +469,10 @@ class NotificationProvider extends ChangeNotifier {
           await FCMService.subscribeToTopic('system_alerts');
           break;
       }
-      
-      debugPrint('✅ Suscrito a tópicos para tipo de usuario: $userType');
+
+      AppLogger.debug('✅ Suscrito a tópicos para tipo de usuario: $userType');
     } catch (e) {
-      debugPrint('❌ Error suscribiendo a tópicos: $e');
+      AppLogger.error('Error suscribiendo a tópicos: $e');
     }
   }
 
@@ -462,14 +481,19 @@ class NotificationProvider extends ChangeNotifier {
     return {
       'total': _notifications.length,
       'unread': unreadCount,
-      'tripRequests': _notifications.where((n) => n.type == NotificationType.tripRequest).length,
-      'tripUpdates': _notifications.where((n) => 
-          n.type == NotificationType.tripAccepted ||
-          n.type == NotificationType.tripStarted ||
-          n.type == NotificationType.driverArrived ||
-          n.type == NotificationType.tripCompleted
-      ).length,
-      'promotions': _notifications.where((n) => n.type == NotificationType.promotion).length,
+      'tripRequests': _notifications
+          .where((n) => n.type == NotificationType.tripRequest)
+          .length,
+      'tripUpdates': _notifications
+          .where((n) =>
+              n.type == NotificationType.tripAccepted ||
+              n.type == NotificationType.tripStarted ||
+              n.type == NotificationType.driverArrived ||
+              n.type == NotificationType.tripCompleted)
+          .length,
+      'promotions': _notifications
+          .where((n) => n.type == NotificationType.promotion)
+          .length,
     };
   }
 
@@ -487,11 +511,12 @@ class NotificationProvider extends ChangeNotifier {
       }
 
       if (oldNotifications.isNotEmpty) {
-        debugPrint('🧹 Limpiadas ${oldNotifications.length} notificaciones antiguas');
+        AppLogger.debug(
+            '🧹 Limpiadas ${oldNotifications.length} notificaciones antiguas');
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('Error limpiando notificaciones antiguas: $e');
+      AppLogger.debug('Error limpiando notificaciones antiguas: $e');
     }
   }
 }

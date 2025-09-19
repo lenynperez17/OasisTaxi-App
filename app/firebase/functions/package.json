@@ -1,0 +1,105 @@
+{
+  "name": "oasistaxi-cloud-functions",
+  "version": "1.0.0",
+  "description": "Firebase Cloud Functions para OasisTaxi Perú - Sistema de transporte con negociación de precios",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint .",
+    "build": "echo 'No build step'",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "test": "echo 'No tests' && exit 0"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.5.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.43",
+    "lodash": "^4.17.21",
+    "axios": "^1.6.0",
+    "crypto": "^1.0.1",
+    "validator": "^13.11.0",
+    "helmet": "^7.1.0",
+    "rate-limiter-flexible": "^3.0.8",
+    "mercadopago": "^1.5.17",
+    "twilio": "^4.19.0",
+    "nodemailer": "^6.9.7",
+    "sharp": "^0.32.6",
+    "pdf-parse": "^1.1.1",
+    "multer": "^1.4.5-lts.1",
+    "busboy": "^1.6.0",
+    "geolib": "^3.3.4",
+    "uuid": "^9.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "@google-cloud/vision": "^4.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "nodemon": "^3.0.1"
+  },
+  "private": true,
+  "keywords": [
+    "firebase",
+    "cloud-functions",
+    "oasistaxi",
+    "peru",
+    "transport",
+    "rideshare",
+    "price-negotiation"
+  ],
+  "author": "OasisTaxi Development Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oasistaxi-peru/cloud-functions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oasistaxi-peru/cloud-functions/issues"
+  },
+  "homepage": "https://oasistaxiperu.com",
+  "eslintConfig": {
+    "parserOptions": {
+      "ecmaVersion": 2018
+    },
+    "extends": [
+      "eslint:recommended",
+      "google"
+    ],
+    "rules": {
+      "no-restricted-globals": [
+        "error",
+        "name",
+        "length"
+      ],
+      "prefer-arrow-callback": "error",
+      "quotes": [
+        "error",
+        "single"
+      ],
+      "max-len": [
+        "error",
+        {
+          "code": 100
+        }
+      ]
+    },
+    "overrides": [],
+    "globals": {},
+    "env": {
+      "node": true,
+      "es6": true
+    }
+  }
+}

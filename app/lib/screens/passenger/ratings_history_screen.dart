@@ -1,118 +1,132 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/modern_theme.dart';
 
 class RatingsHistoryScreen extends StatefulWidget {
   const RatingsHistoryScreen({super.key});
 
   @override
-  _RatingsHistoryScreenState createState() => _RatingsHistoryScreenState();
+  RatingsHistoryScreenState createState() => RatingsHistoryScreenState();
 }
 
-class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
+class RatingsHistoryScreenState extends State<RatingsHistoryScreen>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _userId; // Se obtendrá del usuario actual
-  bool _isLoading = true;
-  
+  // bool _isLoading = true; // No usado en la UI actual
+
   late AnimationController _headerController;
   late AnimationController _listController;
-  
+
   String _selectedFilter = 'all';
-  
+
   // Lista de calificaciones desde Firebase
   List<RatingData> _ratings = [];
-  
+
   List<RatingData> get _filteredRatings {
     if (_selectedFilter == 'all') return _ratings;
-    
+
     final filterValue = int.parse(_selectedFilter);
     return _ratings.where((r) => r.rating == filterValue).toList();
   }
-  
+
   Map<String, dynamic> get _statistics {
     final totalRatings = _ratings.length;
-    final avgRating = _ratings.fold<double>(
-      0, (sum, r) => sum + r.rating) / totalRatings;
-    
+    final avgRating = totalRatings > 0
+        ? _ratings.fold<double>(0, (accumulator, r) => accumulator + r.rating) /
+            totalRatings
+        : 0.0;
+
     final ratingCounts = <int, int>{};
     for (var rating in _ratings) {
       ratingCounts[rating.rating] = (ratingCounts[rating.rating] ?? 0) + 1;
     }
-    
+
     return {
       'total': totalRatings,
       'average': avgRating,
       'counts': ratingCounts,
     };
   }
-  
+
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle('RatingsHistoryScreen', 'initState');
+
     _headerController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    
+
     _listController = AnimationController(
       duration: Duration(milliseconds: 1000),
       vsync: this,
     )..forward();
-    
+
     _loadRatingsFromFirebase();
   }
-  
+
   Future<void> _loadRatingsFromFirebase() async {
     try {
-      setState(() => _isLoading = true);
-      
-      // Por ahora usar un userId de ejemplo
-      // En producción, esto vendría del usuario autenticado
-      _userId = 'test_user_id';
-      
+      // setState(() => _isLoading = true);
+
+      // Obtener el usuario actual autenticado
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          // _isLoading = false;
+          _ratings = [];
+        });
+        return;
+      }
+
+      _userId = user.uid;
+
       // Cargar calificaciones del usuario desde Firebase
-      final ridesSnapshot = await _firestore
-          .collection('rides')
+      final tripsSnapshot = await _firestore
+          .collection('trips')
           .where('passengerId', isEqualTo: _userId)
-          .where('rating', isNotEqualTo: null)
-          .orderBy('rating')
-          .orderBy('createdAt', descending: true)
+          .where('passengerRating', isNotEqualTo: null)
+          .orderBy('passengerRating')
+          .orderBy('requestedAt', descending: true)
           .limit(50)
           .get();
-      
+
       List<RatingData> loadedRatings = [];
-      
-      for (var doc in ridesSnapshot.docs) {
+
+      for (var doc in tripsSnapshot.docs) {
         final data = doc.data();
-        
+
         // Obtener información del conductor
         String driverName = 'Conductor';
         String driverPhoto = '';
-        
+
         if (data['driverId'] != null) {
           try {
             final driverDoc = await _firestore
                 .collection('users')
                 .doc(data['driverId'])
                 .get();
-            
+
             if (driverDoc.exists) {
               final driverData = driverDoc.data()!;
-              driverName = '${driverData['firstName'] ?? ''} ${driverData['lastName'] ?? ''}'.trim();
+              driverName =
+                  '${driverData['firstName'] ?? ''} ${driverData['lastName'] ?? ''}'
+                      .trim();
               if (driverName.isEmpty) driverName = 'Conductor';
               driverPhoto = driverData['profileImage'] ?? '';
             }
           } catch (e) {
-            print('Error obteniendo datos del conductor: $e');
+            AppLogger.error('obteniendo datos del conductor', e);
           }
         }
-        
+
         // Generar tags basados en la calificación
         List<String> tags = [];
-        final rating = data['rating'] ?? 0;
+        final rating = data['passengerRating'] ?? 0;
         if (rating >= 5) {
           tags = ['Excelente servicio', 'Muy satisfecho'];
         } else if (rating >= 4) {
@@ -122,34 +136,34 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
         } else {
           tags = ['Necesita mejorar', 'Insatisfecho'];
         }
-        
+
         loadedRatings.add(RatingData(
           id: doc.id,
           tripId: doc.id,
           driverName: driverName,
           driverPhoto: driverPhoto,
-          date: data['createdAt'] != null 
-              ? (data['createdAt'] as Timestamp).toDate()
+          date: data['requestedAt'] != null
+              ? (data['requestedAt'] as Timestamp).toDate()
               : DateTime.now(),
-          rating: data['rating'] ?? 0,
-          comment: data['ratingComment'] ?? '',
+          rating: data['passengerRating'] ?? 0,
+          comment: data['passengerComment'] ?? '',
           tags: tags,
-          route: '${data['pickupAddress'] ?? 'Origen'} → ${data['destinationAddress'] ?? 'Destino'}',
-          tripAmount: (data['fare'] ?? 0.0).toDouble(),
+          route:
+              '${data['pickupAddress'] ?? 'Origen'} → ${data['dropoffAddress'] ?? 'Destino'}',
+          tripAmount:
+              (data['finalFare'] ?? data['estimatedFare'] ?? 0.0).toDouble(),
         ));
       }
-      
+
       // Si no hay calificaciones, mostrar lista vacía (sin crear datos de ejemplo)
-      
+
       setState(() {
         _ratings = loadedRatings;
-        _isLoading = false;
       });
-      
     } catch (e) {
-      print('Error cargando calificaciones: $e');
-      setState(() => _isLoading = false);
-      
+      AppLogger.error('cargando calificaciones', e);
+      // setState(() => _isLoading = false);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -160,15 +174,14 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       }
     }
   }
-  
-  
+
   @override
   void dispose() {
     _headerController.dispose();
     _listController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -199,10 +212,10 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
               );
             },
           ),
-          
+
           // Filtros
           _buildFilters(),
-          
+
           // Lista de calificaciones
           Expanded(
             child: _filteredRatings.isEmpty
@@ -215,7 +228,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                         itemCount: _filteredRatings.length,
                         itemBuilder: (context, index) {
                           final rating = _filteredRatings[index];
-                          final delay = index * 0.1;
+                          final delay = (index * 0.1).clamp(0.0, 0.5);
                           final animation = Tween<double>(
                             begin: 0,
                             end: 1,
@@ -224,12 +237,12 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                               parent: _listController,
                               curve: Interval(
                                 delay,
-                                delay + 0.5,
+                                (delay + 0.5).clamp(0.0, 1.0),
                                 curve: Curves.easeOutBack,
                               ),
                             ),
                           );
-                          
+
                           return AnimatedBuilder(
                             animation: animation,
                             builder: (context, child) {
@@ -251,11 +264,11 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       ),
     );
   }
-  
+
   Widget _buildStatistics() {
     final stats = _statistics;
     final ratingCounts = stats['counts'] as Map<int, int>;
-    
+
     return Container(
       margin: EdgeInsets.all(16),
       padding: EdgeInsets.all(20),
@@ -295,21 +308,23 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                   ),
                 ],
               ),
-              
+
               // Separador
               Container(
                 height: 40,
                 width: 1,
                 color: Colors.white24,
               ),
-              
+
               // Promedio
               Column(
                 children: [
                   Row(
                     children: [
                       Text(
-                        stats['average'].toStringAsFixed(1),
+                        stats['total'] > 0 && !stats['average'].isNaN
+                            ? stats['average'].toStringAsFixed(1)
+                            : '0.0',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -334,15 +349,17 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
               ),
             ],
           ),
-          
-          SizedBox(height: 20),
-          
+
+          const SizedBox(height: 20),
+
           // Distribución de calificaciones
           Column(
             children: [5, 4, 3, 2, 1].map((rating) {
               final count = ratingCounts[rating] ?? 0;
-              final percentage = (count / stats['total'] * 100).toInt();
-              
+              final percentage = stats['total'] > 0
+                  ? (count / stats['total'] * 100).toInt()
+                  : 0;
+
               return Padding(
                 padding: EdgeInsets.symmetric(vertical: 4),
                 child: Row(
@@ -359,7 +376,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                       size: 16,
                       color: Colors.amber,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Stack(
                         children: [
@@ -373,8 +390,10 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                           AnimatedContainer(
                             duration: Duration(milliseconds: 800),
                             height: 20,
-                            width: MediaQuery.of(context).size.width * 
-                                   percentage / 100 * 0.5,
+                            width: MediaQuery.of(context).size.width *
+                                percentage /
+                                100 *
+                                0.5,
                             decoration: BoxDecoration(
                               color: Colors.amber,
                               borderRadius: BorderRadius.circular(10),
@@ -383,7 +402,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                         ],
                       ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     SizedBox(
                       width: 30,
                       child: Text(
@@ -404,7 +423,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       ),
     );
   }
-  
+
   Widget _buildFilters() {
     return Container(
       height: 50,
@@ -413,24 +432,24 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
         scrollDirection: Axis.horizontal,
         children: [
           _buildFilterChip('Todas', 'all'),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _buildFilterChip('5 ⭐', '5'),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _buildFilterChip('4 ⭐', '4'),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _buildFilterChip('3 ⭐', '3'),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _buildFilterChip('2 ⭐', '2'),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _buildFilterChip('1 ⭐', '1'),
         ],
       ),
     );
   }
-  
+
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedFilter == value;
-    
+
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -453,7 +472,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       ),
     );
   }
-  
+
   Widget _buildRatingCard(RatingData rating) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -475,9 +494,14 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                 children: [
                   CircleAvatar(
                     radius: 25,
-                    backgroundImage: NetworkImage(rating.driverPhoto),
+                    backgroundImage: rating.driverPhoto.isNotEmpty
+                        ? NetworkImage(rating.driverPhoto)
+                        : null,
+                    child: rating.driverPhoto.isEmpty
+                        ? Icon(Icons.person, size: 30, color: Colors.grey)
+                        : null,
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,9 +535,9 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                   ),
                 ],
               ),
-              
-              SizedBox(height: 12),
-              
+
+              const SizedBox(height: 12),
+
               // Ruta
               Container(
                 padding: EdgeInsets.all(8),
@@ -528,7 +552,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                       size: 16,
                       color: ModernTheme.textSecondary,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         rating.route,
@@ -541,7 +565,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                       ),
                     ),
                     Text(
-                      '\$${rating.tripAmount.toStringAsFixed(2)}',
+                      'S/ ${rating.tripAmount.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: ModernTheme.oasisGreen,
@@ -550,9 +574,9 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                   ],
                 ),
               ),
-              
+
               if (rating.comment != null) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   rating.comment!,
                   style: TextStyle(
@@ -563,15 +587,16 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              
+
               if (rating.tags.isNotEmpty) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: rating.tags.map((tag) {
                     return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -594,7 +619,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -605,7 +630,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
             size: 80,
             color: ModernTheme.textSecondary.withValues(alpha: 0.3),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'No hay calificaciones',
             style: TextStyle(
@@ -614,7 +639,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
               color: ModernTheme.textSecondary,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Aquí aparecerán tus calificaciones',
             style: TextStyle(
@@ -625,7 +650,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       ),
     );
   }
-  
+
   void _showRatingDetails(RatingData rating) {
     showModalBottomSheet(
       context: context,
@@ -634,15 +659,15 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
       builder: (context) => RatingDetailsModal(rating: rating),
     );
   }
-  
+
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date).inDays;
-    
+
     if (difference == 0) return 'Hoy';
     if (difference == 1) return 'Ayer';
     if (difference < 7) return 'Hace $difference días';
-    
+
     return '${date.day}/${date.month}/${date.year}';
   }
 }
@@ -650,9 +675,9 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
 // Modal de detalles
 class RatingDetailsModal extends StatelessWidget {
   final RatingData rating;
-  
+
   const RatingDetailsModal({super.key, required this.rating});
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -673,7 +698,7 @@ class RatingDetailsModal extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: EdgeInsets.all(20),
@@ -694,7 +719,7 @@ class RatingDetailsModal extends StatelessWidget {
               ],
             ),
           ),
-          
+
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(20),
@@ -706,9 +731,14 @@ class RatingDetailsModal extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: NetworkImage(rating.driverPhoto),
+                        backgroundImage: rating.driverPhoto.isNotEmpty
+                            ? NetworkImage(rating.driverPhoto)
+                            : null,
+                        child: rating.driverPhoto.isEmpty
+                            ? Icon(Icons.person, size: 40, color: Colors.grey)
+                            : null,
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,13 +750,13 @@ class RatingDetailsModal extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: List.generate(5, (index) {
                                 return Icon(
-                                  index < rating.rating 
-                                    ? Icons.star 
-                                    : Icons.star_border,
+                                  index < rating.rating
+                                      ? Icons.star
+                                      : Icons.star_border,
                                   color: Colors.amber,
                                   size: 24,
                                 );
@@ -737,26 +767,26 @@ class RatingDetailsModal extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
-                  SizedBox(height: 24),
-                  
+
+                  const SizedBox(height: 24),
+
                   // Información del viaje
                   _buildDetailSection(
                     'Información del Viaje',
                     [
-                      _buildDetailRow(Icons.calendar_today, 'Fecha', 
-                        '${rating.date.day}/${rating.date.month}/${rating.date.year}'),
-                      _buildDetailRow(Icons.access_time, 'Hora', 
-                        '${rating.date.hour.toString().padLeft(2, '0')}:${rating.date.minute.toString().padLeft(2, '0')}'),
+                      _buildDetailRow(Icons.calendar_today, 'Fecha',
+                          '${rating.date.day}/${rating.date.month}/${rating.date.year}'),
+                      _buildDetailRow(Icons.access_time, 'Hora',
+                          '${rating.date.hour.toString().padLeft(2, '0')}:${rating.date.minute.toString().padLeft(2, '0')}'),
                       _buildDetailRow(Icons.route, 'Ruta', rating.route),
-                      _buildDetailRow(Icons.attach_money, 'Monto', 
-                        '\$${rating.tripAmount.toStringAsFixed(2)}'),
+                      _buildDetailRow(Icons.attach_money, 'Monto',
+                          'S/ ${rating.tripAmount.toStringAsFixed(2)}'),
                       _buildDetailRow(Icons.tag, 'ID Viaje', rating.tripId),
                     ],
                   ),
-                  
+
                   if (rating.comment != null) ...[
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildDetailSection(
                       'Tu Comentario',
                       [
@@ -770,9 +800,9 @@ class RatingDetailsModal extends StatelessWidget {
                       ],
                     ),
                   ],
-                  
+
                   if (rating.tags.isNotEmpty) ...[
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     Text(
                       'Etiquetas',
                       style: TextStyle(
@@ -781,18 +811,19 @@ class RatingDetailsModal extends StatelessWidget {
                         color: ModernTheme.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: rating.tags.map((tag) {
                         return Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: 12, 
+                            horizontal: 12,
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
+                            color:
+                                ModernTheme.oasisGreen.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: ModernTheme.oasisGreen,
@@ -810,9 +841,9 @@ class RatingDetailsModal extends StatelessWidget {
                       }).toList(),
                     ),
                   ],
-                  
-                  SizedBox(height: 24),
-                  
+
+                  const SizedBox(height: 24),
+
                   // Botón de editar (deshabilitado)
                   OutlinedButton.icon(
                     onPressed: null,
@@ -833,7 +864,7 @@ class RatingDetailsModal extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildDetailSection(String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,7 +877,7 @@ class RatingDetailsModal extends StatelessWidget {
             color: ModernTheme.textPrimary,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -860,14 +891,14 @@ class RatingDetailsModal extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, size: 20, color: ModernTheme.textSecondary),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(color: ModernTheme.textSecondary),
@@ -898,7 +929,7 @@ class RatingData {
   final List<String> tags;
   final String route;
   final double tripAmount;
-  
+
   RatingData({
     required this.id,
     required this.tripId,

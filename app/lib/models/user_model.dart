@@ -57,16 +57,16 @@ class UserModel {
       isVerified: json['isVerified'] ?? false,
       emailVerified: json['emailVerified'] ?? false,
       phoneVerified: json['phoneVerified'] ?? false,
-      createdAt: json['createdAt'] is DateTime 
-          ? json['createdAt'] 
+      createdAt: json['createdAt'] is DateTime
+          ? json['createdAt']
           : DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-      updatedAt: json['updatedAt'] is DateTime 
-          ? json['updatedAt'] 
+      updatedAt: json['updatedAt'] is DateTime
+          ? json['updatedAt']
           : DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       rating: (json['rating'] ?? 5.0).toDouble(),
       totalTrips: json['totalTrips'] ?? 0,
       balance: (json['balance'] ?? 0.0).toDouble(),
-      location: json['location'] != null 
+      location: json['location'] != null
           ? LatLng(
               (json['location']['lat'] ?? 0.0).toDouble(),
               (json['location']['lng'] ?? 0.0).toDouble(),
@@ -96,7 +96,7 @@ class UserModel {
       'rating': rating,
       'totalTrips': totalTrips,
       'balance': balance,
-      'location': location != null 
+      'location': location != null
           ? {
               'lat': location!.latitude,
               'lng': location!.longitude,
@@ -184,7 +184,8 @@ class UserModel {
   int get hashCode => id.hashCode;
 
   /// Constructor para crear desde Firestore Document
-  factory UserModel.fromFirestore(Map<String, dynamic> data, String documentId) {
+  factory UserModel.fromFirestore(
+      Map<String, dynamic> data, String documentId) {
     return UserModel(
       id: documentId,
       fullName: data['fullName'] ?? '',
@@ -201,7 +202,7 @@ class UserModel {
       rating: (data['rating'] ?? 5.0).toDouble(),
       totalTrips: data['totalTrips'] ?? 0,
       balance: (data['balance'] ?? 0.0).toDouble(),
-      location: data['location'] != null 
+      location: data['location'] != null
           ? LatLng(
               (data['location']['lat'] ?? 0.0).toDouble(),
               (data['location']['lng'] ?? 0.0).toDouble(),

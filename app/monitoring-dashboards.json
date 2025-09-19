@@ -1,0 +1,811 @@
+{
+  "dashboards": [
+    {
+      "displayName": "OasisTaxi - Dashboard Principal",
+      "mosaicLayout": {
+        "tiles": [
+          {
+            "width": 6,
+            "height": 4,
+            "widget": {
+              "title": "Usuarios Activos en Tiempo Real",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"firebase.googleapis.com/analytics/active_users\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "timeshiftDuration": "0s",
+                "yAxis": {
+                  "label": "Usuarios Activos",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "xPos": 6,
+            "widget": {
+              "title": "Viajes por Hora",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/trips_created\"",
+                        "aggregation": {
+                          "alignmentPeriod": "300s",
+                          "perSeriesAligner": "ALIGN_RATE"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_BAR"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Viajes/hora",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "yPos": 4,
+            "widget": {
+              "title": "Latencia Cloud Functions",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_time\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_PERCENTILE_95"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Latencia (ms)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 4,
+            "yPos": 4,
+            "widget": {
+              "title": "Errores de Cloud Functions",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_count\" AND metric.label.status=\"error\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_RATE"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_AREA"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Errores/min",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 8,
+            "yPos": 4,
+            "widget": {
+              "title": "Uso de Firestore",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"firestore.googleapis.com/api/request_count\"",
+                        "aggregation": {
+                          "alignmentPeriod": "300s",
+                          "perSeriesAligner": "ALIGN_RATE"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_BAR"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Requests/sec",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "yPos": 7,
+            "widget": {
+              "title": "Ingresos en Tiempo Real",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/revenue\"",
+                        "aggregation": {
+                          "alignmentPeriod": "300s",
+                          "perSeriesAligner": "ALIGN_SUM"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_AREA"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Ingresos (S/)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "xPos": 6,
+            "yPos": 7,
+            "widget": {
+              "title": "Estado de Conductores",
+              "pieChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/drivers_online\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "displayName": "OasisTaxi - Rendimiento de App",
+      "mosaicLayout": {
+        "tiles": [
+          {
+            "width": 6,
+            "height": 4,
+            "widget": {
+              "title": "Tiempo de Carga de Pantallas",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"firebase.googleapis.com/performance/trace_duration\"",
+                        "aggregation": {
+                          "alignmentPeriod": "300s",
+                          "perSeriesAligner": "ALIGN_PERCENTILE_95"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Duración (ms)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "xPos": 6,
+            "widget": {
+              "title": "Crashes y ANRs",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"firebase.googleapis.com/crashlytics/crash_free_users\"",
+                        "aggregation": {
+                          "alignmentPeriod": "3600s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_AREA"
+                  }
+                ],
+                "yAxis": {
+                  "label": "% Usuarios sin Crash",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "yPos": 4,
+            "widget": {
+              "title": "Uso de Memoria",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/memory_usage\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Memoria (MB)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 4,
+            "yPos": 4,
+            "widget": {
+              "title": "Uso de CPU",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/cpu_usage\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_AREA"
+                  }
+                ],
+                "yAxis": {
+                  "label": "CPU %",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 8,
+            "yPos": 4,
+            "widget": {
+              "title": "Velocidad de Red",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"firebase.googleapis.com/performance/network_request_duration\"",
+                        "aggregation": {
+                          "alignmentPeriod": "300s",
+                          "perSeriesAligner": "ALIGN_PERCENTILE_50"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Latencia Red (ms)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "displayName": "OasisTaxi - Métricas de Negocio",
+      "mosaicLayout": {
+        "tiles": [
+          {
+            "width": 3,
+            "height": 3,
+            "widget": {
+              "title": "Nuevos Registros Hoy",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/new_users\"",
+                    "aggregation": {
+                      "alignmentPeriod": "86400s",
+                      "perSeriesAligner": "ALIGN_SUM"
+                    }
+                  }
+                },
+                "sparkChartView": {
+                  "sparkChartType": "SPARK_LINE"
+                }
+              }
+            }
+          },
+          {
+            "width": 3,
+            "height": 3,
+            "xPos": 3,
+            "widget": {
+              "title": "Viajes Completados Hoy",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/trips_completed\"",
+                    "aggregation": {
+                      "alignmentPeriod": "86400s",
+                      "perSeriesAligner": "ALIGN_SUM"
+                    }
+                  }
+                },
+                "sparkChartView": {
+                  "sparkChartType": "SPARK_BAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 3,
+            "height": 3,
+            "xPos": 6,
+            "widget": {
+              "title": "Ingresos del Día",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/daily_revenue\"",
+                    "aggregation": {
+                      "alignmentPeriod": "86400s",
+                      "perSeriesAligner": "ALIGN_SUM"
+                    }
+                  }
+                },
+                "sparkChartView": {
+                  "sparkChartType": "SPARK_LINE"
+                }
+              }
+            }
+          },
+          {
+            "width": 3,
+            "height": 3,
+            "xPos": 9,
+            "widget": {
+              "title": "Conductores Activos",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/active_drivers\"",
+                    "aggregation": {
+                      "alignmentPeriod": "3600s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "sparkChartView": {
+                  "sparkChartType": "SPARK_BAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "yPos": 3,
+            "widget": {
+              "title": "Distribución de Viajes por Región",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/trips_by_region\"",
+                        "aggregation": {
+                          "alignmentPeriod": "3600s",
+                          "perSeriesAligner": "ALIGN_SUM",
+                          "crossSeriesReducer": "REDUCE_SUM",
+                          "groupByFields": ["metric.label.region"]
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_BAR"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Viajes",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 6,
+            "height": 4,
+            "xPos": 6,
+            "yPos": 3,
+            "widget": {
+              "title": "Tiempo Promedio de Viaje",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"custom.googleapis.com/oasistaxi/trip_duration\"",
+                        "aggregation": {
+                          "alignmentPeriod": "3600s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "LINE"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Duración (min)",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "yPos": 7,
+            "widget": {
+              "title": "Rating Promedio Conductores",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/driver_rating\"",
+                    "aggregation": {
+                      "alignmentPeriod": "3600s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "gaugeView": {
+                  "lowerBound": 1.0,
+                  "upperBound": 5.0
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 4,
+            "yPos": 7,
+            "widget": {
+              "title": "Tasa de Conversión",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/conversion_rate\"",
+                    "aggregation": {
+                      "alignmentPeriod": "3600s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "gaugeView": {
+                  "lowerBound": 0.0,
+                  "upperBound": 100.0
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 3,
+            "xPos": 8,
+            "yPos": 7,
+            "widget": {
+              "title": "Tiempo Promedio de Espera",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/wait_time\"",
+                    "aggregation": {
+                      "alignmentPeriod": "3600s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "sparkChartView": {
+                  "sparkChartType": "SPARK_LINE"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "displayName": "OasisTaxi - Alertas y SLA",
+      "mosaicLayout": {
+        "tiles": [
+          {
+            "width": 12,
+            "height": 2,
+            "widget": {
+              "title": "Estado General del Sistema",
+              "xyChart": {
+                "dataSets": [
+                  {
+                    "timeSeriesQuery": {
+                      "timeSeriesFilter": {
+                        "filter": "metric.type=\"compute.googleapis.com/instance/up\"",
+                        "aggregation": {
+                          "alignmentPeriod": "60s",
+                          "perSeriesAligner": "ALIGN_MEAN"
+                        }
+                      }
+                    },
+                    "plotType": "STACKED_AREA"
+                  }
+                ],
+                "yAxis": {
+                  "label": "Uptime %",
+                  "scale": "LINEAR"
+                }
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 4,
+            "yPos": 2,
+            "widget": {
+              "title": "SLA Uptime (99.9%)",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"custom.googleapis.com/oasistaxi/sla_uptime\"",
+                    "aggregation": {
+                      "alignmentPeriod": "3600s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                },
+                "gaugeView": {
+                  "lowerBound": 95.0,
+                  "upperBound": 100.0
+                },
+                "thresholds": [
+                  {
+                    "value": 99.9,
+                    "color": "GREEN",
+                    "direction": "ABOVE"
+                  },
+                  {
+                    "value": 99.0,
+                    "color": "YELLOW",
+                    "direction": "ABOVE"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 4,
+            "xPos": 4,
+            "yPos": 2,
+            "widget": {
+              "title": "Latencia P95 (< 500ms)",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_time\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_PERCENTILE_95"
+                    }
+                  }
+                },
+                "gaugeView": {
+                  "lowerBound": 0.0,
+                  "upperBound": 1000.0
+                },
+                "thresholds": [
+                  {
+                    "value": 500.0,
+                    "color": "GREEN",
+                    "direction": "BELOW"
+                  },
+                  {
+                    "value": 800.0,
+                    "color": "YELLOW",
+                    "direction": "BELOW"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "width": 4,
+            "height": 4,
+            "xPos": 8,
+            "yPos": 2,
+            "widget": {
+              "title": "Error Rate (< 1%)",
+              "scorecard": {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_count\" AND metric.label.status=\"error\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    }
+                  }
+                },
+                "gaugeView": {
+                  "lowerBound": 0.0,
+                  "upperBound": 5.0
+                },
+                "thresholds": [
+                  {
+                    "value": 1.0,
+                    "color": "GREEN",
+                    "direction": "BELOW"
+                  },
+                  {
+                    "value": 3.0,
+                    "color": "YELLOW",
+                    "direction": "BELOW"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "alertPolicies": [
+    {
+      "displayName": "OasisTaxi - High Error Rate",
+      "conditions": [
+        {
+          "displayName": "Error rate > 5%",
+          "conditionThreshold": {
+            "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_count\" AND metric.label.status=\"error\"",
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 0.05,
+            "duration": "300s",
+            "aggregations": [
+              {
+                "alignmentPeriod": "60s",
+                "perSeriesAligner": "ALIGN_RATE"
+              }
+            ]
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": [],
+      "alertStrategy": {
+        "autoClose": "1800s"
+      }
+    },
+    {
+      "displayName": "OasisTaxi - High Latency",
+      "conditions": [
+        {
+          "displayName": "P95 latency > 1000ms",
+          "conditionThreshold": {
+            "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_time\"",
+            "comparison": "COMPARISON_GT",
+            "thresholdValue": 1000,
+            "duration": "300s",
+            "aggregations": [
+              {
+                "alignmentPeriod": "60s",
+                "perSeriesAligner": "ALIGN_PERCENTILE_95"
+              }
+            ]
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": []
+    },
+    {
+      "displayName": "OasisTaxi - Low Driver Availability",
+      "conditions": [
+        {
+          "displayName": "Active drivers < 5",
+          "conditionThreshold": {
+            "filter": "metric.type=\"custom.googleapis.com/oasistaxi/active_drivers\"",
+            "comparison": "COMPARISON_LT",
+            "thresholdValue": 5,
+            "duration": "600s",
+            "aggregations": [
+              {
+                "alignmentPeriod": "300s",
+                "perSeriesAligner": "ALIGN_MEAN"
+              }
+            ]
+          }
+        }
+      ],
+      "combiner": "OR",
+      "enabled": true,
+      "notificationChannels": []
+    }
+  ],
+  "notificationChannels": [
+    {
+      "type": "email",
+      "displayName": "Admin Email",
+      "description": "Email alerts for critical issues",
+      "labels": {
+        "email_address": "admin@oasistaxiperu.com"
+      },
+      "enabled": true
+    },
+    {
+      "type": "slack",
+      "displayName": "Operations Slack",
+      "description": "Slack notifications for operations team",
+      "labels": {
+        "url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      },
+      "enabled": true
+    }
+  ]
+}

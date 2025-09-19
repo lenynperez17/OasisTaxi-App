@@ -1,4 +1,3 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +5,7 @@ import '../../core/theme/modern_theme.dart';
 import '../../widgets/common/oasis_app_bar.dart';
 import '../../providers/ride_provider.dart';
 import '../../models/trip_model.dart';
+import '../../utils/app_logger.dart';
 
 /// Pantalla para que el conductor ingrese el código de verificación
 class DriverVerificationScreen extends StatefulWidget {
@@ -17,14 +17,15 @@ class DriverVerificationScreen extends StatefulWidget {
   });
 
   @override
-  _DriverVerificationScreenState createState() => _DriverVerificationScreenState();
+  DriverVerificationScreenState createState() =>
+      DriverVerificationScreenState();
 }
 
-class _DriverVerificationScreenState extends State<DriverVerificationScreen>
+class DriverVerificationScreenState extends State<DriverVerificationScreen>
     with TickerProviderStateMixin {
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
-  
+
   List<String> _enteredCode = ['', '', '', ''];
   int _currentIndex = 0;
   bool _isVerifying = false;
@@ -33,7 +34,9 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
   @override
   void initState() {
     super.initState();
-    
+    AppLogger.lifecycle(
+        'DriverVerificationScreen', 'initState - TripId: ${widget.trip.id}');
+
     _shakeController = AnimationController(
       duration: Duration(milliseconds: 500),
       vsync: this,
@@ -69,29 +72,29 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
             children: [
               // Información del pasajero
               _buildPassengerInfo(),
-              
-              SizedBox(height: 40),
-              
+
+              const SizedBox(height: 40),
+
               // Instrucciones
               _buildInstructions(),
-              
-              SizedBox(height: 30),
-              
+
+              const SizedBox(height: 30),
+
               // Campo de entrada del código
               _buildCodeInput(),
-              
+
               if (_errorMessage.isNotEmpty) ...[
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _buildErrorMessage(),
               ],
-              
-              SizedBox(height: 40),
-              
+
+              const SizedBox(height: 40),
+
               // Teclado numérico
               _buildNumericKeypad(),
-              
+
               Spacer(),
-              
+
               // Botón de verificar
               _buildVerifyButton(),
             ],
@@ -121,7 +124,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
               color: ModernTheme.primaryBlue,
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           // Info del pasajero
           Expanded(
             child: Column(
@@ -135,11 +138,12 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                     color: ModernTheme.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.location_on, size: 16, color: ModernTheme.textSecondary),
-                    SizedBox(width: 4),
+                    Icon(Icons.location_on,
+                        size: 16, color: ModernTheme.textSecondary),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         widget.trip.pickupAddress,
@@ -153,11 +157,12 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                     ),
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.flag, size: 16, color: ModernTheme.textSecondary),
-                    SizedBox(width: 4),
+                    Icon(Icons.flag,
+                        size: 16, color: ModernTheme.textSecondary),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         widget.trip.destinationAddress,
@@ -231,7 +236,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
               size: 24,
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +249,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                     color: ModernTheme.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Pide al pasajero su código de 4 dígitos para confirmar que eres su conductor',
                   style: TextStyle(
@@ -265,7 +270,8 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
     return AnimatedBuilder(
       animation: _shakeAnimation,
       builder: (context, child) {
-        final offset = _shakeAnimation.value * 10 * (_shakeAnimation.value < 0.5 ? 1 : -1);
+        final offset =
+            _shakeAnimation.value * 10 * (_shakeAnimation.value < 0.5 ? 1 : -1);
         return Transform.translate(
           offset: Offset(offset, 0),
           child: Row(
@@ -289,7 +295,8 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                   boxShadow: _currentIndex == index
                       ? [
                           BoxShadow(
-                            color: ModernTheme.oasisGreen.withValues(alpha: 0.3),
+                            color:
+                                ModernTheme.oasisGreen.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: Offset(0, 4),
                           ),
@@ -330,7 +337,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
       child: Row(
         children: [
           Icon(Icons.error, color: Colors.red, size: 20),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage,
@@ -358,7 +365,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
               _buildKeypadButton('3'),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           // Fila 4-6
           Row(
             children: [
@@ -367,7 +374,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
               _buildKeypadButton('6'),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           // Fila 7-9
           Row(
             children: [
@@ -376,11 +383,11 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
               _buildKeypadButton('9'),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           // Fila 0 y borrar
           Row(
             children: [
-              Expanded(child: Container()), // Espacio vacío
+              Expanded(child: SizedBox()), // Espacio vacío
               _buildKeypadButton('0'),
               _buildKeypadButton('⌫', isDelete: true),
             ],
@@ -415,7 +422,9 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                   style: TextStyle(
                     fontSize: isDelete ? 20 : 24,
                     fontWeight: FontWeight.bold,
-                    color: isDelete ? Colors.grey.shade600 : ModernTheme.textPrimary,
+                    color: isDelete
+                        ? Colors.grey.shade600
+                        : ModernTheme.textPrimary,
                   ),
                 ),
               ),
@@ -428,7 +437,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
 
   Widget _buildVerifyButton() {
     final isCodeComplete = _enteredCode.every((digit) => digit.isNotEmpty);
-    
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -454,7 +463,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                       strokeWidth: 2,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Text('Verificando...', style: TextStyle(fontSize: 16)),
                 ],
               )
@@ -473,7 +482,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
         _currentIndex++;
         _errorMessage = '';
       });
-      
+
       // Vibración ligera
       HapticFeedback.lightImpact();
     }
@@ -486,7 +495,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
         _enteredCode[_currentIndex] = '';
         _errorMessage = '';
       });
-      
+
       HapticFeedback.lightImpact();
     }
   }
@@ -494,7 +503,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
   void _verifyCode() async {
     final enteredCodeString = _enteredCode.join('');
     final correctCode = widget.trip.verificationCode;
-    
+
     setState(() {
       _isVerifying = true;
       _errorMessage = '';
@@ -506,7 +515,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
     if (enteredCodeString == correctCode) {
       // Código correcto
       HapticFeedback.heavyImpact();
-      
+
       if (mounted) {
         setState(() {
           _isVerifying = false;
@@ -527,7 +536,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
       _shakeController.forward().then((_) {
         _shakeController.reset();
       });
-      
+
       if (mounted) {
         setState(() {
           _isVerifying = false;
@@ -560,7 +569,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                 color: ModernTheme.success,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               '¡Verificación Exitosa!',
               style: TextStyle(
@@ -568,7 +577,7 @@ class _DriverVerificationScreenState extends State<DriverVerificationScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Puedes iniciar el viaje ahora',
               style: TextStyle(

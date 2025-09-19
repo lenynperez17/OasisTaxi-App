@@ -1,7 +1,7 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, unreachable_switch_default, avoid_web_libraries_in_flutter
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/modern_theme.dart';
+import '../../utils/app_logger.dart';
 
 class SettingsAdminScreen extends StatefulWidget {
   const SettingsAdminScreen({super.key});
@@ -11,33 +11,38 @@ class SettingsAdminScreen extends StatefulWidget {
   _SettingsAdminScreenState createState() => _SettingsAdminScreenState();
 }
 
-class _SettingsAdminScreenState extends State<SettingsAdminScreen> 
+class _SettingsAdminScreenState extends State<SettingsAdminScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  
+
   // General settings
   bool _maintenanceMode = false;
   bool _allowNewRegistrations = true;
   bool _requireDocumentVerification = true;
   String _defaultLanguage = 'es';
   String _timezone = 'America/Lima';
-  
+
   // Pricing settings
-  final TextEditingController _baseFareController = TextEditingController(text: '5.00');
-  final TextEditingController _perKmController = TextEditingController(text: '2.50');
-  final TextEditingController _perMinController = TextEditingController(text: '0.50');
-  final TextEditingController _commissionController = TextEditingController(text: '20');
-  final TextEditingController _cancellationFeeController = TextEditingController(text: '5.00');
+  final TextEditingController _baseFareController =
+      TextEditingController(text: '5.00');
+  final TextEditingController _perKmController =
+      TextEditingController(text: '2.50');
+  final TextEditingController _perMinController =
+      TextEditingController(text: '0.50');
+  final TextEditingController _commissionController =
+      TextEditingController(text: '20');
+  final TextEditingController _cancellationFeeController =
+      TextEditingController(text: '5.00');
   bool _dynamicPricing = true;
   double _surgeMultiplier = 1.5;
-  
+
   // Zones settings
   final List<Zone> _zones = [
     Zone(name: 'Centro', surcharge: 0, restricted: false),
     Zone(name: 'Aeropuerto', surcharge: 10, restricted: false),
     Zone(name: 'Zona Industrial', surcharge: 5, restricted: true),
   ];
-  
+
   // Promotions settings
   final List<Promotion> _promotions = [
     Promotion(
@@ -55,7 +60,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       expiryDate: DateTime.now().add(Duration(days: 15)),
     ),
   ];
-  
+
   // Notifications settings
   bool _pushNotifications = true;
   bool _emailNotifications = true;
@@ -63,7 +68,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
   bool _notifyNewTrips = true;
   bool _notifyPayments = true;
   bool _notifyEmergencies = true;
-  
+
   // Security settings
   bool _twoFactorAuth = true;
   int _sessionTimeout = 30;
@@ -71,18 +76,19 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
   bool _requireStrongPasswords = true;
   bool _enableApiAccess = false;
   String _apiKey = 'sk_live_...';
-  
+
   // Backup settings
   bool _autoBackup = true;
   String _backupFrequency = 'daily';
   String _backupTime = '03:00';
-  
+
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('SettingsAdminScreen', 'initState');
     _tabController = TabController(length: 6, vsync: this);
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -93,7 +99,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
     _cancellationFeeController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,7 +148,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildGeneralSettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -181,24 +187,25 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                   ),
                 ),
               ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Permitir Nuevos Registros'),
               subtitle: Text('Habilita el registro de nuevos usuarios'),
               value: _allowNewRegistrations,
-              onChanged: (value) => setState(() => _allowNewRegistrations = value),
+              onChanged: (value) =>
+                  setState(() => _allowNewRegistrations = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Verificación de Documentos'),
               subtitle: Text('Requiere verificación para conductores'),
               value: _requireDocumentVerification,
-              onChanged: (value) => setState(() => _requireDocumentVerification = value),
+              onChanged: (value) =>
+                  setState(() => _requireDocumentVerification = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('Regional'),
           _buildSettingCard([
@@ -208,7 +215,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               trailing: Icon(Icons.arrow_forward_ios, size: 16),
               onTap: _showLanguageDialog,
             ),
-            Divider(),
+            const Divider(),
             ListTile(
               title: Text('Zona Horaria'),
               subtitle: Text(_timezone),
@@ -216,7 +223,6 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               onTap: _showTimezoneDialog,
             ),
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('Respaldo de Datos'),
           _buildSettingCard([
@@ -228,14 +234,14 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
             if (_autoBackup) ...[
-              Divider(),
+              const Divider(),
               ListTile(
                 title: Text('Frecuencia'),
                 subtitle: Text(_getBackupFrequencyText()),
                 trailing: Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: _showBackupFrequencyDialog,
               ),
-              Divider(),
+              const Divider(),
               ListTile(
                 title: Text('Hora del Respaldo'),
                 subtitle: Text(_backupTime),
@@ -248,7 +254,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildPricingSettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -267,14 +273,15 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                   SizedBox(height: 16),
                   _buildPriceInput('Por Minuto', _perMinController, 'S/'),
                   SizedBox(height: 16),
-                  _buildPriceInput('Comisión Plataforma', _commissionController, '%'),
+                  _buildPriceInput(
+                      'Comisión Plataforma', _commissionController, '%'),
                   SizedBox(height: 16),
-                  _buildPriceInput('Penalidad Cancelación', _cancellationFeeController, 'S/'),
+                  _buildPriceInput('Penalidad Cancelación',
+                      _cancellationFeeController, 'S/'),
                 ],
               ),
             ),
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('Precios Dinámicos'),
           _buildSettingCard([
@@ -286,7 +293,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
             if (_dynamicPricing) ...[
-              Divider(),
+              const Divider(),
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
@@ -323,7 +330,6 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               ),
             ],
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('Horarios Especiales'),
           _buildSettingCard([
@@ -337,7 +343,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                 thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
               ),
             ),
-            Divider(),
+            const Divider(),
             ListTile(
               leading: Icon(Icons.weekend, color: Colors.orange),
               title: Text('Tarifa Fin de Semana'),
@@ -353,7 +359,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildZonesSettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -382,7 +388,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildZoneCard(Zone zone) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -394,15 +400,18 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       child: ExpansionTile(
         title: Text(zone.name),
         subtitle: Text(
-          zone.restricted ? 'Zona Restringida' : 'Recargo: S/ ${zone.surcharge}',
+          zone.restricted
+              ? 'Zona Restringida'
+              : 'Recargo: S/ ${zone.surcharge}',
           style: TextStyle(
-            color: zone.restricted ? ModernTheme.error : ModernTheme.textSecondary,
+            color:
+                zone.restricted ? ModernTheme.error : ModernTheme.textSecondary,
           ),
         ),
         leading: Container(
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: zone.restricted 
+            color: zone.restricted
                 ? ModernTheme.error.withValues(alpha: 0.1)
                 : ModernTheme.oasisGreen.withValues(alpha: 0.1),
             shape: BoxShape.circle,
@@ -439,7 +448,8 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                     ),
                     prefixText: 'S/ ',
                   ),
-                  controller: TextEditingController(text: zone.surcharge.toString()),
+                  controller:
+                      TextEditingController(text: zone.surcharge.toString()),
                   keyboardType: TextInputType.number,
                 ),
                 SizedBox(height: 16),
@@ -459,7 +469,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildPromotionsSettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -488,7 +498,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildPromotionCard(Promotion promo) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -540,7 +550,8 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
           SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 14, color: ModernTheme.textSecondary),
+              Icon(Icons.calendar_today,
+                  size: 14, color: ModernTheme.textSecondary),
               SizedBox(width: 4),
               Text(
                 'Vence: ${promo.expiryDate.day}/${promo.expiryDate.month}/${promo.expiryDate.year}',
@@ -574,7 +585,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildNotificationSettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -589,9 +600,10 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               value: _pushNotifications,
               onChanged: (value) => setState(() => _pushNotifications = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
-              secondary: Icon(Icons.notifications, color: ModernTheme.primaryBlue),
+              secondary:
+                  Icon(Icons.notifications, color: ModernTheme.primaryBlue),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Notificaciones por Email'),
               subtitle: Text('Enviar correos electrónicos'),
@@ -600,7 +612,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
               secondary: Icon(Icons.email, color: Colors.orange),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Notificaciones SMS'),
               subtitle: Text('Enviar mensajes de texto'),
@@ -610,7 +622,6 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               secondary: Icon(Icons.sms, color: Colors.purple),
             ),
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('Tipos de Notificaciones'),
           _buildSettingCard([
@@ -621,7 +632,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               onChanged: (value) => setState(() => _notifyNewTrips = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Pagos y Transacciones'),
               subtitle: Text('Notificar pagos recibidos y retiros'),
@@ -629,7 +640,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               onChanged: (value) => setState(() => _notifyPayments = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Emergencias'),
               subtitle: Text('Alertas de seguridad y emergencias'),
@@ -642,7 +653,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildSecuritySettings() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -659,7 +670,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
               secondary: Icon(Icons.security, color: ModernTheme.oasisGreen),
             ),
-            Divider(),
+            const Divider(),
             ListTile(
               leading: Icon(Icons.timer, color: ModernTheme.warning),
               title: Text('Tiempo de Sesión'),
@@ -685,7 +696,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                 ],
               ),
             ),
-            Divider(),
+            const Divider(),
             ListTile(
               leading: Icon(Icons.lock, color: ModernTheme.error),
               title: Text('Máximo de Intentos de Login'),
@@ -711,16 +722,16 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
                 ],
               ),
             ),
-            Divider(),
+            const Divider(),
             SwitchListTile(
               title: Text('Contraseñas Fuertes'),
               subtitle: Text('Mínimo 8 caracteres, mayúsculas y números'),
               value: _requireStrongPasswords,
-              onChanged: (value) => setState(() => _requireStrongPasswords = value),
+              onChanged: (value) =>
+                  setState(() => _requireStrongPasswords = value),
               thumbColor: WidgetStateProperty.all(ModernTheme.oasisGreen),
             ),
           ]),
-          
           SizedBox(height: 20),
           _buildSectionTitle('API y Acceso Externo'),
           _buildSettingCard([
@@ -733,7 +744,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
               secondary: Icon(Icons.api, color: ModernTheme.primaryBlue),
             ),
             if (_enableApiAccess) ...[
-              Divider(),
+              const Divider(),
               ListTile(
                 leading: Icon(Icons.vpn_key, color: ModernTheme.warning),
                 title: Text('API Key'),
@@ -758,7 +769,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: EdgeInsets.only(bottom: 12),
@@ -772,7 +783,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   Widget _buildSettingCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
@@ -783,8 +794,9 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       child: Column(children: children),
     );
   }
-  
-  Widget _buildPriceInput(String label, TextEditingController controller, String suffix) {
+
+  Widget _buildPriceInput(
+      String label, TextEditingController controller, String suffix) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.numberWithOptions(decimal: true),
@@ -800,7 +812,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ],
     );
   }
-  
+
   String _getBackupFrequencyText() {
     switch (_backupFrequency) {
       case 'daily':
@@ -813,7 +825,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
         return 'Diario';
     }
   }
-  
+
   void _showLanguageDialog() {
     showDialog(
       context: context,
@@ -822,33 +834,21 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'es',
-                groupValue: _defaultLanguage,
-                onChanged: (value) {
-                  setState(() => _defaultLanguage = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'es',
+              groupValue: _defaultLanguage,
               title: Text('Español'),
-              onTap: () {
-                setState(() => _defaultLanguage = 'es');
+              onChanged: (value) {
+                setState(() => _defaultLanguage = value!);
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'en',
-                groupValue: _defaultLanguage,
-                onChanged: (value) {
-                  setState(() => _defaultLanguage = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'en',
+              groupValue: _defaultLanguage,
               title: Text('English'),
-              onTap: () {
-                setState(() => _defaultLanguage = 'en');
+              onChanged: (value) {
+                setState(() => _defaultLanguage = value!);
                 Navigator.pop(context);
               },
             ),
@@ -857,7 +857,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   void _showTimezoneDialog() {
     showDialog(
       context: context,
@@ -866,33 +866,21 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'America/Lima',
-                groupValue: _timezone,
-                onChanged: (value) {
-                  setState(() => _timezone = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'America/Lima',
+              groupValue: _timezone,
               title: Text('América/Lima'),
-              onTap: () {
-                setState(() => _timezone = 'America/Lima');
+              onChanged: (value) {
+                setState(() => _timezone = value!);
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'America/Mexico_City',
-                groupValue: _timezone,
-                onChanged: (value) {
-                  setState(() => _timezone = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'America/Mexico_City',
+              groupValue: _timezone,
               title: Text('América/México'),
-              onTap: () {
-                setState(() => _timezone = 'America/Mexico_City');
+              onChanged: (value) {
+                setState(() => _timezone = value!);
                 Navigator.pop(context);
               },
             ),
@@ -901,7 +889,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   void _showBackupFrequencyDialog() {
     showDialog(
       context: context,
@@ -910,48 +898,30 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'daily',
-                groupValue: _backupFrequency,
-                onChanged: (value) {
-                  setState(() => _backupFrequency = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'daily',
+              groupValue: _backupFrequency,
               title: Text('Diario'),
-              onTap: () {
-                setState(() => _backupFrequency = 'daily');
+              onChanged: (value) {
+                setState(() => _backupFrequency = value!);
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'weekly',
-                groupValue: _backupFrequency,
-                onChanged: (value) {
-                  setState(() => _backupFrequency = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'weekly',
+              groupValue: _backupFrequency,
               title: Text('Semanal'),
-              onTap: () {
-                setState(() => _backupFrequency = 'weekly');
+              onChanged: (value) {
+                setState(() => _backupFrequency = value!);
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'monthly',
-                groupValue: _backupFrequency,
-                onChanged: (value) {
-                  setState(() => _backupFrequency = value!);
-                  Navigator.pop(context);
-                },
-              ),
+            RadioListTile<String>(
+              value: 'monthly',
+              groupValue: _backupFrequency,
               title: Text('Mensual'),
-              onTap: () {
-                setState(() => _backupFrequency = 'monthly');
+              onChanged: (value) {
+                setState(() => _backupFrequency = value!);
                 Navigator.pop(context);
               },
             ),
@@ -960,7 +930,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   void _showTimePickerDialog() async {
     final time = await showTimePicker(
       context: context,
@@ -968,23 +938,24 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
     );
     if (time != null) {
       setState(() {
-        _backupTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        _backupTime =
+            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
       });
     }
   }
-  
+
   void _addZone() {
     setState(() {
       _zones.add(Zone(name: 'Nueva Zona', surcharge: 0, restricted: false));
     });
   }
-  
+
   void _removeZone(Zone zone) {
     setState(() {
       _zones.remove(zone);
     });
   }
-  
+
   void _addPromotion() {
     setState(() {
       _promotions.add(
@@ -998,17 +969,17 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       );
     });
   }
-  
+
   void _editPromotion(Promotion promo) {
     // Show edit dialog
   }
-  
+
   void _removePromotion(Promotion promo) {
     setState(() {
       _promotions.remove(promo);
     });
   }
-  
+
   void _copyApiKey() {
     Clipboard.setData(ClipboardData(text: _apiKey));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1018,7 +989,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   void _regenerateApiKey() {
     setState(() {
       _apiKey = 'sk_live_${DateTime.now().millisecondsSinceEpoch}';
@@ -1030,7 +1001,7 @@ class _SettingsAdminScreenState extends State<SettingsAdminScreen>
       ),
     );
   }
-  
+
   void _saveSettings() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1046,7 +1017,7 @@ class Zone {
   String name;
   double surcharge;
   bool restricted;
-  
+
   Zone({
     required this.name,
     required this.surcharge,
@@ -1060,7 +1031,7 @@ class Promotion {
   DiscountType type;
   bool active;
   DateTime expiryDate;
-  
+
   Promotion({
     required this.code,
     required this.discount,

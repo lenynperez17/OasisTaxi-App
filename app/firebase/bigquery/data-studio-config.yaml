@@ -1,0 +1,515 @@
+# 📊 CONFIGURACIÓN DE DATA STUDIO DASHBOARDS
+# OasisTaxi Perú - Análisis de Datos en Tiempo Real
+# 
+# Este archivo contiene la configuración completa para crear dashboards
+# profesionales en Google Data Studio conectados a BigQuery
+
+# ═══════════════════════════════════════════════════════════════════
+# 📈 DASHBOARD 1: MÉTRICAS GENERALES DE NEGOCIO
+# ═══════════════════════════════════════════════════════════════════
+dashboard_business_metrics:
+  name: "OasisTaxi - Métricas de Negocio"
+  description: "Dashboard principal con KPIs y métricas clave del negocio"
+  data_sources:
+    - table: "oasis-taxi-peru.analytics_325492040.events_*"
+      type: "Firebase Analytics"
+    - table: "oasis-taxi-peru.firestore_export.trips_*"
+      type: "Firestore Export"
+    - table: "oasis-taxi-peru.firestore_export.users_*"
+      type: "Firestore Export"
+  
+  charts:
+    - type: "scorecard"
+      title: "Viajes Completados (24h)"
+      metric: "total_completed_trips"
+      query: |
+        SELECT COUNT(*) as total_completed_trips
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE status = 'completed'
+        AND DATE(_PARTITIONTIME) = CURRENT_DATE()
+    
+    - type: "scorecard"
+      title: "Ingresos Totales (24h)"
+      metric: "daily_revenue"
+      query: |
+        SELECT SUM(finalPrice) as daily_revenue
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE status = 'completed'
+        AND DATE(_PARTITIONTIME) = CURRENT_DATE()
+        AND paymentStatus = 'paid'
+    
+    - type: "time_series"
+      title: "Viajes por Hora"
+      query: |
+        SELECT 
+          EXTRACT(HOUR FROM createdAt) as hour,
+          COUNT(*) as trip_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+        GROUP BY hour
+        ORDER BY hour
+    
+    - type: "geo_map"
+      title: "Distribución Geográfica de Viajes"
+      query: |
+        SELECT 
+          pickup.address as pickup_address,
+          pickup.lat as pickup_lat,
+          pickup.lng as pickup_lng,
+          COUNT(*) as trip_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'completed'
+        GROUP BY pickup_address, pickup_lat, pickup_lng
+        HAVING trip_count > 5
+        ORDER BY trip_count DESC
+    
+    - type: "bar_chart"
+      title: "Top 10 Rutas Más Populares"
+      query: |
+        SELECT 
+          CONCAT(pickup.address, ' → ', destination.address) as route,
+          COUNT(*) as frequency,
+          AVG(finalPrice) as avg_price
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'completed'
+        GROUP BY route
+        ORDER BY frequency DESC
+        LIMIT 10
+
+# ═══════════════════════════════════════════════════════════════════
+# 🚗 DASHBOARD 2: ANÁLISIS DE CONDUCTORES
+# ═══════════════════════════════════════════════════════════════════
+dashboard_driver_analytics:
+  name: "OasisTaxi - Análisis de Conductores"
+  description: "Métricas de rendimiento y comportamiento de conductores"
+  data_sources:
+    - table: "oasis-taxi-peru.firestore_export.trips_*"
+    - table: "oasis-taxi-peru.firestore_export.users_*"
+    - table: "oasis-taxi-peru.firestore_export.ratings_*"
+  
+  charts:
+    - type: "scorecard"
+      title: "Conductores Activos (7 días)"
+      query: |
+        SELECT COUNT(DISTINCT driverId) as active_drivers
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+        AND status IN ('completed', 'in_progress')
+    
+    - type: "table"
+      title: "Top 10 Conductores por Ingresos"
+      query: |
+        SELECT 
+          u.displayName as driver_name,
+          COUNT(t.id) as total_trips,
+          SUM(t.finalPrice) as total_earnings,
+          AVG(r.rating) as avg_rating,
+          SUM(t.finalPrice) * 0.8 as driver_share
+        FROM `oasis-taxi-peru.firestore_export.trips_*` t
+        JOIN `oasis-taxi-peru.firestore_export.users_*` u ON t.driverId = u.uid
+        LEFT JOIN `oasis-taxi-peru.firestore_export.ratings_*` r ON t.id = r.tripId
+        WHERE DATE(t._PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND t.status = 'completed'
+        AND u.userType = 'driver'
+        GROUP BY u.displayName, u.uid
+        ORDER BY total_earnings DESC
+        LIMIT 10
+    
+    - type: "histogram"
+      title: "Distribución de Ratings de Conductores"
+      query: |
+        SELECT 
+          rating,
+          COUNT(*) as count
+        FROM `oasis-taxi-peru.firestore_export.ratings_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND ratingType = 'driver'
+        GROUP BY rating
+        ORDER BY rating
+    
+    - type: "time_series"
+      title: "Nuevos Conductores por Semana"
+      query: |
+        SELECT 
+          DATE_TRUNC(DATE(createdAt), WEEK) as week,
+          COUNT(*) as new_drivers
+        FROM `oasis-taxi-peru.firestore_export.users_*`
+        WHERE userType = 'driver'
+        AND DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+        GROUP BY week
+        ORDER BY week
+
+# ═══════════════════════════════════════════════════════════════════
+# 📱 DASHBOARD 3: EXPERIENCIA DE USUARIO
+# ═══════════════════════════════════════════════════════════════════
+dashboard_user_experience:
+  name: "OasisTaxi - Experiencia de Usuario"
+  description: "Análisis de comportamiento y satisfacción de usuarios"
+  data_sources:
+    - table: "oasis-taxi-peru.analytics_325492040.events_*"
+    - table: "oasis-taxi-peru.firestore_export.ratings_*"
+    - table: "oasis-taxi-peru.firestore_export.trips_*"
+  
+  charts:
+    - type: "scorecard"
+      title: "NPS Score (30 días)"
+      query: |
+        WITH nps_data AS (
+          SELECT 
+            CASE 
+              WHEN rating >= 9 THEN 'promoter'
+              WHEN rating >= 7 THEN 'passive'
+              ELSE 'detractor'
+            END as nps_category
+          FROM `oasis-taxi-peru.firestore_export.ratings_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          AND ratingType = 'overall'
+        )
+        SELECT 
+          ROUND(
+            (COUNTIF(nps_category = 'promoter') - COUNTIF(nps_category = 'detractor')) * 100.0 / COUNT(*), 
+            1
+          ) as nps_score
+        FROM nps_data
+    
+    - type: "funnel_chart"
+      title: "Embudo de Conversión de Viajes"
+      query: |
+        WITH funnel_data AS (
+          SELECT 
+            'Solicitudes Creadas' as stage, 
+            COUNT(*) as count, 
+            1 as stage_order
+          FROM `oasis-taxi-peru.firestore_export.trips_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+          
+          UNION ALL
+          
+          SELECT 
+            'Conductor Asignado' as stage, 
+            COUNT(*) as count, 
+            2 as stage_order
+          FROM `oasis-taxi-peru.firestore_export.trips_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+          AND driverId IS NOT NULL
+          
+          UNION ALL
+          
+          SELECT 
+            'Viaje Iniciado' as stage, 
+            COUNT(*) as count, 
+            3 as stage_order
+          FROM `oasis-taxi-peru.firestore_export.trips_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+          AND status IN ('in_progress', 'completed')
+          
+          UNION ALL
+          
+          SELECT 
+            'Viaje Completado' as stage, 
+            COUNT(*) as count, 
+            4 as stage_order
+          FROM `oasis-taxi-peru.firestore_export.trips_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+          AND status = 'completed'
+        )
+        SELECT stage, count
+        FROM funnel_data
+        ORDER BY stage_order
+    
+    - type: "pie_chart"
+      title: "Razones de Cancelación"
+      query: |
+        SELECT 
+          cancellationReason as reason,
+          COUNT(*) as count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'cancelled'
+        AND cancellationReason IS NOT NULL
+        GROUP BY reason
+        ORDER BY count DESC
+
+# ═══════════════════════════════════════════════════════════════════
+# 💰 DASHBOARD 4: ANÁLISIS FINANCIERO
+# ═══════════════════════════════════════════════════════════════════
+dashboard_financial:
+  name: "OasisTaxi - Análisis Financiero"
+  description: "Métricas financieras, comisiones y rentabilidad"
+  data_sources:
+    - table: "oasis-taxi-peru.firestore_export.trips_*"
+    - table: "oasis-taxi-peru.firestore_export.payments_*"
+    - table: "oasis-taxi-peru.firestore_export.price_negotiations_*"
+  
+  charts:
+    - type: "line_chart"
+      title: "Ingresos Diarios (30 días)"
+      query: |
+        SELECT 
+          DATE(_PARTITIONTIME) as date,
+          SUM(finalPrice) as total_revenue,
+          SUM(finalPrice) * 0.2 as commission_revenue,
+          COUNT(*) as trip_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'completed'
+        AND paymentStatus = 'paid'
+        GROUP BY date
+        ORDER BY date
+    
+    - type: "scorecard"
+      title: "Precio Promedio Negociado"
+      query: |
+        SELECT AVG(finalPrice) as avg_negotiated_price
+        FROM `oasis-taxi-peru.firestore_export.price_negotiations_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'accepted'
+    
+    - type: "bar_chart"
+      title: "Ingresos por Método de Pago"
+      query: |
+        SELECT 
+          p.method as payment_method,
+          SUM(t.finalPrice) as total_amount,
+          COUNT(*) as transaction_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*` t
+        JOIN `oasis-taxi-peru.firestore_export.payments_*` p ON t.id = p.tripId
+        WHERE DATE(t._PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND t.status = 'completed'
+        AND p.status = 'completed'
+        GROUP BY payment_method
+        ORDER BY total_amount DESC
+    
+    - type: "gauge_chart"
+      title: "Eficiencia de Negociación de Precios"
+      query: |
+        SELECT 
+          ROUND(
+            COUNTIF(finalPrice > initialPrice) * 100.0 / COUNT(*),
+            1
+          ) as negotiation_success_rate
+        FROM `oasis-taxi-peru.firestore_export.price_negotiations_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        AND status = 'accepted'
+
+# ═══════════════════════════════════════════════════════════════════
+# 🗓️ DASHBOARD 5: ANÁLISIS TEMPORAL Y PATRONES
+# ═══════════════════════════════════════════════════════════════════
+dashboard_temporal:
+  name: "OasisTaxi - Análisis Temporal"
+  description: "Patrones de demanda por horario, día y temporada"
+  
+  charts:
+    - type: "heatmap"
+      title: "Heatmap de Demanda (Hora vs Día)"
+      query: |
+        SELECT 
+          EXTRACT(DAYOFWEEK FROM createdAt) as day_of_week,
+          EXTRACT(HOUR FROM createdAt) as hour_of_day,
+          COUNT(*) as trip_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        GROUP BY day_of_week, hour_of_day
+        ORDER BY day_of_week, hour_of_day
+    
+    - type: "time_series"
+      title: "Tendencia de Surge Pricing"
+      query: |
+        SELECT 
+          DATETIME_TRUNC(createdAt, HOUR) as hour,
+          AVG(surgeMultiplier) as avg_surge,
+          COUNT(*) as trip_count
+        FROM `oasis-taxi-peru.firestore_export.trips_*`
+        WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+        AND surgeMultiplier > 1.0
+        GROUP BY hour
+        ORDER BY hour
+    
+    - type: "bar_chart"
+      title: "Distribución de Viajes por Distrito (Lima)"
+      query: |
+        WITH lima_districts AS (
+          SELECT 
+            CASE 
+              WHEN pickup.address LIKE '%Miraflores%' THEN 'Miraflores'
+              WHEN pickup.address LIKE '%San Isidro%' THEN 'San Isidro'
+              WHEN pickup.address LIKE '%Barranco%' THEN 'Barranco'
+              WHEN pickup.address LIKE '%Surco%' THEN 'Surco'
+              WHEN pickup.address LIKE '%La Molina%' THEN 'La Molina'
+              WHEN pickup.address LIKE '%San Borja%' THEN 'San Borja'
+              WHEN pickup.address LIKE '%Pueblo Libre%' THEN 'Pueblo Libre'
+              WHEN pickup.address LIKE '%Jesús María%' THEN 'Jesús María'
+              WHEN pickup.address LIKE '%Lince%' THEN 'Lince'
+              WHEN pickup.address LIKE '%Magdalena%' THEN 'Magdalena'
+              ELSE 'Otros'
+            END as district,
+            COUNT(*) as trip_count,
+            AVG(finalPrice) as avg_price
+          FROM `oasis-taxi-peru.firestore_export.trips_*`
+          WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          AND pickup.address LIKE '%Lima%'
+          AND status = 'completed'
+          GROUP BY district
+        )
+        SELECT district, trip_count, avg_price
+        FROM lima_districts
+        ORDER BY trip_count DESC
+
+# ═══════════════════════════════════════════════════════════════════
+# 🚀 CONFIGURACIÓN DE EXPORTACIÓN AUTOMÁTICA
+# ═══════════════════════════════════════════════════════════════════
+export_settings:
+  schedule: "daily_at_6am"  # Hora de Perú
+  formats: ["pdf", "csv", "google_sheets"]
+  recipients:
+    - "admin@oasistaxiperu.com"
+    - "analytics@oasistaxiperu.com"
+  
+  email_template: |
+    Estimado equipo,
+    
+    Adjunto encontrarás los reportes diarios de OasisTaxi del {date}.
+    
+    Resumen ejecutivo:
+    - Viajes completados: {total_trips}
+    - Ingresos del día: S/ {daily_revenue}
+    - Conductores activos: {active_drivers}
+    - Rating promedio: {avg_rating}/5
+    
+    Puedes acceder a los dashboards interactivos en:
+    https://datastudio.google.com/reporting/oasistaxi-dashboards
+    
+    Saludos,
+    Sistema OasisTaxi
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 INSTRUCCIONES DE IMPLEMENTACIÓN
+# ═══════════════════════════════════════════════════════════════════
+
+# 1. CONFIGURAR BIGQUERY EXPORTS
+# Ejecutar desde Firebase Console:
+gcloud firestore export gs://oasis-taxi-peru-exports/firestore-exports/$(date +%Y%m%d) --collection-ids=trips,users,ratings,payments,price_negotiations
+
+# 2. CREAR DATASET EN BIGQUERY
+bq mk --dataset --location=us-central1 oasis-taxi-peru:firestore_export
+
+# 3. CONFIGURAR SCHEDULED QUERIES
+bq query --use_legacy_sql=false --destination_table=oasis-taxi-peru:analytics.daily_summary --replace --schedule='every 24 hours' '
+SELECT 
+  CURRENT_DATE() as report_date,
+  COUNT(*) as total_trips,
+  SUM(finalPrice) as total_revenue,
+  COUNT(DISTINCT driverId) as active_drivers,
+  AVG(rating) as avg_rating
+FROM `oasis-taxi-peru.firestore_export.trips_*`
+WHERE DATE(_PARTITIONTIME) = CURRENT_DATE()
+AND status = "completed"
+'
+
+# 4. CREAR DASHBOARDS EN DATA STUDIO
+# URL: https://datastudio.google.com/
+# 1. Conectar fuente de datos BigQuery
+# 2. Usar las queries de este archivo
+# 3. Configurar filtros por fecha
+# 4. Establecer actualización automática cada hora
+
+# 5. CONFIGURAR ALERTAS AUTOMÁTICAS
+# En Google Cloud Monitoring:
+gcloud alpha monitoring policies create --policy-from-file=monitoring-alerts.yaml
+
+# 6. PERMISOS NECESARIOS
+# Para Data Studio:
+gcloud projects add-iam-policy-binding oasis-taxi-peru --member="serviceAccount:service-account@oasis-taxi-peru.iam.gserviceaccount.com" --role="roles/bigquery.dataViewer"
+gcloud projects add-iam-policy-binding oasis-taxi-peru --member="serviceAccount:service-account@oasis-taxi-peru.iam.gserviceaccount.com" --role="roles/bigquery.jobUser"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📊 QUERIES SQL ADICIONALES PARA ANÁLISIS AVANZADO
+# ═══════════════════════════════════════════════════════════════════
+
+# COHORT ANALYSIS - Retención de usuarios
+CREATE OR REPLACE TABLE `oasis-taxi-peru.analytics.user_cohorts` AS
+WITH user_first_trip AS (
+  SELECT 
+    passengerId,
+    DATE(MIN(createdAt)) as first_trip_date
+  FROM `oasis-taxi-peru.firestore_export.trips_*`
+  WHERE status = 'completed'
+  GROUP BY passengerId
+),
+monthly_activity AS (
+  SELECT 
+    passengerId,
+    DATE_TRUNC(DATE(createdAt), MONTH) as activity_month
+  FROM `oasis-taxi-peru.firestore_export.trips_*`
+  WHERE status = 'completed'
+  GROUP BY passengerId, activity_month
+)
+SELECT 
+  DATE_TRUNC(first_trip_date, MONTH) as cohort_month,
+  activity_month,
+  DATE_DIFF(activity_month, DATE_TRUNC(first_trip_date, MONTH), MONTH) as period_number,
+  COUNT(DISTINCT u.passengerId) as users
+FROM user_first_trip u
+JOIN monthly_activity m ON u.passengerId = m.passengerId
+GROUP BY cohort_month, activity_month, period_number
+ORDER BY cohort_month, period_number;
+
+# DRIVER PERFORMANCE SCORING
+CREATE OR REPLACE TABLE `oasis-taxi-peru.analytics.driver_scores` AS
+SELECT 
+  driverId,
+  COUNT(*) as total_trips,
+  AVG(rating) as avg_rating,
+  SUM(finalPrice) as total_earnings,
+  AVG(DATETIME_DIFF(completedAt, acceptedAt, MINUTE)) as avg_trip_duration,
+  COUNTIF(status = 'cancelled' AND cancelledBy = 'driver') as driver_cancellations,
+  -- Score calculation (0-100)
+  GREATEST(0, LEAST(100, 
+    (AVG(rating) - 3) * 25 +  -- Rating component (60% weight)
+    GREATEST(0, 20 - COUNTIF(status = 'cancelled' AND cancelledBy = 'driver')) +  -- Cancellation penalty
+    LEAST(20, COUNT(*) / 10)  -- Activity bonus
+  )) as performance_score
+FROM `oasis-taxi-peru.firestore_export.trips_*`
+WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+AND driverId IS NOT NULL
+GROUP BY driverId
+HAVING COUNT(*) >= 5;  -- Mínimo 5 viajes para scoring
+
+# PEAK HOURS ANALYSIS
+CREATE OR REPLACE TABLE `oasis-taxi-peru.analytics.peak_hours` AS
+WITH hourly_stats AS (
+  SELECT 
+    EXTRACT(HOUR FROM createdAt) as hour,
+    EXTRACT(DAYOFWEEK FROM createdAt) as day_of_week,
+    COUNT(*) as trip_count,
+    AVG(finalPrice) as avg_price,
+    AVG(surgeMultiplier) as avg_surge
+  FROM `oasis-taxi-peru.firestore_export.trips_*`
+  WHERE DATE(_PARTITIONTIME) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  AND status = 'completed'
+  GROUP BY hour, day_of_week
+)
+SELECT 
+  hour,
+  day_of_week,
+  CASE day_of_week
+    WHEN 1 THEN 'Domingo'
+    WHEN 2 THEN 'Lunes'
+    WHEN 3 THEN 'Martes'
+    WHEN 4 THEN 'Miércoles'
+    WHEN 5 THEN 'Jueves'
+    WHEN 6 THEN 'Viernes'
+    WHEN 7 THEN 'Sábado'
+  END as day_name,
+  trip_count,
+  avg_price,
+  avg_surge,
+  CASE 
+    WHEN trip_count > PERCENTILE_CONT(trip_count, 0.8) OVER() THEN 'Peak'
+    WHEN trip_count > PERCENTILE_CONT(trip_count, 0.5) OVER() THEN 'Medium'
+    ELSE 'Low'
+  END as demand_level
+FROM hourly_stats
+ORDER BY day_of_week, hour;

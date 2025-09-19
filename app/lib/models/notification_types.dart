@@ -4,51 +4,51 @@ enum NotificationType {
   general,
   system,
   maintenance,
-  
+
   // Notificaciones de viaje
-  tripRequest,        // Nueva solicitud de viaje
-  tripAccepted,       // Viaje aceptado por conductor
-  tripStarted,        // Viaje iniciado
-  tripCompleted,      // Viaje completado
-  tripCancelled,      // Viaje cancelado
-  driverArrived,      // Conductor llegó al punto de recogida
-  driverAssigned,     // Conductor asignado
-  
+  tripRequest, // Nueva solicitud de viaje
+  tripAccepted, // Viaje aceptado por conductor
+  tripStarted, // Viaje iniciado
+  tripCompleted, // Viaje completado
+  tripCancelled, // Viaje cancelado
+  driverArrived, // Conductor llegó al punto de recogida
+  driverAssigned, // Conductor asignado
+
   // Alias y notificaciones adicionales de viaje
-  rideUpdate,         // Actualización general del viaje
-  rideAccepted,       // Alias para tripAccepted (compatibilidad)
-  rideCancelled,      // Alias para tripCancelled (compatibilidad)
-  
+  rideUpdate, // Actualización general del viaje
+  rideAccepted, // Alias para tripAccepted (compatibilidad)
+  rideCancelled, // Alias para tripCancelled (compatibilidad)
+
   // Notificaciones de pago
-  payment,            // Pago general
-  paymentSuccess,     // Pago exitoso
-  paymentFailed,      // Fallo en pago
-  paymentRefund,      // Reembolso procesado
-  
+  payment, // Pago general
+  paymentSuccess, // Pago exitoso
+  paymentFailed, // Fallo en pago
+  paymentRefund, // Reembolso procesado
+
   // Notificaciones de emergencia
-  emergency,          // Botón SOS activado
-  securityAlert,      // Alerta de seguridad
-  
+  emergency, // Botón SOS activado
+  securityAlert, // Alerta de seguridad
+
   // Notificaciones de chat
-  chatMessage,        // Nuevo mensaje en chat
-  chatDriverMessage,  // Mensaje del conductor
+  chatMessage, // Nuevo mensaje en chat
+  chatDriverMessage, // Mensaje del conductor
   chatPassengerMessage, // Mensaje del pasajero
-  
+
   // Notificaciones promocionales
-  promotion,          // Promoción general
-  discount,           // Descuento disponible
-  specialOffer,       // Oferta especial
-  
+  promotion, // Promoción general
+  discount, // Descuento disponible
+  specialOffer, // Oferta especial
+
   // Soporte y sistema
-  support,            // Mensaje de soporte
-  appUpdate,          // Actualización de app disponible
+  support, // Mensaje de soporte
+  appUpdate, // Actualización de app disponible
 }
 
 /// Prioridades de notificación
 enum NotificationPriority {
-  low,      // Promociones, ofertas
-  normal,   // Mensajes generales
-  high,     // Viajes, pagos
+  low, // Promociones, ofertas
+  normal, // Mensajes generales
+  high, // Viajes, pagos
   critical, // Emergencias, seguridad
 }
 
@@ -60,7 +60,7 @@ enum NotificationChannel {
   emergency('oasis_emergency', 'Emergencias', 'Alertas de seguridad'),
   chat('oasis_chat', 'Chat', 'Mensajes de chat'),
   promotions('oasis_promotions', 'Promociones', 'Ofertas y descuentos');
-  
+
   const NotificationChannel(this.id, this.name, this.description);
   final String id;
   final String name;
@@ -124,19 +124,20 @@ class NotificationData {
         orElse: () => NotificationChannel.general,
       ),
       timestamp: DateTime.parse(map['timestamp']),
-      scheduledTime: map['scheduledTime'] != null 
-        ? DateTime.parse(map['scheduledTime']) 
-        : null,
-      expiresAt: map['expiresAt'] != null 
-        ? DateTime.parse(map['expiresAt']) 
-        : null,
+      scheduledTime: map['scheduledTime'] != null
+          ? DateTime.parse(map['scheduledTime'])
+          : null,
+      expiresAt:
+          map['expiresAt'] != null ? DateTime.parse(map['expiresAt']) : null,
       isRead: map['isRead'] ?? false,
       isDelivered: map['isDelivered'] ?? false,
       userId: map['userId'],
       tripId: map['tripId'],
       imageUrl: map['imageUrl'],
       data: map['data'] != null ? Map<String, dynamic>.from(map['data']) : {},
-      actions: map['actions'] != null ? Map<String, String>.from(map['actions']) : {},
+      actions: map['actions'] != null
+          ? Map<String, String>.from(map['actions'])
+          : {},
     );
   }
 
@@ -246,7 +247,8 @@ class TaxiNotificationBuilder {
     return NotificationData(
       id: 'ride_request_$tripId',
       title: '¡Nueva solicitud de viaje!',
-      body: 'Pasajero: $passengerName\nDesde: $pickupAddress\nTarifa: S/ ${estimatedFare.toStringAsFixed(2)}',
+      body:
+          'Pasajero: $passengerName\nDesde: $pickupAddress\nTarifa: S/ ${estimatedFare.toStringAsFixed(2)}',
       type: NotificationType.tripRequest,
       priority: NotificationPriority.high,
       channel: NotificationChannel.rides,
@@ -338,9 +340,9 @@ class TaxiNotificationBuilder {
       id: 'chat_${DateTime.now().millisecondsSinceEpoch}',
       title: 'Nuevo mensaje de ${isFromDriver ? 'conductor' : 'pasajero'}',
       body: '$senderName: $message',
-      type: isFromDriver 
-        ? NotificationType.chatDriverMessage 
-        : NotificationType.chatPassengerMessage,
+      type: isFromDriver
+          ? NotificationType.chatDriverMessage
+          : NotificationType.chatPassengerMessage,
       priority: NotificationPriority.normal,
       channel: NotificationChannel.chat,
       timestamp: DateTime.now(),

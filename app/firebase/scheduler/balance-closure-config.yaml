@@ -1,0 +1,693 @@
+# ====================================================================
+# 💰 CONFIGURACIÓN CIERRES DE BALANCE - CLOUD SCHEDULER OASISTAXI
+# ====================================================================
+# Jobs programados para cierres automáticos de balance y transferencias
+# Sistema de pagos a conductores con integración bancaria Peru
+# Reportes financieros automáticos y reconciliación de cuentas
+# ====================================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-balance-closure
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: daily-closure
+    region: peru-lima
+spec:
+  schedule: "0 23 * * *" # 11 PM todos los días
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: daily-closure-processor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "daily-closure"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: BCP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: bcp-api-key
+            - name: BCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: bcp-client-id
+            - name: BCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: bcp-client-secret
+            - name: BBVA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: bbva-api-key
+            - name: INTERBANK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: interbank-api-key
+            - name: SCOTIABANK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: scotiabank-api-key
+            - name: BIGQUERY_DATASET
+              value: "oasistaxi_analytics"
+            - name: MIN_TRANSFER_AMOUNT
+              value: "10.00"
+            - name: MAX_RETRY_ATTEMPTS
+              value: "3"
+            - name: COMMISSION_RATES
+              value: |
+                {
+                  "economy": 0.15,
+                  "comfort": 0.17,
+                  "premium": 0.20,
+                  "van": 0.18,
+                  "moto": 0.12,
+                  "default": 0.15
+                }
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1000m"
+            volumeMounts:
+            - name: bank-configs
+              mountPath: /bank-configs
+          volumes:
+          - name: bank-configs
+            configMap:
+              name: peru-banks-config
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🏦 PROCESAMIENTO DE TRANSFERENCIAS PENDIENTES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pending-transfers-processor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: pending-transfers
+spec:
+  schedule: "0 8,14,18 * * 1-5" # 8AM, 2PM, 6PM días laborables
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: transfers-processor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "process-pending-transfers"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: BANK_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: peru-banks-credentials
+                  key: all-banks.json
+            - name: BUSINESS_HOURS_START
+              value: "8"
+            - name: BUSINESS_HOURS_END
+              value: "18"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📊 GENERACIÓN DE REPORTES FINANCIEROS DIARIOS
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-financial-reports
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: daily-reports
+spec:
+  schedule: "30 23 * * *" # 11:30 PM todos los días (después del cierre)
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: reports-generator
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "daily-reports"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: BIGQUERY_PROJECT_ID
+              value: "oasis-taxi-peru"
+            - name: BIGQUERY_DATASET
+              value: "oasistaxi_analytics"
+            - name: EMAIL_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: sendgrid-api-key
+            - name: REPORT_RECIPIENTS
+              value: |
+                [
+                  "finanzas@oasistaxiperu.com",
+                  "admin@oasistaxiperu.com",
+                  "operaciones@oasistaxiperu.com"
+                ]
+            - name: SUNAT_THRESHOLD_AMOUNT
+              value: "100000" # S/ 100,000
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "400m"
+            volumeMounts:
+            - name: report-templates
+              mountPath: /report-templates
+          volumes:
+          - name: report-templates
+            configMap:
+              name: financial-report-templates
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📅 CIERRE SEMANAL DE BALANCES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekly-balance-closure
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: weekly-closure
+spec:
+  schedule: "0 1 * * 1" # Lunes a la 1 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: weekly-closure-processor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "weekly-closure"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: WEEKLY_BONUS_RULES
+              value: |
+                {
+                  "productivityBonus": {
+                    "50_trips": 0.05,
+                    "75_trips": 0.08,
+                    "100_trips": 0.12
+                  },
+                  "qualityBonus": {
+                    "rating_4_8": 0.03,
+                    "rating_4_9": 0.05
+                  },
+                  "loyaltyBonus": {
+                    "6_months": 0.02,
+                    "12_months": 0.05
+                  }
+                }
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "300m"
+              limits:
+                memory: "2Gi"
+                cpu: "600m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📊 CIERRE MENSUAL Y REPORTES FISCALES
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-balance-closure
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: monthly-closure
+spec:
+  schedule: "0 2 1 * *" # Primer día del mes a las 2 AM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: monthly-closure-processor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "monthly-closure"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: SUNAT_RUC
+              value: "20123456789"
+            - name: SUNAT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: peru-government-apis
+                  key: sunat-api-key
+            - name: IGV_RATE
+              value: "0.18"
+            - name: MONTHLY_BONUS_BUDGET
+              value: "50000" # S/ 50,000 mensual para bonos
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "500m"
+              limits:
+                memory: "4Gi"
+                cpu: "1000m"
+            volumeMounts:
+            - name: tax-templates
+              mountPath: /tax-templates
+          volumes:
+          - name: tax-templates
+            configMap:
+              name: peru-tax-report-templates
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🔄 RECONCILIACIÓN BANCARIA AUTOMÁTICA
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bank-reconciliation
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: bank-reconciliation
+spec:
+  schedule: "0 6 * * 1-5" # 6 AM días laborables
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: reconciliation-processor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "bank-reconciliation"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: BANK_STATEMENT_APIS
+              value: |
+                {
+                  "BCP": "https://api.viabcp.com/statements",
+                  "BBVA": "https://api.bbva.pe/statements",
+                  "INTERBANK": "https://api.interbank.pe/statements",
+                  "SCOTIABANK": "https://api.scotiabank.com.pe/statements"
+                }
+            - name: RECONCILIATION_WINDOW_DAYS
+              value: "3"
+            - name: VARIANCE_THRESHOLD
+              value: "0.50" # S/ 0.50 máxima diferencia aceptable
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "400m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# ⚠️ MONITOREO DE TRANSFERENCIAS FALLIDAS
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: failed-transfers-monitor
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: failed-transfers-monitor
+spec:
+  schedule: "*/30 * * * *" # Cada 30 minutos
+  timeZone: "America/Lima"
+  concurrencyPolicy: Allow
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: failed-transfers-monitor
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "monitor-failed-transfers"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: oasistaxi-secrets
+                  key: fcm-server-key
+            - name: MAX_FAILED_THRESHOLD
+              value: "5" # Alerta si hay 5+ transferencias fallidas
+            - name: RETRY_FAILED_TRANSFERS
+              value: "true"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 📧 NOTIFICACIONES Y ALERTAS FINANCIERAS
+# ====================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: financial-notifications
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+    component: notifications
+spec:
+  schedule: "0 7,19 * * *" # 7 AM y 7 PM
+  timeZone: "America/Lima"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: financial-notifier
+            image: gcr.io/oasis-taxi-peru/balance-closure-manager:latest
+            env:
+            - name: JOB_TYPE
+              value: "financial-notifications"
+            - name: FIREBASE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: config.json
+            - name: NOTIFICATION_RULES
+              value: |
+                {
+                  "dailySummary": {
+                    "time": "19:00",
+                    "recipients": ["admin", "finance"]
+                  },
+                  "weeklyReport": {
+                    "day": "monday",
+                    "time": "07:00"
+                  },
+                  "monthlyReport": {
+                    "day": 1,
+                    "time": "07:00"
+                  },
+                  "alerts": {
+                    "failedTransfers": "immediate",
+                    "highVariance": "immediate",
+                    "systemErrors": "immediate"
+                  }
+                }
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+
+---
+# ====================================================================
+# 🗃️ CONFIGMAPS CON CONFIGURACIONES
+# ====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: peru-banks-config
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+data:
+  banks-config.json: |
+    {
+      "BCP": {
+        "name": "Banco de Crédito del Perú",
+        "code": "002",
+        "api": "https://api.viabcp.com/transfers",
+        "cci": "20100000001",
+        "supportedCurrencies": ["PEN", "USD"],
+        "maxDailyTransfer": 500000,
+        "processingHours": {"start": 8, "end": 18}
+      },
+      "BBVA": {
+        "name": "BBVA Continental",
+        "code": "011",
+        "api": "https://api.bbva.pe/transfers",
+        "cci": "20110000001",
+        "supportedCurrencies": ["PEN", "USD"],
+        "maxDailyTransfer": 300000,
+        "processingHours": {"start": 9, "end": 17}
+      },
+      "INTERBANK": {
+        "name": "Interbank",
+        "code": "003",
+        "api": "https://api.interbank.pe/transfers",
+        "cci": "20030000001",
+        "supportedCurrencies": ["PEN"],
+        "maxDailyTransfer": 200000,
+        "processingHours": {"start": 8, "end": 19}
+      },
+      "SCOTIABANK": {
+        "name": "Scotiabank Perú",
+        "code": "009",
+        "api": "https://api.scotiabank.com.pe/transfers",
+        "cci": "20090000001",
+        "supportedCurrencies": ["PEN", "USD"],
+        "maxDailyTransfer": 400000,
+        "processingHours": {"start": 8, "end": 18}
+      }
+    }
+
+  commission-rules.json: |
+    {
+      "baseCommissionRates": {
+        "economy": 0.15,
+        "comfort": 0.17,
+        "premium": 0.20,
+        "van": 0.18,
+        "moto": 0.12,
+        "default": 0.15
+      },
+      "productivityBonuses": {
+        "daily": {
+          "10_trips": 0.02,
+          "15_trips": 0.03,
+          "20_trips": 0.05
+        },
+        "weekly": {
+          "50_trips": 0.05,
+          "75_trips": 0.08,
+          "100_trips": 0.12
+        },
+        "monthly": {
+          "200_trips": 0.10,
+          "300_trips": 0.15,
+          "500_trips": 0.20
+        }
+      },
+      "qualityBonuses": {
+        "rating_4_8": 0.03,
+        "rating_4_9": 0.05,
+        "rating_5_0": 0.10,
+        "zero_complaints": 0.02
+      }
+    }
+
+---
+# ====================================================================
+# 📊 SERVICE MONITOR PARA PROMETHEUS
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: balance-closure-monitoring
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+spec:
+  selector:
+    matchLabels:
+      app: balance-closure-metrics
+  endpoints:
+  - port: metrics
+    interval: 60s
+    path: /metrics
+
+---
+# ====================================================================
+# 🚨 ALERTING RULES FINANCIERAS
+# ====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: finance-alerts
+  namespace: oasistaxi-prod
+  labels:
+    app: oasistaxi-finance
+spec:
+  groups:
+  - name: finance.rules
+    rules:
+    - alert: DailyClosureFailed
+      expr: balance_closure_failures_total > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Error en cierre diario de balances"
+        description: "El cierre diario ha fallado {{ $value }} veces"
+    
+    - alert: HighTransferFailureRate
+      expr: (transfer_failures_total / transfer_attempts_total) > 0.05
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Alta tasa de transferencias fallidas"
+        description: "{{ $value | humanizePercentage }} de transferencias han fallado"
+    
+    - alert: BankReconciliationMismatch
+      expr: bank_reconciliation_variance > 100
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Discrepancia en reconciliación bancaria"
+        description: "Variación de S/ {{ $value }} detectada en reconciliación"
+    
+    - alert: LargeTransferPending
+      expr: pending_transfer_amount > 50000
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Transferencia grande pendiente"
+        description: "Transferencia de S/ {{ $value }} pendiente por más de 30 minutos"
+
+    - alert: MonthlyClosureOverdue
+      expr: days_since_monthly_closure > 3
+      for: 1h
+      labels:
+        severity: critical
+      annotations:
+        summary: "Cierre mensual atrasado"
+        description: "Han pasado {{ $value }} días desde el último cierre mensual"
+
+# ====================================================================
+# 🚀 COMANDOS DE DEPLOYMENT Y GESTIÓN
+# ====================================================================
+# 
+# 1. Aplicar toda la configuración:
+# kubectl apply -f balance-closure-config.yaml
+#
+# 2. Verificar CronJobs financieros:
+# kubectl get cronjobs -n oasistaxi-prod -l app=oasistaxi-finance
+#
+# 3. Ejecutar cierre diario manual:
+# kubectl create job --from=cronjob/daily-balance-closure manual-closure-$(date +%s) -n oasistaxi-prod
+#
+# 4. Ver logs del cierre diario:
+# kubectl logs -n oasistaxi-prod -l component=daily-closure --tail=100
+#
+# 5. Monitorear transferencias pendientes:
+# kubectl logs -f -n oasistaxi-prod -l component=pending-transfers
+#
+# 6. Ver alertas financieras activas:
+# kubectl get prometheusrules finance-alerts -n oasistaxi-prod -o yaml
+#
+# 7. Ejecutar reconciliación bancaria manual:
+# kubectl create job --from=cronjob/bank-reconciliation manual-reconciliation-$(date +%s) -n oasistaxi-prod
+#
+# 8. Ver métricas en dashboard:
+# kubectl port-forward -n oasistaxi-prod svc/balance-closure-metrics 9090:9090
+#
+# 9. Verificar configuración de bancos:
+# kubectl get configmap peru-banks-config -n oasistaxi-prod -o yaml
+#
+# 10. Restart servicios financieros:
+# kubectl delete pods -n oasistaxi-prod -l app=oasistaxi-finance
+#
+# ====================================================================

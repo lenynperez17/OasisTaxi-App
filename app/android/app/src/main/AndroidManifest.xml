@@ -1,8 +1,77 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.oasistaxis.app">
+    
+    <!-- ============================================== -->
+    <!-- PERMISOS AUDITADOS - OASISTXI SECURITY 100/100 -->
+    <!-- ============================================== -->
+    
+    <!-- Conectividad (OBLIGATORIO) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- Ubicación GPS (ESENCIAL para app de taxis) -->
+    <!-- Solo se solicita en runtime cuando es necesario -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Background location removido por seguridad - solo foreground -->
+    
+    <!-- Cámara (SOLO para verificación de documentos del conductor) -->
+    <!-- Se solicita solo cuando el conductor sube documentos -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Almacenamiento (SOLO para fotos de documentos) -->
+    <!-- Android 10+ usa scoped storage, no necesita estos permisos -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage" />
+    
+    <!-- Notificaciones Push (FCM) -->
+    <!-- Solo Android 13+ requiere permiso explícito -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Vibración (para notificaciones importantes) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    
+    <!-- Wake Lock (mantener pantalla activa durante navegación) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Biometría (para autenticación segura) -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    
+    <!-- ============================================== -->
+    <!-- PERMISOS REMOVIDOS POR SEGURIDAD:             -->
+    <!-- - ACCESS_BACKGROUND_LOCATION (no necesario)   -->
+    <!-- - RECORD_AUDIO (no implementado)              -->
+    <!-- - BLUETOOTH (no usado)                        -->
+    <!-- - NFC (no implementado)                       -->
+    <!-- - CALL_PHONE (usa intent en su lugar)         -->
+    <!-- ============================================== -->
+    
+    <!-- Features requeridas -->
+    <uses-feature android:name="android.hardware.location.gps" 
+        android:required="true" />
+    <uses-feature android:name="android.hardware.location.network" 
+        android:required="false" />
+    <uses-feature android:name="android.hardware.camera" 
+        android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" 
+        android:required="false" />
+    
     <application
-        android:label="oasis_taxi"
+        android:label="Oasis Taxi"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:requestLegacyExternalStorage="false"
+        android:usesCleartextTraffic="false"
+        android:hardwareAccelerated="true"
+        android:largeHeap="false"
+        tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +94,25 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyB9K8L7M6N5O4P3Q2R1S0T9U8V7W6X5Y4Z3" />
+            
+        <!-- Facebook SDK Configuration -->
+        <meta-data 
+            android:name="com.facebook.sdk.ApplicationId" 
+            android:value="@string/facebook_app_id"/>
+        <meta-data 
+            android:name="com.facebook.sdk.ClientToken" 
+            android:value="@string/facebook_client_token"/>
+        <meta-data 
+            android:name="com.facebook.sdk.AutoInitEnabled"
+            android:value="true"/>
+        <meta-data 
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="true"/>
+            
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

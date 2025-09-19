@@ -1,0 +1,691 @@
+# 📢 CONFIGURACIÓN DE CLOUD SCHEDULER PARA CAMPAÑAS DE NOTIFICACIONES
+# OasisTaxi Perú - Sistema de Campañas Automatizadas con FCM
+# 
+# Este archivo define los trabajos de Cloud Scheduler para:
+# - Campañas promocionales automáticas
+# - Reactivación de usuarios inactivos
+# - Recordatorios de mantenimiento para conductores
+# - Notificaciones de eventos especiales
+# - Campañas de rating y feedback
+
+# ═══════════════════════════════════════════════════════════════════
+# 📱 JOB 1: CAMPAÑA PROMOCIONAL SEMANAL
+# ═══════════════════════════════════════════════════════════════════
+name: "weekly-promo-campaign"
+description: "Campaña promocional semanal para usuarios activos - OasisTaxi"
+schedule: "0 10 * * 2" # Martes a las 10:00 AM (horario de mayor apertura de emails)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "weekly_promo",
+        "targetAudience": "active_users",
+        "schedule": "weekly",
+        "content": {
+          "title": "¡Ofertas especiales esta semana! 🚖✨",
+          "body": "Descuentos del 20% en tus próximos 3 viajes. ¡Aprovecha ahora!",
+          "imageUrl": "https://storage.googleapis.com/oasis-taxi-peru-assets/campaigns/weekly-promo.jpg",
+          "actionUrl": "oasistaxi://promo/weekly",
+          "promoCode": "SEMANA20"
+        },
+        "filters": {
+          "userType": "passenger",
+          "lastTripDays": 30,
+          "minimumTrips": 1,
+          "excludeInactive": true
+        },
+        "executedAt": "2024-01-01T10:00:00Z"
+      }
+retry_config:
+  retry_count: 3
+  max_retry_duration: "600s"
+  min_backoff_duration: "10s"
+  max_backoff_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 💤 JOB 2: REACTIVACIÓN DE USUARIOS INACTIVOS
+# ═══════════════════════════════════════════════════════════════════
+name: "user-reactivation-campaign"
+description: "Campaña de reactivación para usuarios inactivos hace 30+ días - OasisTaxi"
+schedule: "0 16 * * 5" # Viernes a las 4:00 PM (preparar fin de semana)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "user_reactivation",
+        "targetAudience": "inactive_users",
+        "schedule": "weekly",
+        "content": {
+          "title": "Te extrañamos en OasisTaxi 😢",
+          "body": "¡Vuelve y recibe S/ 10 de descuento en tu próximo viaje!",
+          "imageUrl": "https://storage.googleapis.com/oasis-taxi-peru-assets/campaigns/comeback.jpg",
+          "actionUrl": "oasistaxi://reactivation",
+          "promoCode": "VUELVE10"
+        },
+        "filters": {
+          "userType": "passenger",
+          "lastTripDays": 30,
+          "maxLastTripDays": 90,
+          "excludeNew": true,
+          "minimumHistoricalTrips": 3
+        },
+        "personalizedContent": {
+          "includeLastTripDate": true,
+          "includeFavoriteRoute": true,
+          "includePreferredVehicleType": true
+        },
+        "executedAt": "2024-01-01T16:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔧 JOB 3: RECORDATORIOS DE MANTENIMIENTO PARA CONDUCTORES
+# ═══════════════════════════════════════════════════════════════════
+name: "driver-maintenance-reminders"
+description: "Recordatorios de mantenimiento y documentos para conductores - OasisTaxi"
+schedule: "0 9 1 * *" # Primer día de cada mes a las 9:00 AM
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "driver_maintenance",
+        "targetAudience": "active_drivers",
+        "schedule": "monthly",
+        "content": {
+          "title": "Recordatorio mensual de mantenimiento 🔧",
+          "body": "Revisa que tu SOAT, licencia y revisión técnica estén vigentes",
+          "imageUrl": "https://storage.googleapis.com/oasis-taxi-peru-assets/campaigns/maintenance.jpg",
+          "actionUrl": "oasistaxi://driver/documents"
+        },
+        "filters": {
+          "userType": "driver",
+          "status": "active",
+          "lastTripDays": 7
+        },
+        "personalizedContent": {
+          "checkDocumentExpiry": true,
+          "includeMaintenanceTips": true,
+          "includeEarningsSummary": true
+        },
+        "urgentFilters": {
+          "soatExpiringDays": 30,
+          "licenseExpiringDays": 60,
+          "technicalReviewExpiringDays": 45
+        },
+        "executedAt": "2024-01-01T09:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎉 JOB 4: CAMPAÑAS DE EVENTOS ESPECIALES
+# ═══════════════════════════════════════════════════════════════════
+name: "special-events-campaign"
+description: "Notificaciones para eventos especiales y fechas importantes - OasisTaxi"
+schedule: "0 8 * * *" # Diario a las 8:00 AM (chequea eventos del día)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "special_events",
+        "targetAudience": "all_users",
+        "schedule": "daily_check",
+        "eventTypes": [
+          {
+            "type": "national_holidays",
+            "events": [
+              {"date": "2024-07-28", "name": "Día de la Independencia", "surge": 1.5},
+              {"date": "2024-12-25", "name": "Navidad", "surge": 2.0},
+              {"date": "2024-12-31", "name": "Año Nuevo", "surge": 2.5}
+            ]
+          },
+          {
+            "type": "local_events",
+            "events": [
+              {"date": "2024-10-18", "name": "Señor de los Milagros", "areas": ["Lima Centro", "Callao"]},
+              {"date": "2024-08-30", "name": "Festival de Wong", "areas": ["Miraflores", "Barranco"]}
+            ]
+          },
+          {
+            "type": "weather_alerts",
+            "conditions": ["lluvia_intensa", "neblina_densa", "vientos_fuertes"]
+          }
+        ],
+        "content": {
+          "holiday": {
+            "title": "¡Feliz {holiday_name}! 🎉",
+            "body": "Mayor demanda esperada. Reserva tu viaje con anticipación",
+            "actionUrl": "oasistaxi://book"
+          },
+          "weather": {
+            "title": "Alerta climática ⚠️",
+            "body": "Condiciones climáticas adversas. Viaja con precaución",
+            "actionUrl": "oasistaxi://safety"
+          }
+        },
+        "executedAt": "2024-01-01T08:00:00Z"
+      }
+retry_config:
+  retry_count: 1
+  max_retry_duration: "120s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# ⭐ JOB 5: CAMPAÑA DE RATING Y FEEDBACK
+# ═══════════════════════════════════════════════════════════════════
+name: "rating-feedback-campaign"
+description: "Recordatorios para calificar viajes y dar feedback - OasisTaxi"
+schedule: "0 19 * * *" # Diario a las 7:00 PM (después del horario pico)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "rating_feedback",
+        "targetAudience": "recent_trip_users",
+        "schedule": "daily",
+        "content": {
+          "rating_reminder": {
+            "title": "¿Cómo estuvo tu viaje? ⭐",
+            "body": "Tu opinión nos ayuda a mejorar. Califica tu experiencia",
+            "actionUrl": "oasistaxi://rate/{trip_id}"
+          },
+          "feedback_request": {
+            "title": "Cuéntanos tu experiencia 💬",
+            "body": "¿Algo que podamos mejorar? Tu feedback es valioso",
+            "actionUrl": "oasistaxi://feedback"
+          },
+          "thank_you": {
+            "title": "¡Gracias por tu calificación! 🙏",
+            "body": "Tu opinión nos ayuda a brindar un mejor servicio",
+            "rewards": true
+          }
+        },
+        "filters": {
+          "completedTripsLast24h": true,
+          "unratedTrips": true,
+          "excludeAlreadyNotified": true
+        },
+        "incentives": {
+          "ratingReward": {
+            "points": 50,
+            "discount": "S/ 2 en próximo viaje"
+          },
+          "detailedFeedbackReward": {
+            "points": 100,
+            "discount": "S/ 5 en próximo viaje"
+          }
+        },
+        "executedAt": "2024-01-01T19:00:00Z"
+      }
+retry_config:
+  retry_count: 2
+  max_retry_duration: "300s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎯 JOB 6: CAMPAÑA PERSONALIZADA POR SEGMENTOS
+# ═══════════════════════════════════════════════════════════════════
+name: "personalized-segment-campaign"
+description: "Campañas personalizadas por segmentos de usuarios - OasisTaxi"
+schedule: "0 11 * * 3,6" # Miércoles y sábados a las 11:00 AM
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "personalized_segments",
+        "targetAudience": "segmented_users",
+        "schedule": "bi_weekly",
+        "segments": [
+          {
+            "name": "frequent_business_users",
+            "criteria": {
+              "tripsPerMonth": 20,
+              "averageDistance": 15,
+              "preferredHours": ["07:00-09:00", "18:00-20:00"],
+              "vehiclePreference": "premium"
+            },
+            "content": {
+              "title": "Tu plan empresarial te espera 💼",
+              "body": "Descuentos especiales para usuarios frecuentes como tú",
+              "promoCode": "BUSINESS25",
+              "actionUrl": "oasistaxi://business-plan"
+            }
+          },
+          {
+            "name": "weekend_leisure_users",
+            "criteria": {
+              "tripsPerWeekend": 3,
+              "averageDistance": 8,
+              "popularDestinations": ["centros comerciales", "restaurantes", "cines"],
+              "timePreference": "weekend"
+            },
+            "content": {
+              "title": "¡Planes de fin de semana! 🎊",
+              "body": "Descuentos para tus salidas de recreación",
+              "promoCode": "WEEKEND15",
+              "actionUrl": "oasistaxi://weekend-deals"
+            }
+          },
+          {
+            "name": "airport_commuters",
+            "criteria": {
+              "airportTripsPerMonth": 4,
+              "bookingAdvance": 2,
+              "preferredVehicle": "van",
+              "luggageRequirement": true
+            },
+            "content": {
+              "title": "Viajero frecuente detectado ✈️",
+              "body": "Servicios premium para tus viajes al aeropuerto",
+              "promoCode": "AIRPORT20",
+              "actionUrl": "oasistaxi://airport-service"
+            }
+          }
+        ],
+        "executedAt": "2024-01-01T11:00:00Z"
+      }
+retry_config:
+  retry_count: 3
+  max_retry_duration: "600s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🚨 JOB 7: NOTIFICACIONES DE EMERGENCIA Y ALERTAS
+# ═══════════════════════════════════════════════════════════════════
+name: "emergency-alerts-campaign"
+description: "Sistema de alertas de emergencia y notificaciones críticas - OasisTaxi"
+schedule: "*/30 * * * *" # Cada 30 minutos (monitoreo continuo)
+time_zone: "America/Lima"
+target:
+  pubsub_target:
+    topic_name: "projects/oasis-taxi-peru/topics/notification-campaigns"
+    data: |
+      {
+        "campaignType": "emergency_alerts",
+        "targetAudience": "all_active_users",
+        "schedule": "continuous",
+        "alertTypes": [
+          {
+            "type": "service_disruption",
+            "triggers": ["system_outage", "payment_issues", "map_service_down"],
+            "content": {
+              "title": "Interrupción del servicio ⚠️",
+              "body": "Estamos trabajando para resolver el problema. Disculpa las molestias",
+              "actionUrl": "oasistaxi://status",
+              "priority": "high"
+            }
+          },
+          {
+            "type": "security_alert",
+            "triggers": ["suspicious_activity", "fraud_detection", "safety_incident"],
+            "content": {
+              "title": "Alerta de seguridad 🔒",
+              "body": "Hemos detectado actividad sospechosa. Verifica tu cuenta",
+              "actionUrl": "oasistaxi://security",
+              "priority": "critical"
+            }
+          },
+          {
+            "type": "area_restriction",
+            "triggers": ["traffic_closure", "event_restriction", "emergency_zone"],
+            "content": {
+              "title": "Restricción de zona 🚫",
+              "body": "Acceso restringido en {area_name}. Rutas alternativas disponibles",
+              "actionUrl": "oasistaxi://restrictions",
+              "priority": "medium"
+            }
+          },
+          {
+            "type": "driver_sos",
+            "triggers": ["driver_emergency_button", "passenger_emergency_button"],
+            "content": {
+              "title": "Alerta de emergencia activada 🚨",
+              "body": "Se ha activado el botón de emergencia. Autoridades notificadas",
+              "actionUrl": "oasistaxi://emergency/{trip_id}",
+              "priority": "critical",
+              "recipients": ["emergency_contacts", "support_team"]
+            }
+          }
+        ],
+        "executedAt": "2024-01-01T00:00:00Z"
+      }
+retry_config:
+  retry_count: 5
+  max_retry_duration: "300s"
+  min_backoff_duration: "5s"
+  max_backoff_duration: "60s"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔧 COMANDOS PARA CREAR LOS JOBS EN GOOGLE CLOUD
+# ═══════════════════════════════════════════════════════════════════
+
+# 1. CAMPAÑA PROMOCIONAL SEMANAL
+gcloud scheduler jobs create pubsub weekly-promo-campaign \
+  --location=us-central1 \
+  --schedule="0 10 * * 2" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"weekly_promo","targetAudience":"active_users"}' \
+  --description="Campaña promocional semanal para usuarios activos - OasisTaxi" \
+  --max-retry-attempts=3 \
+  --max-retry-duration=600s
+
+# 2. REACTIVACIÓN DE USUARIOS
+gcloud scheduler jobs create pubsub user-reactivation-campaign \
+  --location=us-central1 \
+  --schedule="0 16 * * 5" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"user_reactivation","targetAudience":"inactive_users"}' \
+  --description="Campaña de reactivación para usuarios inactivos - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# 3. RECORDATORIOS DE MANTENIMIENTO
+gcloud scheduler jobs create pubsub driver-maintenance-reminders \
+  --location=us-central1 \
+  --schedule="0 9 1 * *" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"driver_maintenance","targetAudience":"active_drivers"}' \
+  --description="Recordatorios de mantenimiento para conductores - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# 4. EVENTOS ESPECIALES
+gcloud scheduler jobs create pubsub special-events-campaign \
+  --location=us-central1 \
+  --schedule="0 8 * * *" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"special_events","targetAudience":"all_users"}' \
+  --description="Notificaciones para eventos especiales - OasisTaxi" \
+  --max-retry-attempts=1 \
+  --max-retry-duration=120s
+
+# 5. RATING Y FEEDBACK
+gcloud scheduler jobs create pubsub rating-feedback-campaign \
+  --location=us-central1 \
+  --schedule="0 19 * * *" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"rating_feedback","targetAudience":"recent_trip_users"}' \
+  --description="Recordatorios para calificar viajes - OasisTaxi" \
+  --max-retry-attempts=2 \
+  --max-retry-duration=300s
+
+# 6. CAMPAÑAS PERSONALIZADAS
+gcloud scheduler jobs create pubsub personalized-segment-campaign \
+  --location=us-central1 \
+  --schedule="0 11 * * 3,6" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"personalized_segments","targetAudience":"segmented_users"}' \
+  --description="Campañas personalizadas por segmentos - OasisTaxi" \
+  --max-retry-attempts=3 \
+  --max-retry-duration=600s
+
+# 7. ALERTAS DE EMERGENCIA
+gcloud scheduler jobs create pubsub emergency-alerts-campaign \
+  --location=us-central1 \
+  --schedule="*/30 * * * *" \
+  --time-zone="America/Lima" \
+  --topic="notification-campaigns" \
+  --message-body='{"campaignType":"emergency_alerts","targetAudience":"all_active_users"}' \
+  --description="Sistema de alertas de emergencia - OasisTaxi" \
+  --max-retry-attempts=5 \
+  --max-retry-duration=300s
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 VERIFICACIÓN Y MONITOREO
+# ═══════════════════════════════════════════════════════════════════
+
+# Listar todos los jobs de campañas
+gcloud scheduler jobs list --location=us-central1 --filter="name:*campaign*"
+
+# Ver detalles de una campaña específica
+gcloud scheduler jobs describe weekly-promo-campaign --location=us-central1
+
+# Ejecutar manualmente una campaña (para pruebas)
+gcloud scheduler jobs run weekly-promo-campaign --location=us-central1
+
+# Ver logs de ejecución de campañas
+gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id:*campaign*" --limit=20 --format=json
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔄 TÓPICOS PUBSUB NECESARIOS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear tópico principal de campañas
+gcloud pubsub topics create notification-campaigns
+
+# Crear tópicos para diferentes tipos de notificaciones
+gcloud pubsub topics create fcm-notifications
+gcloud pubsub topics create email-notifications
+gcloud pubsub topics create sms-notifications
+gcloud pubsub topics create push-notifications
+
+# Verificar tópicos creados
+gcloud pubsub topics list --filter="name:*notification*"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🛡️ PERMISOS Y CONFIGURACIÓN DE SEGURIDAD
+# ═══════════════════════════════════════════════════════════════════
+
+# Permisos para Cloud Scheduler
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+
+# Permisos para Cloud Functions
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
+  --role="roles/cloudfunctions.invoker"
+
+# Permisos para Firebase Messaging
+gcloud projects add-iam-policy-binding oasis-taxi-peru \
+  --member="serviceAccount:firebase-adminsdk-xyz@oasis-taxi-peru.iam.gserviceaccount.com" \
+  --role="roles/firebase.messagingSender"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📊 MÉTRICAS Y MONITOREO DE CAMPAÑAS
+# ═══════════════════════════════════════════════════════════════════
+
+# Crear alertas para fallos en campañas críticas
+gcloud alpha monitoring policies create --policy-from-file=campaign-alerts.yaml
+
+# Configurar métricas personalizadas para engagement
+gcloud logging metrics create campaign_success_rate \
+  --description="Tasa de éxito de campañas de notificaciones" \
+  --log-filter='resource.type="cloud_function" AND textPayload:"campaign_sent"'
+
+# Dashboard personalizado para campañas
+# URL: https://console.cloud.google.com/monitoring/dashboards
+
+# ═══════════════════════════════════════════════════════════════════
+# 📝 CONFIGURACIÓN DE A/B TESTING PARA CAMPAÑAS
+# ═══════════════════════════════════════════════════════════════════
+
+# Firebase Remote Config para A/B testing
+# Configurar en: https://console.firebase.google.com/project/oasis-taxi-peru/config
+
+ab_testing_config:
+  campaign_variations:
+    promo_title_test:
+      variant_a: "¡Ofertas especiales esta semana!"
+      variant_b: "¡Descuentos increíbles te esperan!"
+      variant_c: "¡No te pierdas estas promociones!"
+      allocation: "33.33% each"
+      
+    call_to_action_test:
+      variant_a: "Aprovecha ahora"
+      variant_b: "Reserva tu descuento"
+      variant_c: "Ver ofertas"
+      allocation: "33.33% each"
+      
+    send_time_test:
+      variant_a: "10:00 AM"
+      variant_b: "2:00 PM"
+      variant_c: "6:00 PM"
+      allocation: "33.33% each"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🎯 SEGMENTACIÓN AVANZADA DE USUARIOS
+# ═══════════════════════════════════════════════════════════════════
+
+user_segments:
+  behavioral:
+    - high_frequency_users: "20+ viajes/mes"
+    - occasional_users: "1-5 viajes/mes"
+    - weekend_warriors: "80% viajes fin de semana"
+    - business_commuters: "Lun-Vie 7-9AM, 5-7PM"
+    
+  geographic:
+    - lima_metropolitana: "Dentro de Lima Metro"
+    - provincia: "Fuera de Lima"
+    - airport_frequent: "3+ viajes aeropuerto/mes"
+    - mall_shoppers: "Destinos: centros comerciales"
+    
+  value_based:
+    - premium_customers: "Viajes >S/50 promedio"
+    - budget_conscious: "Viajes <S/20 promedio"
+    - tip_generous: "Propinas >10%"
+    - loyalty_members: "6+ meses activos"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📱 PLANTILLAS DE CONTENIDO PERSONALIZADO
+# ═══════════════════════════════════════════════════════════════════
+
+content_templates:
+  spanish_formal: # Para usuarios business
+    greeting: "Estimado {user_name}"
+    tone: "formal"
+    cta: "Solicite su viaje"
+    
+  spanish_casual: # Para usuarios jóvenes
+    greeting: "¡Hola {user_name}!"
+    tone: "amigable"
+    cta: "¡Pide tu viaje ya!"
+    
+  spanish_premium: # Para usuarios VIP
+    greeting: "Distinguido {user_name}"
+    tone: "exclusivo"
+    cta: "Reserve su servicio premium"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🏆 GAMIFICACIÓN EN CAMPAÑAS
+# ═══════════════════════════════════════════════════════════════════
+
+gamification_elements:
+  achievements:
+    - eco_warrior: "10 viajes compartidos"
+    - night_owl: "5 viajes después 11PM"
+    - explorer: "Visita 20 distritos diferentes"
+    - punctual: "95% viajes a tiempo"
+    
+  rewards:
+    - streak_bonus: "7 días consecutivos = descuento"
+    - referral_points: "Invita amigos = puntos"
+    - rating_rewards: "5 estrellas = beneficios"
+    - milestone_prizes: "Viaje #100 = sorpresa"
+    
+  challenges:
+    monthly: "30 viajes en el mes"
+    seasonal: "Descubre 5 lugares nuevos"
+    social: "Comparte tu experiencia"
+    green: "Usa solo vehículos eco"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📞 INTEGRACIÓN CON CALL TO ACTION AVANZADOS
+# ═══════════════════════════════════════════════════════════════════
+
+advanced_cta:
+  deep_links:
+    - "oasistaxi://book?origin=last_destination"
+    - "oasistaxi://promo?code={dynamic_code}"
+    - "oasistaxi://driver/earnings?period=last_month"
+    - "oasistaxi://passenger/history?filter=favorites"
+    
+  smart_suggestions:
+    - weather_based: "Lluvia detectada → Reservar viaje"
+    - time_based: "Hora pico → Pre-reservar"
+    - location_based: "En aeropuerto → Confirmar viaje"
+    - event_based: "Concierto hoy → Reservar regreso"
+    
+  contextual_actions:
+    - "Repetir último viaje"
+    - "Llamar al conductor asignado"
+    - "Compartir ubicación con familia"
+    - "Activar modo silencioso"
+
+# ═══════════════════════════════════════════════════════════════════
+# 📈 ANÁLISIS DE PERFORMANCE DE CAMPAÑAS
+# ═══════════════════════════════════════════════════════════════════
+
+performance_kpis:
+  engagement:
+    - open_rate: ">25%"
+    - click_through_rate: ">8%"
+    - conversion_rate: ">3%"
+    - unsubscribe_rate: "<1%"
+    
+  business_impact:
+    - trip_bookings_generated: "+15%"
+    - revenue_attributed: "S/ 10,000/mes"
+    - user_reactivation: "20% de inactivos"
+    - driver_retention: "+10%"
+    
+  technical:
+    - delivery_success_rate: ">99%"
+    - processing_time: "<30s"
+    - error_rate: "<0.1%"
+    - bounce_rate: "<2%"
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔒 CUMPLIMIENTO Y PRIVACIDAD
+# ═══════════════════════════════════════════════════════════════════
+
+privacy_compliance:
+  gdpr_features:
+    - consent_management: "Opt-in requerido"
+    - data_retention: "24 meses máximo"
+    - right_to_be_forgotten: "Eliminar en 30 días"
+    - data_portability: "Exportar datos usuario"
+    
+  peru_data_protection:
+    - ley_29733_compliance: "Ley de Protección Datos Personales"
+    - consent_forms: "Consentimiento explícito"
+    - data_controller: "OasisTaxi Perú SAC"
+    - user_rights: "Acceso, rectificación, cancelación"
+    
+  opt_out_mechanisms:
+    - global_unsubscribe: "Todas las campañas"
+    - category_preferences: "Solo promociones/solo alertas"
+    - frequency_control: "Máximo 1/día, 3/semana"
+    - quiet_hours: "No enviar 10PM-7AM"

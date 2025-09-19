@@ -1,7 +1,5 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, use_build_context_synchronously
-// ignore_for_file: library_private_types_in_public_api
-
 import 'package:flutter/material.dart';
+import '../../utils/app_logger.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +12,7 @@ import 'dart:math' as math;
 // Models
 import '../../models/trip_model.dart';
 
-// Providers  
+// Providers
 import '../../providers/auth_provider.dart';
 
 // Services
@@ -34,10 +32,10 @@ class TripTrackingScreen extends StatefulWidget {
   });
 
   @override
-  State<TripTrackingScreen> createState() => _TripTrackingScreenState();
+  State<TripTrackingScreen> createState() => TripTrackingScreenState();
 }
 
-class _TripTrackingScreenState extends State<TripTrackingScreen>
+class TripTrackingScreenState extends State<TripTrackingScreen>
     with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   StreamSubscription<Position>? _positionSubscription;
@@ -51,20 +49,18 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
 
   TripModel? _currentRide;
   Position? _currentPosition;
-  Position? _driverPosition;
   LatLng? _driverLatLng;
-  
+
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   List<LatLng> _routePoints = [];
-  
+
   String _estimatedArrival = 'Calculando...';
   double _distanceToDestination = 0.0;
   double _distanceToPickup = 0.0;
   String _currentStatus = 'Buscando conductor...';
-  bool _isMapLoaded = false;
   bool _showDriverInfo = true;
-  
+
   // Colores del tema
   static const primaryColor = Color(0xFF00C800);
   static const accentColor = Color(0xFF1E1E1E);
@@ -72,6 +68,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle(
+        'TripTrackingScreen', 'initState - RideId: ${widget.rideId}');
     _initializeAnimations();
     _loadRideData();
     _startLocationTracking();
@@ -94,7 +92,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
-    
+
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -103,7 +101,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
@@ -118,7 +116,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
   Future<void> _loadRideData() async {
     try {
       if (!mounted) return;
-      
+
       if (widget.ride != null) {
         if (!mounted) return;
         setState(() {
@@ -159,7 +157,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
           _updateStatus();
           _setupMapMarkers();
         });
-        
+
         // Por ahora no hay ubicación del conductor en TripModel
         // Se actualizará dinámicamente desde Firebase
       }
@@ -168,7 +166,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
 
   void _updateStatus() {
     if (_currentRide == null) return;
-    
+
     switch (_currentRide!.status) {
       case 'searching':
         _currentStatus = 'Buscando conductor...';
@@ -198,7 +196,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
           accuracy: LocationAccuracy.high,
         ),
       );
-      
+
       if (mounted) {
         setState(() {
           _currentPosition = position;
@@ -219,7 +217,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
         }
       });
     } catch (e) {
-      print('Error al obtener ubicación: $e');
+      AppLogger.error('al obtener ubicación', e);
     }
   }
 
@@ -245,33 +243,23 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
     if (_currentRide?.driverId == null) return;
 
     try {
-      final driverLocation = await FirebaseService()
-          .getDriverLocation(_currentRide!.driverId);
-      
+      final driverLocation =
+          await FirebaseService().getDriverLocation(_currentRide!.driverId);
+
       if (driverLocation != null && mounted) {
         _updateDriverPosition(driverLocation);
       }
     } catch (e) {
-      print('Error al actualizar ubicación del conductor: $e');
+      AppLogger.error('al actualizar ubicación del conductor', e);
     }
   }
 
   void _updateDriverPosition(LatLng position) {
-    setState(() {
-      _driverLatLng = position;
-      _driverPosition = Position(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        timestamp: DateTime.now(),
-        accuracy: 10.0,
-        altitude: 0.0,
-        heading: 0.0,
-        speed: 0.0,
-        speedAccuracy: 0.0,
-        altitudeAccuracy: 0.0,
-        headingAccuracy: 0.0,
-      );
-    });
+    if (mounted) {
+      setState(() {
+        _driverLatLng = position;
+      });
+    }
     _setupMapMarkers();
     _calculateDistances();
     _calculateRoute();
@@ -283,21 +271,23 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
     if (_currentRide != null) {
       // Distancia al destino
       _distanceToDestination = Geolocator.distanceBetween(
-        _currentPosition!.latitude,
-        _currentPosition!.longitude,
-        _currentRide!.destinationLocation.latitude,
-        _currentRide!.destinationLocation.longitude,
-      ) / 1000;
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            _currentRide!.destinationLocation.latitude,
+            _currentRide!.destinationLocation.longitude,
+          ) /
+          1000;
 
       // Distancia al pickup (si el viaje no ha empezado)
       if (_currentRide!.status == 'accepted' ||
           _currentRide!.status == 'arrived') {
         _distanceToPickup = Geolocator.distanceBetween(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-          _currentRide!.pickupLocation.latitude,
-          _currentRide!.pickupLocation.longitude,
-        ) / 1000;
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              _currentRide!.pickupLocation.latitude,
+              _currentRide!.pickupLocation.longitude,
+            ) /
+            1000;
       }
     }
   }
@@ -308,16 +298,17 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
     try {
       // Simulación de cálculo de ETA (en producción usar Google Directions API)
       double distance;
-      
+
       if (_currentRide!.status == 'accepted' ||
           _currentRide!.status == 'arrived') {
         // Distancia del conductor al pickup
         distance = Geolocator.distanceBetween(
-          _driverLatLng!.latitude,
-          _driverLatLng!.longitude,
-          _currentRide!.pickupLocation.latitude,
-          _currentRide!.pickupLocation.longitude,
-        ) / 1000;
+              _driverLatLng!.latitude,
+              _driverLatLng!.longitude,
+              _currentRide!.pickupLocation.latitude,
+              _currentRide!.pickupLocation.longitude,
+            ) /
+            1000;
       } else {
         // Distancia del conductor/usuario al destino
         distance = _distanceToDestination;
@@ -326,16 +317,14 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
       // Velocidad promedio estimada (30 km/h en ciudad)
       const averageSpeed = 30.0;
       final etaMinutes = (distance / averageSpeed * 60).round();
-      
+
       if (mounted) {
         setState(() {
-          _estimatedArrival = etaMinutes > 0 
-              ? '$etaMinutes min' 
-              : 'Muy pronto';
+          _estimatedArrival = etaMinutes > 0 ? '$etaMinutes min' : 'Muy pronto';
         });
       }
     } catch (e) {
-      print('Error al calcular ETA: $e');
+      AppLogger.error('al calcular ETA', e);
     }
   }
 
@@ -379,7 +368,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
         position: _driverLatLng!,
         infoWindow: InfoWindow(
           title: 'Conductor',
-          snippet: _currentRide!.vehicleInfo?['driverName'] ?? 'Conductor asignado',
+          snippet:
+              _currentRide!.vehicleInfo?['driverName'] ?? 'Conductor asignado',
         ),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       ));
@@ -412,9 +402,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
     // En una implementación real, usar Google Directions API
     // Por ahora, dibujamos línea directa
     List<LatLng> points = [];
-    
-    if (_driverLatLng != null && (_currentRide!.status == 'accepted' || 
-        _currentRide!.status == 'arrived')) {
+
+    if (_driverLatLng != null &&
+        (_currentRide!.status == 'accepted' ||
+            _currentRide!.status == 'arrived')) {
       // Ruta del conductor al pickup
       points = [
         _driverLatLng!,
@@ -436,7 +427,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
         width: 4,
         patterns: [PatternItem.dash(20), PatternItem.gap(10)],
       ));
-      
+
       setState(() {
         _routePoints = points;
       });
@@ -488,7 +479,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
       return;
     }
 
-    final Uri phoneUri = Uri(scheme: 'tel', path: _currentRide!.vehicleInfo?['driverPhone'] ?? '');
+    final Uri phoneUri = Uri(
+        scheme: 'tel', path: _currentRide!.vehicleInfo?['driverPhone'] ?? '');
     if (await canLaunchUrl(phoneUri)) {
       await launchUrl(phoneUri);
     }
@@ -507,7 +499,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
         MaterialPageRoute(
           builder: (context) => ChatScreen(
             rideId: widget.rideId,
-            otherUserName: _currentRide!.vehicleInfo?['driverName'] ?? 'Conductor',
+            otherUserName:
+                _currentRide!.vehicleInfo?['driverName'] ?? 'Conductor',
             otherUserRole: 'driver',
             otherUserId: _currentRide!.driverId,
           ),
@@ -523,8 +516,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
         return AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.warning, color: Colors.red, size: 28),
-              SizedBox(width: 12),
+              const Icon(Icons.warning, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
               Text('Emergencia', style: TextStyle(color: Colors.red)),
             ],
           ),
@@ -634,7 +627,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
   }
 
   Widget _buildDriverInfo() {
-    if (_currentRide?.driverId == null) return Container();
+    if (_currentRide?.driverId == null) return const SizedBox();
 
     return SlideTransition(
       position: _slideAnimation,
@@ -659,11 +652,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: primaryColor.withValues(alpha: 0.1),
-                  backgroundImage: _currentRide?.vehicleInfo?['driverPhoto'] != null
+                  backgroundImage: _currentRide?.vehicleInfo?['driverPhoto'] !=
+                          null
                       ? NetworkImage(_currentRide!.vehicleInfo?['driverPhoto'])
                       : null,
                   child: _currentRide?.vehicleInfo?['driverPhoto'] == null
-                      ? Icon(Icons.person, size: 30, color: primaryColor)
+                      ? const Icon(Icons.person, size: 30, color: primaryColor)
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -681,10 +675,12 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.star, color: Colors.amber, size: 16),
+                          const Icon(Icons.star, color: Colors.amber, size: 16),
                           const SizedBox(width: 4),
                           Text(
-                            _currentRide?.vehicleInfo?['driverRating']?.toStringAsFixed(1) ?? '5.0',
+                            _currentRide?.vehicleInfo?['driverRating']
+                                    ?.toStringAsFixed(1) ??
+                                '5.0',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.grey,
@@ -802,13 +798,14 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _distanceToDestination > 0 
+                  _distanceToDestination > 0
                       ? '${_distanceToDestination.toStringAsFixed(1)} km'
                       : '...',
                   style: const TextStyle(
@@ -867,10 +864,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
           child: GoogleMap(
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
-              setState(() {
-                _isMapLoaded = true;
-              });
-              
+
               // Centrar mapa en la ruta después de un delay
               Future.delayed(const Duration(seconds: 1), () {
                 _centerMapOnRoute();
@@ -972,7 +966,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
                   _showDriverInfo = !_showDriverInfo;
                 });
               },
-              icon: Icon(_showDriverInfo ? Icons.visibility_off : Icons.visibility),
+              icon: Icon(
+                  _showDriverInfo ? Icons.visibility_off : Icons.visibility),
             ),
         ],
       ),

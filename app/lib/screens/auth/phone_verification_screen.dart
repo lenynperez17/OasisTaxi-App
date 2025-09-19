@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// ignore_for_file: library_private_types_in_public_api
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
@@ -7,12 +6,13 @@ import 'dart:async';
 import '../../core/theme/modern_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/animated/modern_animated_widgets.dart';
+import '../../utils/app_logger.dart';
 
 /// Pantalla de Verificación de Teléfono con OTP Profesional
 class PhoneVerificationScreen extends StatefulWidget {
   final String phoneNumber;
   final bool isRegistration;
-  
+
   const PhoneVerificationScreen({
     super.key,
     required this.phoneNumber,
@@ -20,43 +20,46 @@ class PhoneVerificationScreen extends StatefulWidget {
   });
 
   @override
-  State<PhoneVerificationScreen> createState() => _PhoneVerificationScreenState();
+  State<PhoneVerificationScreen> createState() =>
+      PhoneVerificationScreenState();
 }
 
-class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> 
+class PhoneVerificationScreenState extends State<PhoneVerificationScreen>
     with TickerProviderStateMixin {
   final _otpController = TextEditingController();
   StreamController<ErrorAnimationType>? _errorController;
-  
+
   late AnimationController _animationController;
   late AnimationController _timerAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   bool _isLoading = false;
   bool _hasError = false;
   String _currentOTP = "";
-  
+
   // Timer para reenvío
   Timer? _timer;
   int _resendTimer = 60;
   bool _canResend = false;
-  
+
   @override
   void initState() {
     super.initState();
+    AppLogger.lifecycle('PhoneVerificationScreen',
+        'initState - Teléfono: ${widget.phoneNumber}');
     _errorController = StreamController<ErrorAnimationType>();
-    
+
     _animationController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _timerAnimationController = AnimationController(
       duration: Duration(seconds: 60),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -64,7 +67,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
@@ -72,16 +75,16 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
       parent: _animationController,
       curve: Curves.elasticOut,
     ));
-    
+
     _animationController.forward();
     _startResendTimer();
-    
+
     // Iniciar verificación
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startPhoneVerification();
     });
   }
-  
+
   @override
   void dispose() {
     _errorController?.close();
@@ -91,12 +94,12 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
     _timer?.cancel();
     super.dispose();
   }
-  
+
   void _startResendTimer() {
     _canResend = false;
     _resendTimer = 60;
     _timer?.cancel();
-    
+
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         if (_resendTimer > 0) {
@@ -108,50 +111,58 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
       });
     });
   }
-  
+
   Future<void> _startPhoneVerification() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     setState(() => _isLoading = true);
-    
-    final success = await authProvider.startPhoneVerification(widget.phoneNumber);
-    
+
+    final success =
+        await authProvider.startPhoneVerification(widget.phoneNumber);
+
     if (!mounted) return;
-    
+
     if (!success && authProvider.errorMessage != null) {
       _showError(authProvider.errorMessage!);
     }
-    
+
     setState(() => _isLoading = false);
   }
-  
+
   Future<void> _verifyOTP() async {
+    AppLogger.info(
+        'Iniciando verificación OTP para teléfono: ${widget.phoneNumber}');
+
     if (_currentOTP.length != 6) {
       _errorController!.add(ErrorAnimationType.shake);
       _showError("Por favor ingresa el código completo de 6 dígitos");
+      AppLogger.warning('OTP incompleto - longitud: ${_currentOTP.length}');
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _hasError = false;
     });
-    
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.verifyOTP(_currentOTP);
-    
+
     if (!mounted) return;
-    
+
     if (success) {
+      AppLogger.info(
+          'OTP verificado exitosamente para teléfono: ${widget.phoneNumber}');
+
       // Animación de éxito
       HapticFeedback.mediumImpact();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text("Teléfono verificado exitosamente"),
             ],
           ),
@@ -162,50 +173,59 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
           ),
         ),
       );
-      
+
       // Navegar según el contexto
       if (widget.isRegistration) {
+        AppLogger.navigation('PhoneVerificationScreen', '/welcome');
         Navigator.pushNamedAndRemoveUntil(
-          context, 
-          '/welcome', 
+          context,
+          '/welcome',
           (route) => false,
         );
       } else {
+        AppLogger.navigation('PhoneVerificationScreen', '/passenger/home');
         Navigator.pushNamedAndRemoveUntil(
-          context, 
-          '/passenger/home', 
+          context,
+          '/passenger/home',
           (route) => false,
         );
       }
     } else {
+      AppLogger.warning(
+          'Falló verificación OTP para teléfono: ${widget.phoneNumber}');
       _errorController!.add(ErrorAnimationType.shake);
       HapticFeedback.heavyImpact();
-      
+
       setState(() {
         _hasError = true;
         _currentOTP = "";
       });
-      
+
       _otpController.clear();
-      
-      _showError(authProvider.errorMessage ?? "Código inválido. Intenta de nuevo.");
+
+      _showError(
+          authProvider.errorMessage ?? "Código inválido. Intenta de nuevo.");
     }
-    
+
     setState(() => _isLoading = false);
   }
-  
+
   Future<void> _resendOTP() async {
     if (!_canResend) return;
-    
+
+    AppLogger.info('Reenviando OTP para teléfono: ${widget.phoneNumber}');
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     setState(() => _isLoading = true);
-    
+
     final success = await authProvider.resendOTP();
-    
+
     if (!mounted) return;
-    
+
     if (success) {
+      AppLogger.info(
+          'OTP reenviado exitosamente para teléfono: ${widget.phoneNumber}');
       _startResendTimer();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -220,10 +240,10 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
     } else {
       _showError(authProvider.errorMessage ?? "Error al reenviar código");
     }
-    
+
     setState(() => _isLoading = false);
   }
-  
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -231,7 +251,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
         content: Row(
           children: [
             Icon(Icons.error_outline, color: Colors.white),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(child: Text(message)),
           ],
         ),
@@ -244,7 +264,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -292,9 +312,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                       ],
                     ),
                   ),
-                  
-                  SizedBox(height: 32),
-                  
+
+                  const SizedBox(height: 32),
+
                   // Título
                   Text(
                     'Verificación de Teléfono',
@@ -304,9 +324,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                       color: ModernTheme.textPrimary,
                     ),
                   ),
-                  
-                  SizedBox(height: 12),
-                  
+
+                  const SizedBox(height: 12),
+
                   // Subtítulo
                   Text(
                     'Ingresa el código de 6 dígitos\nenviado al',
@@ -316,9 +336,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                       color: ModernTheme.textSecondary,
                     ),
                   ),
-                  
-                  SizedBox(height: 8),
-                  
+
+                  const SizedBox(height: 8),
+
                   // Número de teléfono
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -335,9 +355,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                       ),
                     ),
                   ),
-                  
-                  SizedBox(height: 40),
-                  
+
+                  const SizedBox(height: 40),
+
                   // Campo OTP
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 20),
@@ -361,9 +381,8 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                         fieldWidth: 45,
                         activeFillColor: Colors.white,
                         inactiveFillColor: ModernTheme.backgroundLight,
-                        selectedFillColor: ModernTheme.oasisGreen.withValues(alpha: 0.1),
-                        activeColor: ModernTheme.oasisGreen,
-                        inactiveColor: ModernTheme.borderColor,
+                        selectedFillColor:
+                            ModernTheme.oasisGreen.withValues(alpha: 0.1),
                         selectedColor: ModernTheme.oasisGreen,
                         errorBorderColor: ModernTheme.error,
                       ),
@@ -384,7 +403,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                       },
                     ),
                   ),
-                  
+
                   if (_hasError)
                     Padding(
                       padding: EdgeInsets.only(top: 8),
@@ -396,9 +415,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                         ),
                       ),
                     ),
-                  
-                  SizedBox(height: 32),
-                  
+
+                  const SizedBox(height: 32),
+
                   // Botón verificar
                   AnimatedPulseButton(
                     text: 'Verificar Código',
@@ -406,9 +425,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                     isLoading: _isLoading,
                     onPressed: _isLoading ? null : _verifyOTP,
                   ),
-                  
-                  SizedBox(height: 24),
-                  
+
+                  const SizedBox(height: 24),
+
                   // Timer y reenviar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -443,9 +462,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                         ),
                     ],
                   ),
-                  
-                  SizedBox(height: 40),
-                  
+
+                  const SizedBox(height: 40),
+
                   // Información de seguridad
                   Container(
                     padding: EdgeInsets.all(16),
@@ -463,7 +482,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                           color: ModernTheme.info,
                           size: 24,
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,7 +495,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen>
                                   fontSize: 14,
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
                                 'Este código es único y caduca en 10 minutos. No lo compartas con nadie.',
                                 style: TextStyle(
