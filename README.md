@@ -1,6 +1,6 @@
 # 🚖 OASISTAXIPERU - Aplicación de Transporte
 ## Plataforma Completa de Ride-Hailing para Perú
-### ✅ ESTADO: 100% COMPLETADO - LISTO PARA PRODUCCIÓN
+
 
 ---
 
