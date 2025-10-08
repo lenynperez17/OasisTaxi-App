@@ -33,14 +33,18 @@ import 'screens/auth/modern_login_screen.dart';
 import 'screens/auth/modern_register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/email_verification_screen.dart';
+import 'screens/auth/phone_verification_screen.dart';
 import 'screens/passenger/modern_passenger_home.dart';
 import 'screens/passenger/trip_history_screen.dart';
 import 'screens/passenger/ratings_history_screen.dart';
 import 'screens/passenger/payment_methods_screen.dart';
+import 'screens/passenger/payment_method_selection_screen.dart';
 import 'screens/passenger/favorites_screen.dart';
 import 'screens/passenger/promotions_screen.dart';
 import 'screens/passenger/profile_screen.dart';
 import 'screens/passenger/profile_edit_screen.dart';
+import 'screens/passenger/emergency_sos_screen.dart';
+import 'screens/passenger/passenger_negotiations_screen.dart';
 // Screens with complex constructors temporarily disabled
 import 'screens/driver/modern_driver_home.dart';
 import 'screens/driver/wallet_screen.dart';
@@ -50,8 +54,10 @@ import 'screens/driver/metrics_screen.dart';
 import 'screens/driver/vehicle_management_screen.dart';
 import 'screens/driver/transactions_history_screen.dart';
 import 'screens/driver/earnings_details_screen.dart';
+import 'screens/driver/earnings_withdrawal_screen.dart';
 import 'screens/driver/documents_screen.dart';
 import 'screens/driver/driver_profile_screen.dart';
+import 'screens/driver/driver_negotiations_screen.dart';
 import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/users_management_screen.dart';
@@ -64,6 +70,8 @@ import 'screens/shared/settings_screen.dart';
 import 'screens/shared/about_screen.dart';
 import 'screens/shared/support_screen.dart';
 import 'screens/shared/notifications_screen.dart';
+import 'screens/shared/live_tracking_map_screen.dart';
+import 'screens/shared/emergency_details_screen.dart';
 import 'screens/passenger/trip_verification_code_screen.dart';
 import 'screens/driver/driver_verification_screen.dart';
 import 'screens/shared/trip_details_screen.dart';
@@ -234,12 +242,18 @@ class OasisTaxiApp extends StatelessWidget {
           '/email-verification': (context) => EmailVerificationScreen(
             email: (ModalRoute.of(context)!.settings.arguments as String?) ?? '',
           ),
-          
+          '/phone-verification': (context) => PhoneVerificationScreen(
+            phoneNumber: (ModalRoute.of(context)!.settings.arguments as String?) ?? '',
+          ),
+
           // Rutas de Pasajero
           '/passenger/home': (context) => ModernPassengerHomeScreen(),
           '/passenger/trip-history': (context) => TripHistoryScreen(),
           '/passenger/ratings-history': (context) => RatingsHistoryScreen(),
           '/passenger/payment-methods': (context) => PaymentMethodsScreen(),
+          '/passenger/payment-method-selection': (context) => PaymentMethodSelectionScreen(),
+          '/passenger/emergency': (context) => EmergencySosScreen(),
+          '/passenger/negotiations': (context) => PassengerNegotiationsScreen(),
           '/passenger/favorites': (context) => FavoritesScreen(),
           '/passenger/promotions': (context) => PromotionsScreen(),
           '/passenger/profile': (context) => ProfileScreen(),
@@ -263,6 +277,8 @@ class OasisTaxiApp extends StatelessWidget {
           '/driver/vehicle-management': (context) => VehicleManagementScreen(),
           '/driver/transactions-history': (context) => TransactionsHistoryScreen(),
           '/driver/earnings-details': (context) => EarningsDetailsScreen(),
+          '/driver/earnings-withdrawal': (context) => EarningsWithdrawalScreen(),
+          '/driver/negotiations': (context) => DriverNegotiationsScreen(),
           '/driver/documents': (context) => DocumentsScreen(),
           '/driver/profile': (context) => DriverProfileScreen(),
           '/driver/verification': (context) => DriverVerificationScreen(
@@ -295,6 +311,12 @@ class OasisTaxiApp extends StatelessWidget {
           '/shared/about': (context) => AboutScreen(),
           '/shared/support': (context) => SupportScreen(),
           '/shared/notifications': (context) => NotificationsScreen(),
+          '/shared/live-tracking-map': (context) => LiveTrackingMapScreen(
+            rideId: (ModalRoute.of(context)!.settings.arguments as String?) ?? '',
+          ),
+          '/shared/emergency-details': (context) => EmergencyDetailsScreen(
+            emergencyId: (ModalRoute.of(context)!.settings.arguments as String?) ?? '',
+          ),
           '/map-picker': (context) => MapPickerScreen(),
         },
       ),
