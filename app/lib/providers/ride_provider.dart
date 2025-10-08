@@ -849,10 +849,10 @@ class RideProvider with ChangeNotifier {
       // Actualizar trip en la lista local si está disponible
       final tripIndex = _tripHistory.indexWhere((trip) => trip.id == tripId);
       if (tripIndex != -1) {
-        // TODO: Agregar campo 'rating' al modelo TripModel
-        // _tripHistory[tripIndex] = _tripHistory[tripIndex].copyWith(
-        //   rating: rating,
-        // );
+        _tripHistory[tripIndex] = _tripHistory[tripIndex].copyWith(
+          passengerRating: rating,
+          passengerComment: comment,
+        );
       }
 
       debugPrint('Calificación actualizada: $rating estrellas para viaje $tripId');

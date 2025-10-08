@@ -348,8 +348,8 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
   Map<String, dynamic> get _statistics {
     final activeDrivers = _drivers.where((d) => d.status == DriverStatus.active).length;
     final pendingDrivers = _drivers.where((d) => d.status == DriverStatus.pending).length;
-    final totalEarnings = _drivers.fold<double>(0, (sum, d) => sum + d.earnings);
-    final totalCommission = _drivers.fold<double>(0, (sum, d) => sum + d.commission);
+    final totalEarnings = _drivers.fold<double>(0, (total, d) => total + d.earnings);
+    final totalCommission = _drivers.fold<double>(0, (total, d) => total + d.commission);
     
     return {
       'total': _drivers.length,
@@ -1073,8 +1073,11 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              navigator.pop();
+
               try {
                 // Actualizar en Firebase
                 await _firestore.collection('users').doc(driver.id).update({
@@ -1082,18 +1085,21 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
                   'isActive': false,
                   'suspendedAt': FieldValue.serverTimestamp(),
                 });
-                
-                ScaffoldMessenger.of(context).showSnackBar(
+
+                if (!mounted) return;
+
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Conductor suspendido correctamente'),
                     backgroundColor: ModernTheme.warning,
                   ),
                 );
-                
+
                 // Recargar conductores
                 _loadDriversFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                if (!mounted) return;
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Error al suspender conductor: $e'),
                     backgroundColor: ModernTheme.error,
@@ -1110,6 +1116,8 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
   }
   
   void _activateDriver(Driver driver) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       // Actualizar en Firebase
       await _firestore.collection('users').doc(driver.id).update({
@@ -1118,18 +1126,21 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
         'isVerified': true,
         'activatedAt': FieldValue.serverTimestamp(),
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
+
+      if (!mounted) return;
+
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Conductor activado correctamente'),
           backgroundColor: ModernTheme.success,
         ),
       );
-      
+
       // Recargar conductores
       _loadDriversFromFirebase();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Error al activar conductor: $e'),
           backgroundColor: ModernTheme.error,
@@ -1164,33 +1175,39 @@ class _DriversManagementScreenState extends State<DriversManagementScreen>
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              navigator.pop();
+
               try {
                 // Eliminar de Firebase
                 await _firestore.collection('users').doc(driver.id).delete();
-                
+
                 // También eliminar el vehículo asociado si existe
                 final vehicleSnapshot = await _firestore
                     .collection('vehicles')
                     .where('driverId', isEqualTo: driver.id)
                     .get();
-                
+
                 for (var doc in vehicleSnapshot.docs) {
                   await doc.reference.delete();
                 }
-                
-                ScaffoldMessenger.of(context).showSnackBar(
+
+                if (!mounted) return;
+
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Conductor eliminado correctamente'),
                     backgroundColor: ModernTheme.error,
                   ),
                 );
-                
+
                 // Recargar conductores
                 _loadDriversFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                if (!mounted) return;
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Error al eliminar conductor: $e'),
                     backgroundColor: ModernTheme.error,

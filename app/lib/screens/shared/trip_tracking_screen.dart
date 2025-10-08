@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unused_field, unused_element, avoid_print, use_build_context_synchronously
+// ignore_for_file: deprecated_member_use, unused_field, unused_element, use_build_context_synchronously
 // ignore_for_file: library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
@@ -14,11 +14,14 @@ import 'dart:math' as math;
 // Models
 import '../../models/trip_model.dart';
 
-// Providers  
+// Providers
 import '../../providers/auth_provider.dart';
 
 // Services
 import '../../services/firebase_service.dart';
+
+// Utils
+import '../../utils/logger.dart';
 
 // Screens
 import 'chat_screen.dart';
@@ -218,8 +221,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
           _calculateDistances();
         }
       });
-    } catch (e) {
-      print('Error al obtener ubicación: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error al obtener ubicación', e, stackTrace);
     }
   }
 
@@ -251,8 +254,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
       if (driverLocation != null && mounted) {
         _updateDriverPosition(driverLocation);
       }
-    } catch (e) {
-      print('Error al actualizar ubicación del conductor: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error al actualizar ubicación del conductor', e, stackTrace);
     }
   }
 
@@ -334,8 +337,8 @@ class _TripTrackingScreenState extends State<TripTrackingScreen>
               : 'Muy pronto';
         });
       }
-    } catch (e) {
-      print('Error al calcular ETA: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error al calcular ETA', e, stackTrace);
     }
   }
 

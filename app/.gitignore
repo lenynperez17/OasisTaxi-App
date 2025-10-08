@@ -43,3 +43,28 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase Admin SDK credentials (NEVER commit these!)
+**/firebase-adminsdk-*.json
+*-adminsdk-*.json
+
+# Sensitive credentials and keys
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+
+# Temporary development files
+*_output.txt
+*_results.txt
+*_checks.txt
+flutter_analyze*.txt
+*.md.backup
+*.sh.backup
+*_backup.*

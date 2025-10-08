@@ -32,6 +32,7 @@ import 'screens/auth/modern_splash_screen.dart';
 import 'screens/auth/modern_login_screen.dart';
 import 'screens/auth/modern_register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/email_verification_screen.dart';
 import 'screens/passenger/modern_passenger_home.dart';
 import 'screens/passenger/trip_history_screen.dart';
 import 'screens/passenger/ratings_history_screen.dart';
@@ -230,6 +231,9 @@ class OasisTaxiApp extends StatelessWidget {
           '/login': (context) => ModernLoginScreen(),
           '/register': (context) => ModernRegisterScreen(),
           '/forgot-password': (context) => ForgotPasswordScreen(),
+          '/email-verification': (context) => EmailVerificationScreen(
+            email: (ModalRoute.of(context)!.settings.arguments as String?) ?? '',
+          ),
           
           // Rutas de Pasajero
           '/passenger/home': (context) => ModernPassengerHomeScreen(),

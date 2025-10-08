@@ -34,7 +34,7 @@ class _RatingsHistoryScreenState extends State<RatingsHistoryScreen>
   Map<String, dynamic> get _statistics {
     final totalRatings = _ratings.length;
     final avgRating = _ratings.fold<double>(
-      0, (sum, r) => sum + r.rating) / totalRatings;
+      0, (total, r) => total + r.rating) / totalRatings;
     
     final ratingCounts = <int, int>{};
     for (var rating in _ratings) {

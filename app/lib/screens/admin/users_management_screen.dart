@@ -27,9 +27,11 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
 
   // Cargar usuarios reales desde Firebase
   Future<void> _loadUsersFromFirebase() async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       setState(() => _isLoading = true);
-      
+
       // Obtener usuarios desde Firebase
       final QuerySnapshot snapshot = await _firestore
           .collection('users')
@@ -37,14 +39,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           .get();
 
       final List<User> loadedUsers = [];
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
+
         // Calcular número de viajes del usuario
         int tripCount = 0;
         double avgRating = 0.0;
-        
+
         // Obtener estadísticas de viajes según el rol
         if (data['role'] == 'driver') {
           final tripsSnapshot = await _firestore
@@ -53,7 +55,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
               .where('status', isEqualTo: 'completed')
               .get();
           tripCount = tripsSnapshot.size;
-          
+
           // Calcular rating promedio
           if (tripsSnapshot.docs.isNotEmpty) {
             double totalRating = 0;
@@ -77,14 +79,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           tripCount = tripsSnapshot.size;
           avgRating = data['rating'] ?? 4.5;
         }
-        
+
         loadedUsers.add(User(
           id: doc.id,
           name: data['name'] ?? 'Sin nombre',
           email: data['email'] ?? '',
           phone: data['phone'] ?? '',
           type: data['role'] == 'driver' ? 'Conductor' : 'Pasajero',
-          status: data['isActive'] == true ? 'Activo' : 
+          status: data['isActive'] == true ? 'Activo' :
                   data['isSuspended'] == true ? 'Suspendido' : 'Inactivo',
           registrationDate: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
           lastLogin: (data['lastLogin'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -92,17 +94,18 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           rating: avgRating,
         ));
       }
-      
+
       setState(() {
         _users = loadedUsers;
         _filteredUsers = loadedUsers;
         _isLoading = false;
       });
-      
+
     } catch (e) {
       print('Error cargando usuarios: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Error al cargar usuarios: $e'),
           backgroundColor: ModernTheme.error,
@@ -670,8 +673,11 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              navigator.pop();
+
               // Actualizar en Firebase
               try {
                 await _firestore.collection('users').doc(user.id).update({
@@ -679,22 +685,25 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   'isSuspended': true,
                   'suspendedAt': FieldValue.serverTimestamp(),
                 });
-                
+
+                if (!mounted) return;
+
                 setState(() {
                   user.status = 'Suspendido';
                 });
-                
-                ScaffoldMessenger.of(context).showSnackBar(
+
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Usuario suspendido correctamente'),
                     backgroundColor: ModernTheme.warning,
                   ),
                 );
-                
+
                 // Recargar usuarios
                 _loadUsersFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                if (!mounted) return;
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Error al suspender usuario: $e'),
                     backgroundColor: ModernTheme.error,
@@ -713,6 +722,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   }
 
   void _confirmActivateUser(User user) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       // Actualizar en Firebase
       await _firestore.collection('users').doc(user.id).update({
@@ -720,22 +731,25 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
         'isSuspended': false,
         'activatedAt': FieldValue.serverTimestamp(),
       });
-      
+
+      if (!mounted) return;
+
       setState(() {
         user.status = 'Activo';
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
+
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Usuario activado correctamente'),
           backgroundColor: ModernTheme.success,
         ),
       );
-      
+
       // Recargar usuarios
       _loadUsersFromFirebase();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Error al activar usuario: $e'),
           backgroundColor: ModernTheme.error,
@@ -757,33 +771,39 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              navigator.pop();
+
               try {
                 // Eliminar de Firebase
                 await _firestore.collection('users').doc(user.id).delete();
-                
+
+                if (!mounted) return;
+
                 // También eliminar sus viajes asociados (opcional, depende de la lógica de negocio)
                 // final ridesSnapshot = await _firestore
                 //     .collection('rides')
                 //     .where(user.role == 'driver' ? 'driverId' : 'passengerId', isEqualTo: user.id)
                 //     .get();
-                // 
+                //
                 // for (var doc in ridesSnapshot.docs) {
                 //   await doc.reference.delete();
                 // }
-                
-                ScaffoldMessenger.of(context).showSnackBar(
+
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Usuario eliminado correctamente'),
                     backgroundColor: ModernTheme.error,
                   ),
                 );
-                
+
                 // Recargar usuarios
                 _loadUsersFromFirebase();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                if (!mounted) return;
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Error al eliminar usuario: $e'),
                     backgroundColor: ModernTheme.error,

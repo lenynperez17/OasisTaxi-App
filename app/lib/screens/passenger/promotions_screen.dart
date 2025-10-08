@@ -123,9 +123,13 @@ class _PromotionsScreenState extends State<PromotionsScreen>
         
         // Determinar el tipo de promoción
         PromotionType type = PromotionType.percentage;
-        if (data['type'] == 'fixed') type = PromotionType.fixed;
-        else if (data['type'] == 'freeRide') type = PromotionType.freeRide;
-        else if (data['type'] == 'loyalty') type = PromotionType.loyalty;
+        if (data['type'] == 'fixed') {
+          type = PromotionType.fixed;
+        } else if (data['type'] == 'freeRide') {
+          type = PromotionType.freeRide;
+        } else if (data['type'] == 'loyalty') {
+          type = PromotionType.loyalty;
+        }
         
         // Determinar el estado de la promoción
         PromotionStatus status = PromotionStatus.active;
@@ -157,9 +161,13 @@ class _PromotionsScreenState extends State<PromotionsScreen>
         
         // Determinar el color basado en el tipo
         Color color = ModernTheme.primaryBlue;
-        if (type == PromotionType.fixed) color = ModernTheme.success;
-        else if (type == PromotionType.freeRide) color = ModernTheme.warning;
-        else if (type == PromotionType.loyalty) color = ModernTheme.oasisGreen;
+        if (type == PromotionType.fixed) {
+          color = ModernTheme.success;
+        } else if (type == PromotionType.freeRide) {
+          color = ModernTheme.warning;
+        } else if (type == PromotionType.loyalty) {
+          color = ModernTheme.oasisGreen;
+        }
         
         loadedPromotions.add(Promotion(
           id: doc.id,

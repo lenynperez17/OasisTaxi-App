@@ -62,30 +62,32 @@ class _ModernRegisterScreenState extends State<ModernRegisterScreen>
   // Función de registro real con Firebase
   Future<void> _registerUser() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     try {
       setState(() => _isLoading = true);
-      
-      // Crear email usando el teléfono (formato: +51999999999@oasistaxi.com)
-      String email = '${_phoneController.text}@oasistaxi.com';
-      
+
+      // Usar el email ingresado por el usuario
+      String email = _emailController.text.trim();
+
       // Registrar usuario en Firebase
-      await authProvider.register(
+      final success = await authProvider.register(
         email: email,
         password: _passwordController.text,
         fullName: _nameController.text,
         phone: _phoneController.text,
         userType: _userType,
       );
-      
+
       // Verificar que el widget siga montado antes de usar context
       if (!mounted) return;
-      
-      // Navegar según el tipo de usuario
-      if (_userType == 'passenger') {
-        Navigator.pushReplacementNamed(context, '/passenger/home');
-      } else {
-        Navigator.pushReplacementNamed(context, '/driver/home');
+
+      // Si el registro fue exitoso, navegar a la pantalla de verificación de email
+      if (success) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/email-verification',
+          arguments: email,
+        );
       }
       
     } catch (e) {
@@ -382,10 +384,20 @@ class _ModernRegisterScreenState extends State<ModernRegisterScreen>
             labelText: 'Número de teléfono',
             prefixIcon: Icon(Icons.phone, color: ModernTheme.oasisGreen),
             prefixText: '+51 ',
+            helperText: '9 dígitos',
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Ingresa tu número';
+            }
+            // Validar formato peruano: 9 dígitos
+            final phoneRegex = RegExp(r'^\d{9}$');
+            if (!phoneRegex.hasMatch(value)) {
+              return 'Debe tener exactamente 9 dígitos';
+            }
+            // Validar que empiece con 9 (típico de móviles en Perú)
+            if (!value.startsWith('9')) {
+              return 'Número móvil debe empezar con 9';
             }
             return null;
           },
@@ -503,18 +515,48 @@ class _ModernRegisterScreenState extends State<ModernRegisterScreen>
         ),
         
         SizedBox(height: 20),
-        
-        CheckboxListTile(
-          value: _acceptTerms,
-          onChanged: (value) => setState(() => _acceptTerms = value!),
-          title: Text(
-            'Acepto los términos y condiciones',
-            style: TextStyle(fontSize: 14),
+
+        Container(
+          decoration: BoxDecoration(
+            color: _acceptTerms
+              ? ModernTheme.oasisGreen.withValues(alpha: 0.1)
+              : Colors.red.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _acceptTerms
+                ? ModernTheme.oasisGreen.withValues(alpha: 0.3)
+                : Colors.red.withValues(alpha: 0.2),
+              width: 1,
+            ),
           ),
-          controlAffinity: ListTileControlAffinity.leading,
-          activeColor: ModernTheme.oasisGreen,
+          child: CheckboxListTile(
+            value: _acceptTerms,
+            onChanged: (value) => setState(() => _acceptTerms = value!),
+            title: Text(
+              'Acepto los términos y condiciones',
+              style: TextStyle(
+                fontSize: 14,
+                color: _acceptTerms ? Colors.black87 : Colors.red.shade700,
+                fontWeight: _acceptTerms ? FontWeight.normal : FontWeight.w600,
+              ),
+            ),
+            subtitle: !_acceptTerms
+              ? Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Debes aceptar los términos para continuar',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                )
+              : null,
+            controlAffinity: ListTileControlAffinity.leading,
+            activeColor: ModernTheme.oasisGreen,
+          ),
         ),
-        
+
         SizedBox(height: 24),
         
         Row(

@@ -55,10 +55,10 @@ class _FinancialScreenState extends State<FinancialScreen>
   String _selectedPeriod = 'today';
   String _searchQuery = '';
   double _currentCommissionRate = 20.0; // 20% commission
-  bool _isLoading = true;
-  
+  final bool _isLoading = true;
+
   // Datos financieros desde Firebase
-  Map<String, double> _financialStats = {
+  final Map<String, double> _financialStats = {
     'totalRevenue': 45678.90,
     'totalCommissions': 9135.78,
     'pendingPayouts': 3456.50,

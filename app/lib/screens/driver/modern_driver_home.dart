@@ -203,6 +203,8 @@ class _ModernDriverHomeScreenState extends State<ModernDriverHomeScreen>
   }
   
   void _acceptRequest(PriceNegotiation request) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       // Actualizar en Firebase
       await _firestore.collection('price_negotiations').doc(request.id).update({
@@ -210,7 +212,7 @@ class _ModernDriverHomeScreenState extends State<ModernDriverHomeScreen>
         'driverId': _driverId,
         'acceptedAt': FieldValue.serverTimestamp(),
       });
-      
+
       // Crear registro de viaje
       await _firestore.collection('rides').add({
         'passengerId': request.passengerId,
@@ -221,19 +223,20 @@ class _ModernDriverHomeScreenState extends State<ModernDriverHomeScreen>
         'status': 'accepted',
         'createdAt': FieldValue.serverTimestamp(),
       });
-      
+
       setState(() {
         _availableRequests.remove(request);
         _showRequestDetails = false;
       });
-      
+
       // Recargar estadísticas
       await _loadTodayStats();
-      
+
       _showAcceptedDialog(request);
     } catch (e) {
       print('Error aceptando solicitud: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Error al aceptar el viaje'),
           backgroundColor: ModernTheme.error,

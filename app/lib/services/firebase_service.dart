@@ -220,50 +220,47 @@ class FirebaseService {
   /// Usuario actual
   User? get currentUser => auth.currentUser;
 
-  /// Iniciar sesión con Google - IMPLEMENTACIÓN REAL
+  /// Iniciar sesión con Google - IMPLEMENTACIÓN v7.2.0
   Future<User?> signInWithGoogle() async {
     try {
       AppLogger.firebase('Iniciando autenticación con Google');
       await logEvent('google_login_attempt', {});
-      
-      // Configurar Google Sign In
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: [
-          'email',
-          'profile',
-        ],
+
+      // Obtener instancia singleton
+      final googleSignIn = GoogleSignIn.instance;
+
+      // Inicializar Google Sign In (obligatorio en v7.2.0)
+      await googleSignIn.initialize(
+        hostedDomain: null, // Permitir cualquier dominio
       );
-      
+
       // Cerrar sesión previa si existe
       await googleSignIn.signOut();
-      
-      // Iniciar proceso de autenticación
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      
-      if (googleUser == null) {
-        AppLogger.warning('Usuario canceló el login con Google');
-        return null;
-      }
-      
-      // Obtener tokens de autenticación
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      // Crear credencial para Firebase
+
+      // Iniciar proceso de autenticación (reemplaza signIn())
+      final GoogleSignInAccount googleUser = await googleSignIn.authenticate(
+        scopeHint: ['email', 'profile'],
+      );
+
+      // Obtener tokens de autenticación (es un getter, no Future)
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+
+      // Para Firebase solo necesitamos idToken
+      // Si necesitamos accessToken, usar authorizationClient.authorizeScopes()
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      
+
       // Autenticar en Firebase
       final UserCredential userCredential = await auth.signInWithCredential(credential);
       final User? user = userCredential.user;
-      
+
       if (user != null) {
         AppLogger.firebase('Login con Google exitoso', {'uid': user.uid, 'email': user.email});
-        
+
         // Verificar si el usuario ya existe en Firestore
         final userDoc = await firestore.collection('users').doc(user.uid).get();
-        
+
         if (!userDoc.exists) {
           // Crear perfil de usuario si no existe
           await firestore.collection('users').doc(user.uid).set({
@@ -282,7 +279,7 @@ class FirebaseService {
             'totalTrips': 0,
             'balance': 0.0,
           });
-          
+
           await logEvent('google_signup_success', {
             'user_id': user.uid,
             'email': user.email,
@@ -293,16 +290,16 @@ class FirebaseService {
             'lastLoginAt': FieldValue.serverTimestamp(),
             'authProvider': 'google',
           });
-          
+
           await logEvent('google_login_success', {
             'user_id': user.uid,
             'email': user.email,
           });
         }
-        
+
         return user;
       }
-      
+
       return null;
     } catch (e, stackTrace) {
       AppLogger.error('Error en login con Google', e, stackTrace);

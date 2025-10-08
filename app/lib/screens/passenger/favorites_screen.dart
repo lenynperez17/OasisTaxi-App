@@ -1012,6 +1012,8 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               ),
               ElevatedButton(
                 onPressed: () async {
+                  final navigator = Navigator.of(context);
+
                   if (isNew) {
                     // Agregar a Firebase
                     await _addToFavorites(
@@ -1030,7 +1032,8 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       selectedColor,
                     );
                   }
-                  if (mounted) Navigator.pop(context);
+                  if (!mounted) return;
+                  navigator.pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ModernTheme.oasisGreen,
@@ -1110,7 +1113,7 @@ class FavoritesMapScreen extends StatefulWidget {
 
 class _FavoritesMapScreenState extends State<FavoritesMapScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  bool _isLoading = true;
+  final bool _isLoading = true;
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   

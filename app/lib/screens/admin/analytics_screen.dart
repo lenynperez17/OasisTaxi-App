@@ -65,11 +65,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     {'hour': '22:00', 'trips': 198},
     {'hour': '23:00', 'trips': 123},
   ];
-  
-  List<Map<String, dynamic>> _zoneStatistics = [];
-  
-  List<Map<String, dynamic>> _driverPerformance = [];
-  
+
+  final List<Map<String, dynamic>> _zoneStatistics = [];
+
+  final List<Map<String, dynamic>> _driverPerformance = [];
+
   @override
   void initState() {
     super.initState();
@@ -1324,17 +1324,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
   
   void _refreshData() async {
+    final messenger = ScaffoldMessenger.of(context);
+
     // Recargar datos desde Firebase
     await _loadAnalyticsData();
-    
+
+    if (!mounted) return;
+
     // Reiniciar animaciones
     setState(() {
       _chartAnimationController.forward(from: 0);
       _statsAnimationController.forward(from: 0);
       _pieChartController.forward(from: 0);
     });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
+
+    messenger.showSnackBar(
       SnackBar(
         content: Text('Datos actualizados'),
         backgroundColor: ModernTheme.success,

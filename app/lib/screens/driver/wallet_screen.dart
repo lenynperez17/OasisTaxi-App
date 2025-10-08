@@ -19,12 +19,12 @@ class _WalletScreenState extends State<WalletScreen>
   late TabController _tabController;
   
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  bool _isLoading = true;
+  final bool _isLoading = true;
   
   // Balance desde Firebase
   double _currentBalance = 0.0;
-  double _weeklyEarnings = 0.0;
-  double _monthlyEarnings = 0.0;
+  final double _weeklyEarnings = 0.0;
+  final double _monthlyEarnings = 0.0;
   
   // Método de retiro seleccionado
   String _selectedWithdrawalMethod = 'bank';
@@ -84,20 +84,20 @@ class _WalletScreenState extends State<WalletScreen>
   Map<String, dynamic> get _statistics {
     final today = DateTime.now();
     final todayEarnings = _transactions
-        .where((t) => 
+        .where((t) =>
             t.type == TransactionType.tripEarning &&
             t.date.day == today.day &&
             t.date.month == today.month &&
             t.date.year == today.year)
-        .fold<double>(0, (sum, t) => sum + t.amount);
-    
+        .fold<double>(0, (total, t) => total + t.amount);
+
     final totalTrips = _transactions
         .where((t) => t.type == TransactionType.tripEarning)
         .length;
-    
+
     final totalCommission = _transactions
         .where((t) => t.type == TransactionType.tripEarning)
-        .fold<double>(0, (sum, t) => sum + (t.commission ?? 0));
+        .fold<double>(0, (total, t) => total + (t.commission ?? 0));
     
     return {
       'todayEarnings': todayEarnings,
