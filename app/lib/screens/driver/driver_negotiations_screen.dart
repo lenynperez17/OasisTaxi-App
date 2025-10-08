@@ -4,12 +4,11 @@ import '../../core/theme/modern_theme.dart';
 import '../../providers/price_negotiation_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/price_negotiation_model.dart';
-import 'package:intl/intl.dart';
 
 /// Pantalla de negociaciones para conductores
 /// Muestra las solicitudes activas donde pueden hacer ofertas
 class DriverNegotiationsScreen extends StatefulWidget {
-  const DriverNegotiationsScreen({Key? key}) : super(key: key);
+  const DriverNegotiationsScreen({super.key});
 
   @override
   State<DriverNegotiationsScreen> createState() => _DriverNegotiationsScreenState();
@@ -24,7 +23,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
 
   Future<void> _loadActiveNegotiations() async {
     final provider = Provider.of<PriceNegotiationProvider>(context, listen: false);
-    await provider.loadActiveNegotiations();
+    await provider.loadDriverRequests();
   }
 
   @override
@@ -32,7 +31,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Solicitudes de Viaje'),
-        backgroundColor: ModernTheme.primary,
+        backgroundColor: ModernTheme.oasisGreen,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -42,11 +41,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
       ),
       body: Consumer<PriceNegotiationProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final activeNegotiations = provider.activeNegotiations
+          final activeNegotiations = provider.driverVisibleRequests
               .where((n) => n.status == NegotiationStatus.waiting ||
                            n.status == NegotiationStatus.negotiating)
               .toList();
@@ -101,7 +96,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
 
   Widget _buildNegotiationCard(PriceNegotiation negotiation) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentDriverId = authProvider.currentUser?.uid ?? '';
+    final currentDriverId = authProvider.currentUser?.id ?? '';
 
     // Verificar si el conductor ya hizo una oferta
     final hasOffer = negotiation.driverOffers.any((offer) =>
@@ -118,7 +113,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ModernTheme.primary.withOpacity(0.1),
+              color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
@@ -220,7 +215,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ModernTheme.primary.withOpacity(0.1),
+                    color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -238,7 +233,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: ModernTheme.primary,
+                          color: ModernTheme.oasisGreen,
                         ),
                       ),
                     ],
@@ -278,7 +273,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                     child: ElevatedButton(
                       onPressed: () => _showOfferDialog(negotiation),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ModernTheme.primary,
+                        backgroundColor: ModernTheme.oasisGreen,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -297,7 +292,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: ModernTheme.success.withOpacity(0.1),
+                      color: ModernTheme.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -487,20 +482,16 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                 context,
                 listen: false,
               );
-              final authProvider = Provider.of<AuthProvider>(
-                context,
-                listen: false,
-              );
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
 
               try {
                 await provider.makeDriverOffer(
-                  negotiationId: negotiation.id,
-                  driverId: authProvider.currentUser!.uid,
-                  offeredPrice: price,
+                  negotiation.id,
+                  price,
                 );
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(
                       content: Text('Oferta enviada exitosamente'),
                       backgroundColor: ModernTheme.success,
@@ -509,7 +500,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     SnackBar(
                       content: Text('Error al enviar oferta: $e'),
                       backgroundColor: ModernTheme.error,
@@ -519,7 +510,7 @@ class _DriverNegotiationsScreenState extends State<DriverNegotiationsScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.primary,
+              backgroundColor: ModernTheme.oasisGreen,
             ),
             child: const Text('Enviar oferta'),
           ),

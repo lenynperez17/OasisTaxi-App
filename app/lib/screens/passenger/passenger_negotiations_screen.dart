@@ -4,12 +4,11 @@ import '../../core/theme/modern_theme.dart';
 import '../../providers/price_negotiation_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/price_negotiation_model.dart';
-import 'package:intl/intl.dart';
 
 /// Pantalla de negociaciones para pasajeros
 /// Muestra las negociaciones activas y las ofertas de conductores
 class PassengerNegotiationsScreen extends StatefulWidget {
-  const PassengerNegotiationsScreen({Key? key}) : super(key: key);
+  const PassengerNegotiationsScreen({super.key});
 
   @override
   State<PassengerNegotiationsScreen> createState() => _PassengerNegotiationsScreenState();
@@ -17,40 +16,19 @@ class PassengerNegotiationsScreen extends StatefulWidget {
 
 class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScreen> {
   @override
-  void initState() {
-    super.initState();
-    _loadMyNegotiations();
-  }
-
-  Future<void> _loadMyNegotiations() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final provider = Provider.of<PriceNegotiationProvider>(context, listen: false);
-
-    if (authProvider.currentUser != null) {
-      await provider.loadUserNegotiations(authProvider.currentUser!.uid);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.id ?? '';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mis Negociaciones'),
-        backgroundColor: ModernTheme.primary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMyNegotiations,
-          ),
-        ],
+        backgroundColor: ModernTheme.oasisGreen,
       ),
       body: Consumer<PriceNegotiationProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final myNegotiations = provider.userNegotiations
+          final myNegotiations = provider.activeNegotiations
+              .where((n) => n.passengerId == currentUserId)
               .where((n) =>
                   n.status == NegotiationStatus.waiting ||
                   n.status == NegotiationStatus.negotiating)
@@ -60,15 +38,12 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
             return _buildEmptyState();
           }
 
-          return RefreshIndicator(
-            onRefresh: _loadMyNegotiations,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: myNegotiations.length,
-              itemBuilder: (context, index) {
-                return _buildNegotiationCard(myNegotiations[index]);
-              },
-            ),
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: myNegotiations.length,
+            itemBuilder: (context, index) {
+              return _buildNegotiationCard(myNegotiations[index]);
+            },
           );
         },
       ),
@@ -118,7 +93,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _getStatusColor(negotiation.status).withOpacity(0.1),
+              color: _getStatusColor(negotiation.status).withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
@@ -170,7 +145,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ModernTheme.primary.withOpacity(0.1),
+                    color: ModernTheme.oasisGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -185,7 +160,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: ModernTheme.primary,
+                          color: ModernTheme.oasisGreen,
                         ),
                       ),
                     ],
@@ -211,7 +186,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: ModernTheme.success.withOpacity(0.2),
+                            color: ModernTheme.success.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -266,25 +241,6 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
                     ),
                   ),
                 ],
-
-                const SizedBox(height: 16),
-
-                // Botón cancelar
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => _cancelNegotiation(negotiation.id),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: ModernTheme.error,
-                      side: BorderSide(color: ModernTheme.error),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Cancelar solicitud'),
-                  ),
-                ),
               ],
             ),
           ),
@@ -356,7 +312,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: ModernTheme.primary,
+                    color: ModernTheme.oasisGreen,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -454,7 +410,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
       case NegotiationStatus.waiting:
         return ModernTheme.warning;
       case NegotiationStatus.negotiating:
-        return ModernTheme.primary;
+        return ModernTheme.oasisGreen;
       case NegotiationStatus.accepted:
         return ModernTheme.success;
       case NegotiationStatus.expired:
@@ -531,10 +487,7 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
       );
 
       try {
-        await provider.acceptDriverOffer(
-          negotiationId: negotiationId,
-          driverId: driverId,
-        );
+        provider.acceptDriverOffer(negotiationId, driverId);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -550,59 +503,6 @@ class _PassengerNegotiationsScreenState extends State<PassengerNegotiationsScree
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error al aceptar oferta: $e'),
-              backgroundColor: ModernTheme.error,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _cancelNegotiation(String negotiationId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancelar solicitud'),
-        content: const Text(
-          '¿Estás seguro de que quieres cancelar esta solicitud?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ModernTheme.error,
-            ),
-            child: const Text('Sí, cancelar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final provider = Provider.of<PriceNegotiationProvider>(
-        context,
-        listen: false,
-      );
-
-      try {
-        await provider.cancelNegotiation(negotiationId);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Solicitud cancelada'),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al cancelar: $e'),
               backgroundColor: ModernTheme.error,
             ),
           );

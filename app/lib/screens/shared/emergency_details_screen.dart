@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/modern_theme.dart';
 import '../../providers/emergency_provider.dart';
-import '../../providers/auth_provider.dart';
 
 /// Pantalla de detalles de emergencia activa
 /// Muestra información completa de una emergencia en curso
@@ -12,9 +11,9 @@ class EmergencyDetailsScreen extends StatefulWidget {
   final String emergencyId;
 
   const EmergencyDetailsScreen({
-    Key? key,
+    super.key,
     required this.emergencyId,
-  }) : super(key: key);
+  });
 
   @override
   State<EmergencyDetailsScreen> createState() => _EmergencyDetailsScreenState();
@@ -22,36 +21,15 @@ class EmergencyDetailsScreen extends StatefulWidget {
 
 class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
   @override
-  void initState() {
-    super.initState();
-    _loadEmergencyDetails();
-  }
-
-  Future<void> _loadEmergencyDetails() async {
-    final provider = Provider.of<EmergencyProvider>(context, listen: false);
-    await provider.loadEmergencyDetails(widget.emergencyId);
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emergencia Activa'),
         backgroundColor: ModernTheme.error,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadEmergencyDetails,
-          ),
-        ],
       ),
       body: Consumer<EmergencyProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final emergency = provider.currentEmergency;
+          final emergency = provider.activeAlert;
 
           if (emergency == null) {
             return _buildEmptyState();
@@ -85,7 +63,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
                 ],
 
                 // Notas adicionales
-                if (emergency.notes != null && emergency.notes!.isNotEmpty) ...[
+                if (emergency.description != null && emergency.description!.isNotEmpty) ...[
                   _buildNotes(emergency),
                   const SizedBox(height: 24),
                 ],
@@ -178,7 +156,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha:0.2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -327,7 +305,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
                 icon: const Icon(Icons.map),
                 label: const Text('Abrir en Google Maps'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: ModernTheme.primary,
+                  backgroundColor: ModernTheme.oasisGreen,
                 ),
               ),
             ),
@@ -356,7 +334,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: ModernTheme.error.withOpacity(0.1),
+                color: ModernTheme.error.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -427,7 +405,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
             ),
             const Divider(height: 24),
             Text(
-              emergency.notes!,
+              emergency.description!,
               style: const TextStyle(fontSize: 16),
             ),
           ],
@@ -490,7 +468,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha:0.3)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -572,7 +550,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
                 height: 20,
                 color: Colors.grey[300],
               ),
-            Icon(icon, color: ModernTheme.primary),
+            Icon(icon, color: ModernTheme.oasisGreen),
             if (!isLast)
               Container(
                 width: 2,
@@ -641,7 +619,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
             icon: const Icon(Icons.share),
             label: const Text('Compartir información'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: ModernTheme.primary,
+              foregroundColor: ModernTheme.oasisGreen,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -760,7 +738,7 @@ class _EmergencyDetailsScreenState extends State<EmergencyDetailsScreen> {
       final provider = Provider.of<EmergencyProvider>(context, listen: false);
 
       try {
-        await provider.resolveEmergency(emergencyId);
+        await provider.deactivateSOS(resolution: 'Resuelta manualmente');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
